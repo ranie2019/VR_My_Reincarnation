@@ -1,5 +1,5 @@
 using UnityEngine;
-using System.Collections; // Adicione esta linha
+using System.Collections;
 
 public class TreeDestruction : MonoBehaviour
 {
@@ -47,8 +47,7 @@ public class TreeDestruction : MonoBehaviour
         // Verifica se o número de colisões atingiu o necessário para destruir a árvore
         if (collisionCount >= requiredCollisions)
         {
-            // Destroi o objeto imediatamente
-            Destroy(gameObject);
+            DestroyTree();
         }
         else
         {
@@ -68,5 +67,13 @@ public class TreeDestruction : MonoBehaviour
 
         // Desativa o cooldown
         isInCooldown = false;
+    }
+
+    // Método para destruir a árvore imediatamente
+    private void DestroyTree()
+    {
+        // Destroi o objeto (a árvore)
+        Debug.Log("Árvore destruída!");
+        Destroy(gameObject);
     }
 }

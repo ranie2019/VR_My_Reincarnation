@@ -19,7 +19,7 @@ public class Axe : MonoBehaviour
     private void OnCollisionEnter(Collision collision)
     {
         // Verifica se o objeto que colidiu tem a tag "tree"
-        if (collision.gameObject.CompareTag("tree"))
+        if (collision.gameObject.CompareTag("Tree"))
         {
             // Exibe uma mensagem de depuração quando colidir com uma árvore
             Debug.Log("Machado colidiu com uma árvore: " + collision.gameObject.name);
