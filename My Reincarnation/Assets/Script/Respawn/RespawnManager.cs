@@ -15,6 +15,15 @@ public class RespawnManager : MonoBehaviour
     [Tooltip("Tempo em segundos antes de o objeto ser respawnado após a destruição.")]
     [SerializeField] public float respawnTime = 3f;
 
+    // Verifica se o prefab está definido ao iniciar
+    private void Start()
+    {
+        if (objectToRespawn == null)
+        {
+            Debug.LogError("O prefab objectToRespawn não está definido no RespawnManager!");
+        }
+    }
+
     // Método público para iniciar o respawn de um objeto após um tempo
     public void RespawnObjectWithDelay(Vector3 originalPosition)
     {

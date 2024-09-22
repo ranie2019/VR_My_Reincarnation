@@ -207,7 +207,7 @@ Transform:
   m_GameObject: {fileID: 454227471}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0.93}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -310,27 +310,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Timeout: 10
   m_XROrigin: {fileID: 454227474}
---- !u!1 &477878180 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 9153226395671933284, guid: d8067ecd7d4315c4aada5608b42ed73b, type: 3}
-  m_PrefabInstance: {fileID: 1242723227}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &477878189
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 477878180}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3dbf8e21983584043b93e8cbd919286d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  objectToSpawn: {fileID: 1360994071702760, guid: 640e2e58c89e3714881006bd0c5eeabf, type: 3}
-  spawnOffset: {x: 1, y: 1, z: 1}
-  spawnRotation: {x: 0, y: 0, z: 0, w: 1}
-  spawnChance: 100
 --- !u!1 &616036866
 GameObject:
   m_ObjectHideFlags: 0
@@ -2008,6 +1987,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 4039485565265428659, guid: d8067ecd7d4315c4aada5608b42ed73b, type: 3}
+      propertyPath: prefabToRespawn
+      value: 
+      objectReference: {fileID: 2145026372}
+    - target: {fileID: 7987348773363985556, guid: d8067ecd7d4315c4aada5608b42ed73b, type: 3}
+      propertyPath: requiredCollisions
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 9153226395671933284, guid: d8067ecd7d4315c4aada5608b42ed73b, type: 3}
       propertyPath: m_Name
       value: Tree1
@@ -2055,10 +2042,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 9153226395671933284, guid: d8067ecd7d4315c4aada5608b42ed73b, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 477878189}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d8067ecd7d4315c4aada5608b42ed73b, type: 3}
 --- !u!4 &1351105945 stripped
 Transform:
@@ -2331,7 +2315,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2389191213126284287, guid: ad443ad961f8e1a40a4e1e251c7f5c9c, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 1.06
+      value: 1.93
       objectReference: {fileID: 0}
     - target: {fileID: 2389191213126284287, guid: ad443ad961f8e1a40a4e1e251c7f5c9c, type: 3}
       propertyPath: m_LocalRotation.w

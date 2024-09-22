@@ -72,8 +72,6 @@ public class TreeDestruction : MonoBehaviour
     // Método para destruir a árvore imediatamente
     private void DestroyTree()
     {
-        // Destroi o objeto (a árvore)
-        Debug.Log("Árvore destruída!");
         Destroy(gameObject);
     }
 }

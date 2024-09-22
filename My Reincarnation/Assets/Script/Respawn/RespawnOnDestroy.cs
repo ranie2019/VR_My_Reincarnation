@@ -14,7 +14,11 @@ public class RespawnOnDestroy : MonoBehaviour
             respawnManager = FindObjectOfType<RespawnManager>();
         }
 
-        // Chama o método de respawn no RespawnManager
-        respawnManager.RespawnObjectWithDelay(transform.position);
+        // Verifica se o RespawnManager foi encontrado
+        if (respawnManager != null)
+        {
+            // Chama o método de respawn no RespawnManager
+            respawnManager.RespawnObjectWithDelay(transform.position);
+        }
     }
 }

@@ -37,9 +37,5 @@ public class SpawnOnDestroy : MonoBehaviour
                 Instantiate(objectToSpawn, spawnPosition, spawnRotation);
             }
         }
-        else
-        {
-            Debug.LogWarning("Nenhum objeto definido para ser spawnado!");
-        }
     }
 }

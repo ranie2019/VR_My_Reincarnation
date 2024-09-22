@@ -15,8 +15,11 @@ GameObject:
   - component: {fileID: 2161939164758802770}
   - component: {fileID: 5978738755675558858}
   - component: {fileID: 7987348773363985556}
+  - component: {fileID: 6393191624155512343}
+  - component: {fileID: 4378087096779709025}
+  - component: {fileID: 4039485565265428659}
   m_Layer: 0
-  m_Name: MainTree
+  m_Name: Tree1
   m_TagString: Tree
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -173,3 +176,44 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   requiredCollisions: 5
   collisionCount: 0
+--- !u!114 &6393191624155512343
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9153226395671933284}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dbf8e21983584043b93e8cbd919286d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  objectToSpawn: {fileID: 1360994071702760, guid: 640e2e58c89e3714881006bd0c5eeabf, type: 3}
+  spawnOffset: {x: 1, y: 1, z: 1}
+  spawnRotation: {x: 0, y: 0, z: 0, w: 1}
+  spawnChance: 100
+--- !u!114 &4378087096779709025
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9153226395671933284}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8e99a03badcd264d9b22cc875970515, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &4039485565265428659
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9153226395671933284}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8fefadc6eee5794883e5d4ea328f1b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  prefabToRespawn: {fileID: 0}

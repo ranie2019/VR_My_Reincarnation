@@ -21,28 +21,16 @@ public class Axe : MonoBehaviour
         // Verifica se o objeto que colidiu tem a tag "tree"
         if (collision.gameObject.CompareTag("Tree"))
         {
-            // Exibe uma mensagem de depuração quando colidir com uma árvore
-            Debug.Log("Machado colidiu com uma árvore: " + collision.gameObject.name);
-
             // Tenta obter o script TreeDestruction no objeto da árvore
             TreeDestruction tree = collision.gameObject.GetComponent<TreeDestruction>();
 
             // Certifica-se de que a árvore possui o script TreeDestruction
             if (tree != null)
             {
-                Debug.Log("A árvore contém o script TreeDestruction. Iniciando o processo de colisão.");
 
                 // Aplicar força ou lógica adicional, se necessário (opcional)
                 ApplyImpactForce(collision);
             }
-            else
-            {
-                Debug.LogWarning("O objeto colidido não contém o script TreeDestruction.");
-            }
-        }
-        else
-        {
-            Debug.Log("Machado colidiu com outro objeto: " + collision.gameObject.name);
         }
     }
 
@@ -54,7 +42,6 @@ public class Axe : MonoBehaviour
             // Adiciona força na direção oposta ao ponto de contato (simulando o impacto do machado)
             Vector3 impactDirection = collision.contacts[0].normal;
             rb.AddForce(-impactDirection * impactForce, ForceMode.Impulse);
-            Debug.Log("Força de impacto aplicada à árvore.");
         }
     }
 }
