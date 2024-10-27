@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
@@ -29,36 +28,49 @@ public class AtivarObjeto : MonoBehaviour
         foreach (var dispositivo in dispositivos)
         {
             // Verificar se o botão X foi pressionado para ativar
-            bool botaoX;
-            if (dispositivo.TryGetFeatureValue(CommonUsages.primaryButton, out botaoX))
+            if (VerificarBotao(dispositivo, CommonUsages.primaryButton, ref botaoXPressionadoAnteriormente, !objetoAtivo))
             {
-                if (botaoX && !botaoXPressionadoAnteriormente && !objetoAtivo)
-                {
-                    // Ativar o objeto
-                    objetoParaAtivar.SetActive(true);
-                    objetoAtivo = true;
-                    Debug.Log("Botão X pressionado: Objeto ativado.");
-                }
-
-                // Atualiza o estado do botão X
-                botaoXPressionadoAnteriormente = botaoX;
+                AtivarObjetoFuncao();
             }
 
             // Verificar se o botão Y foi pressionado para desativar
-            bool botaoY;
-            if (dispositivo.TryGetFeatureValue(CommonUsages.secondaryButton, out botaoY))
+            if (VerificarBotao(dispositivo, CommonUsages.secondaryButton, ref botaoYPressionadoAnteriormente, objetoAtivo))
             {
-                if (botaoY && !botaoYPressionadoAnteriormente && objetoAtivo)
-                {
-                    // Desativar o objeto
-                    objetoParaAtivar.SetActive(false);
-                    objetoAtivo = false;
-                    Debug.Log("Botão Y pressionado: Objeto desativado.");
-                }
-
-                // Atualiza o estado do botão Y
-                botaoYPressionadoAnteriormente = botaoY;
+                DesativarObjetoFuncao();
             }
+        }
+    }
+
+    // Método para verificar se o botão foi pressionado
+    private bool VerificarBotao(InputDevice dispositivo, InputFeatureUsage<bool> botao, ref bool botaoPressionadoAnteriormente, bool condicao)
+    {
+        bool estadoBotao;
+        if (dispositivo.TryGetFeatureValue(botao, out estadoBotao) && estadoBotao && !botaoPressionadoAnteriormente && condicao)
+        {
+            botaoPressionadoAnteriormente = estadoBotao;
+            return true;
+        }
+        botaoPressionadoAnteriormente = estadoBotao; // Atualiza o estado do botão
+        return false;
+    }
+
+    private void AtivarObjetoFuncao()
+    {
+        if (objetoParaAtivar != null)
+        {
+            objetoParaAtivar.SetActive(true);
+            objetoAtivo = true;
+            Debug.Log("Botão X pressionado: Objeto ativado.");
+        }
+    }
+
+    private void DesativarObjetoFuncao()
+    {
+        if (objetoParaAtivar != null)
+        {
+            objetoParaAtivar.SetActive(false);
+            objetoAtivo = false;
+            Debug.Log("Botão Y pressionado: Objeto desativado.");
         }
     }
 }
