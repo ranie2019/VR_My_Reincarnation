@@ -1,48 +1,88 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem; // Input System
 
 public class Slot : MonoBehaviour
 {
-    public GameObject ItemInSlot;
-    public Image SlotImage;
-    Color originalColor;
+    [Header("UI")]
+    public Image slotImage;
 
-    void Start()
+    [Header("Estado")]
+    public GameObject itemInSlot;
+
+    [Header("Input (XR / Input System)")]
+    [Tooltip("A ação usada para inserir o item no slot. Ex: XRI RightHand Interaction/Select ou Activate.")]
+    public InputActionReference insertAction;
+
+    [Header("Config")]
+    [Tooltip("Quando true, o item vira filho do slot e fica travado (kinematic).")]
+    public bool travarItemNoSlot = true;
+
+    private Color _corOriginal;
+
+    void Awake()
     {
-        SlotImage = GetComponentInChildren<Image>();
-        originalColor = SlotImage.color;
+        if (!slotImage)
+            slotImage = GetComponentInChildren<Image>();
+
+        if (slotImage)
+            _corOriginal = slotImage.color;
+    }
+
+    void OnEnable()
+    {
+        if (insertAction && insertAction.action != null)
+            insertAction.action.Enable();
+    }
+
+    void OnDisable()
+    {
+        if (insertAction && insertAction.action != null)
+            insertAction.action.Disable();
     }
 
     private void OnTriggerStay(Collider other)
     {
-        if (ItemInSlot != null) return;
-        GameObject obj = other.gameObject;  
-        if (!IsItem(obj)) return;
-        if (OVRInput.GetUp(OVRInput.Button.SecondaryHandTrigger))
+        if (itemInSlot != null) return;
+
+        GameObject obj = other.gameObject;
+
+        // Precisa ser um Item
+        Item item = obj.GetComponent<Item>();
+        if (item == null) return;
+
+        // Precisa ter action configurada
+        if (insertAction == null || insertAction.action == null) return;
+
+        // Botão pressionado?
+        if (insertAction.action.WasPressedThisFrame())
         {
-            InsertItem(obj);
+            InsertItem(obj, item);
         }
     }
 
-    bool IsItem(GameObject obj)
+    private void InsertItem(GameObject obj, Item item)
     {
-        return obj.GetComponent<Item>();
-    }
+        Rigidbody rb = obj.GetComponent<Rigidbody>();
+        if (rb && travarItemNoSlot)
+            rb.isKinematic = true;
 
-    void InsertItem(GameObject obj)
-    {
-        obj.GetComponent<Rigidbody>().isKinematic = true;
-        obj.transform.SetParent(gameObject.transform, true);
+        obj.transform.SetParent(transform, true);
         obj.transform.localPosition = Vector3.zero;
-        obj.transform.localEulerAngles = obj.GetComponent<Item>().slotRotation;
-        obj.GetComponent<Item>().inSlot = true;
-        obj.GetComponent<Item>().currentSlot = this;
-        ItemInSlot = obj;
-        SlotImage.color = Color.gray;
+        obj.transform.localEulerAngles = item.slotRotation;
+
+        item.inSlot = true;
+        item.currentSlot = this;
+
+        itemInSlot = obj;
+
+        if (slotImage)
+            slotImage.color = Color.gray;
     }
 
     public void ResetColor()
     {
-        SlotImage.color = originalColor;
+        if (slotImage)
+            slotImage.color = _corOriginal;
     }
 }
