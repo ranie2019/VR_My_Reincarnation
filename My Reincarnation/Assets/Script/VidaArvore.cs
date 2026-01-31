@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[DisallowMultipleComponent]
 public class VidaArvore : MonoBehaviour
 {
     [Header("Vida")]
@@ -22,7 +23,24 @@ public class VidaArvore : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool debugLogs = true;
 
-    private bool emCooldown;
+    private bool emCooldown = false;
+
+    // ===== Repassador para colisão/trigger em colliders dos FILHOS =====
+    private class RepassadorFisica : MonoBehaviour
+    {
+        private VidaArvore pai;
+        public void Init(VidaArvore p) => pai = p;
+
+        private void OnCollisionEnter(Collision c)
+        {
+            if (pai != null) pai.ReceberHitPorCollision(c, gameObject);
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if (pai != null) pai.ReceberHitPorTrigger(other, gameObject);
+        }
+    }
 
     private void Reset()
     {
@@ -31,72 +49,104 @@ public class VidaArvore : MonoBehaviour
         tagMachado = "machado";
         danoPorHit = 1;
         cooldownHit = 0.25f;
-        offsetSpawn = Vector3.zero;
         audioSourceHit = GetComponent<AudioSource>();
         debugLogs = true;
     }
 
     private void Awake()
     {
-        if (audioSourceHit == null)
-            audioSourceHit = GetComponent<AudioSource>();
+        if (!audioSourceHit) audioSourceHit = GetComponent<AudioSource>();
+        vidaAtual = Mathf.Clamp(vidaAtual, 1, Mathf.Max(1, vidaMax));
 
-        vidaAtual = Mathf.Clamp(vidaAtual, 1, vidaMax);
+        InstalarRepassadoresNosFilhos();
     }
 
-    // ========= COLISÃO NORMAL =========
-    private void OnCollisionEnter(Collision collision)
+    private void OnValidate()
     {
+        if (vidaMax < 1) vidaMax = 1;
+        if (vidaAtual < 1) vidaAtual = 1;
+        if (vidaAtual > vidaMax) vidaAtual = vidaMax;
+        if (cooldownHit < 0f) cooldownHit = 0f;
+        if (danoPorHit < 1) danoPorHit = 1;
+    }
+
+    private void InstalarRepassadoresNosFilhos()
+    {
+        var cols = GetComponentsInChildren<Collider>(true);
+        if (cols == null || cols.Length == 0)
+        {
+            if (debugLogs) Debug.LogWarning($"[VidaArvore] Sem Collider em '{name}'. Sem collider não tem hit.", this);
+            return;
+        }
+
+        foreach (var col in cols)
+        {
+            if (!col) continue;
+            var go = col.gameObject;
+
+            var rep = go.GetComponent<RepassadorFisica>();
+            if (rep == null) rep = go.AddComponent<RepassadorFisica>();
+            rep.Init(this);
+        }
+
+        if (debugLogs)
+            Debug.Log($"[VidaArvore] Repassadores instalados em {cols.Length} collider(s) (pai/filhos).", this);
+    }
+
+    // ===================== HIT via COLLISION =====================
+    private void ReceberHitPorCollision(Collision collision, GameObject donoCollider)
+    {
+        if (collision == null) return;
+
         if (debugLogs)
         {
-            Debug.Log($"[VidaArvore] OnCollisionEnter com: {collision.gameObject.name} | tag: {collision.gameObject.tag}", this);
+            Debug.Log($"[VidaArvore] COLLISION: Tree='{name}' Filho='{donoCollider.name}' BateuCom='{collision.gameObject.name}' Tag='{collision.gameObject.tag}'", this);
         }
 
         if (emCooldown) return;
 
-        // Pode bater com collider filho do machado, então checa a hierarquia
-        if (TemTagNaHierarquia(collision.transform, tagMachado))
-        {
-            AplicarDano(danoPorHit, collision.gameObject);
-        }
+        // pega a TAG do objeto que bateu (ou do pai dele)
+        if (TemTagMachado(collision.transform))
+            TomarDano(danoPorHit);
     }
 
-    // ========= TRIGGER (mais confiável em alguns setups XR) =========
-    private void OnTriggerEnter(Collider other)
+    // ===================== HIT via TRIGGER (RECOMENDADO) =====================
+    private void ReceberHitPorTrigger(Collider other, GameObject donoCollider)
     {
+        if (other == null) return;
+
         if (debugLogs)
         {
-            Debug.Log($"[VidaArvore] OnTriggerEnter com: {other.gameObject.name} | tag: {other.gameObject.tag}", this);
+            Debug.Log($"[VidaArvore] TRIGGER: Tree='{name}' Filho='{donoCollider.name}' EncostouEm='{other.name}' Tag='{other.tag}'", this);
         }
 
         if (emCooldown) return;
 
-        if (TemTagNaHierarquia(other.transform, tagMachado))
-        {
-            AplicarDano(danoPorHit, other.gameObject);
-        }
+        // aqui funciona MUITO melhor com machado segurado no XR
+        if (TemTagMachado(other.transform))
+            TomarDano(danoPorHit);
     }
 
-    private void AplicarDano(int dano, GameObject quemBateu)
+    // Aceita tag no próprio collider OU no pai/root do machado
+    private bool TemTagMachado(Transform t)
+    {
+        if (!t) return false;
+        if (t.CompareTag(tagMachado)) return true;
+        if (t.root != null && t.root.CompareTag(tagMachado)) return true;
+        return false;
+    }
+
+    private void TomarDano(int dano)
     {
         vidaAtual -= dano;
 
-        if (audioSourceHit != null)
-            audioSourceHit.Play();
-
         if (debugLogs)
-        {
-            Debug.Log($"[VidaArvore] DANO por '{quemBateu.name}'. Vida agora: {vidaAtual}/{vidaMax}", this);
-        }
+            Debug.Log($"[VidaArvore] DANO! Vida agora: {vidaAtual}/{vidaMax}", this);
 
-        if (vidaAtual <= 0)
-        {
-            Morrer();
-        }
-        else
-        {
-            StartCoroutine(Cooldown());
-        }
+        if (audioSourceHit) audioSourceHit.Play();
+
+        if (vidaAtual <= 0) Morrer();
+        else StartCoroutine(Cooldown());
     }
 
     private IEnumerator Cooldown()
@@ -109,25 +159,11 @@ public class VidaArvore : MonoBehaviour
     private void Morrer()
     {
         if (debugLogs)
-            Debug.Log("[VidaArvore] MORREU! Spawnando e destruindo...", this);
+            Debug.Log($"[VidaArvore] MORREU! Spawn='{(prefabAoDestruir ? prefabAoDestruir.name : "null")}'", this);
 
-        if (prefabAoDestruir != null)
-        {
+        if (prefabAoDestruir)
             Instantiate(prefabAoDestruir, transform.position + offsetSpawn, transform.rotation);
-        }
 
         Destroy(gameObject);
-    }
-
-    // Procura a tag no objeto que colidiu OU em qualquer pai dele
-    private bool TemTagNaHierarquia(Transform t, string tagProcurada)
-    {
-        while (t != null)
-        {
-            if (t.CompareTag(tagProcurada))
-                return true;
-            t = t.parent;
-        }
-        return false;
     }
 }

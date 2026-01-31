@@ -186,8 +186,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.47910675, y: 4.950701, z: 0.55136824}
-  m_Center: {x: 0.006423399, y: 2.4756033, z: -0.028959155}
+  m_Size: {x: 1, y: 4.950701, z: 1}
+  m_Center: {x: 0, y: 2.4756033, z: 0}
 --- !u!1 &6941765000743290380
 GameObject:
   m_ObjectHideFlags: 0
@@ -198,7 +198,6 @@ GameObject:
   m_Component:
   - component: {fileID: 880970725214738984}
   - component: {fileID: 5096517541735811467}
-  - component: {fileID: 6056227070778178203}
   - component: {fileID: 3660743392047574041}
   m_Layer: 0
   m_Name: arvore3
@@ -247,33 +246,6 @@ LODGroup:
     renderers:
     - renderer: {fileID: 287222047877186625}
   m_Enabled: 1
---- !u!54 &6056227070778178203
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6941765000743290380}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 126
-  m_CollisionDetection: 0
 --- !u!114 &3660743392047574041
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -290,8 +262,8 @@ MonoBehaviour:
   vidaAtual: 5
   tagMachado: machado
   danoPorHit: 1
-  cooldownHit: 1
+  cooldownHit: 0.25
   prefabAoDestruir: {fileID: 1360994071702760, guid: 640e2e58c89e3714881006bd0c5eeabf, type: 3}
-  offsetSpawn: {x: 0, y: 1, z: 0}
+  offsetSpawn: {x: 1, y: 1, z: 1}
   audioSourceHit: {fileID: 0}
-  debugLogs: 0
+  debugLogs: 1
