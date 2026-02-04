@@ -130,7 +130,7 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
+  m_UseGravity: 0
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 126
@@ -153,6 +153,7 @@ MonoBehaviour:
   - machado
   - Espada
   aceitarTagNoRoot: 1
+  aceitarTagNoParent: 1
   danoPorHit: 1
   cooldownHit: 0.7
   exigirImpacto: 1
@@ -161,7 +162,7 @@ MonoBehaviour:
   prefabAoDestruir: {fileID: 1360994071702760, guid: 640e2e58c89e3714881006bd0c5eeabf, type: 3}
   offsetSpawn: {x: 0, y: 1, z: 0}
   audioSourceHit: {fileID: 8697918475902214781}
-  debugLogs: 1
+  debugLogs: 0
 --- !u!82 &8697918475902214781
 AudioSource:
   m_ObjectHideFlags: 0

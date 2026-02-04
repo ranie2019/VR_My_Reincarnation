@@ -1,88 +1,53 @@
 using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.InputSystem; // Input System
 
 public class Slot : MonoBehaviour
 {
-    [Header("UI")]
-    public Image slotImage;
-
     [Header("Estado")]
-    public GameObject itemInSlot;
-
-    [Header("Input (XR / Input System)")]
-    [Tooltip("A ação usada para inserir o item no slot. Ex: XRI RightHand Interaction/Select ou Activate.")]
-    public InputActionReference insertAction;
+    public Item itemInSlot;
 
     [Header("Config")]
-    [Tooltip("Quando true, o item vira filho do slot e fica travado (kinematic).")]
-    public bool travarItemNoSlot = true;
+    public bool travarFisica = true;
 
-    private Color _corOriginal;
-
-    void Awake()
-    {
-        if (!slotImage)
-            slotImage = GetComponentInChildren<Image>();
-
-        if (slotImage)
-            _corOriginal = slotImage.color;
-    }
-
-    void OnEnable()
-    {
-        if (insertAction && insertAction.action != null)
-            insertAction.action.Enable();
-    }
-
-    void OnDisable()
-    {
-        if (insertAction && insertAction.action != null)
-            insertAction.action.Disable();
-    }
-
-    private void OnTriggerStay(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
         if (itemInSlot != null) return;
 
-        GameObject obj = other.gameObject;
-
-        // Precisa ser um Item
-        Item item = obj.GetComponent<Item>();
+        Item item = other.GetComponent<Item>();
         if (item == null) return;
+        if (item.inSlot) return;
 
-        // Precisa ter action configurada
-        if (insertAction == null || insertAction.action == null) return;
-
-        // Botão pressionado?
-        if (insertAction.action.WasPressedThisFrame())
-        {
-            InsertItem(obj, item);
-        }
+        InserirItem(item);
     }
 
-    private void InsertItem(GameObject obj, Item item)
+    private void InserirItem(Item item)
     {
-        Rigidbody rb = obj.GetComponent<Rigidbody>();
-        if (rb && travarItemNoSlot)
+        Rigidbody rb = item.GetComponent<Rigidbody>();
+        if (rb != null && travarFisica)
             rb.isKinematic = true;
 
-        obj.transform.SetParent(transform, true);
-        obj.transform.localPosition = Vector3.zero;
-        obj.transform.localEulerAngles = item.slotRotation;
+        item.transform.SetParent(transform);
+        item.transform.localPosition = Vector3.zero;
+        item.transform.localRotation = Quaternion.identity;
 
         item.inSlot = true;
         item.currentSlot = this;
-
-        itemInSlot = obj;
-
-        if (slotImage)
-            slotImage.color = Color.gray;
+        itemInSlot = item;
     }
 
-    public void ResetColor()
+    public void RemoverItem()
     {
-        if (slotImage)
-            slotImage.color = _corOriginal;
+        if (itemInSlot == null) return;
+
+        Item item = itemInSlot;
+
+        Rigidbody rb = item.GetComponent<Rigidbody>();
+        if (rb != null)
+            rb.isKinematic = false;
+
+        item.transform.SetParent(null);
+
+        item.inSlot = false;
+        item.currentSlot = null;
+        itemInSlot = null;
     }
 }
