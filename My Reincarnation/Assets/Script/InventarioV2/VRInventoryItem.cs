@@ -12,12 +12,12 @@ public class VRInventoryItem : MonoBehaviour
     [HideInInspector] public VRInventorySlot currentSlot = null;
 
     private Rigidbody rb;
-    private XRGrabInteractable grabInteractable;
+    private UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        grabInteractable = GetComponent<XRGrabInteractable>();
+        grabInteractable = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
 
         if (grabInteractable != null)
         {

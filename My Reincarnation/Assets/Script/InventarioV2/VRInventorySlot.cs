@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit;
+
 
 [RequireComponent(typeof(Collider))]
 public class VRInventorySlot : MonoBehaviour
@@ -34,7 +34,7 @@ public class VRInventorySlot : MonoBehaviour
         if (item == null) return;
 
         // Se o item não estiver sendo segurado (solto no slot)
-        XRGrabInteractable grab = item.GetComponent<XRGrabInteractable>();
+        UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab = item.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
         if (grab != null && !grab.isSelected)
         {
             StoreItem(item);
