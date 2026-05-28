@@ -22,11 +22,8 @@ public class ItemInventarioEscalavel : MonoBehaviour
         Vector3 escalaLocalOriginal = ConverterEscalaMundoParaLocal(escalaOriginalMundo);
         AplicarEscalaLocal(escalaLocalOriginal);
 
-        if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsItem, out int qtdRenderers, out int qtdColliders))
-        {
-            Debug.Log($"[InventarioEscala] item={name} | slot={NomeDoSlot(slotCollider, pontoReferencia)} | margem={margem:F3} | renderers={qtdRenderers} | colliders={qtdColliders} | tamanhoInicial={Vector3.zero} | tamanhoPermitido={boundsPermitido.size} | fator=1.0000 | escalaFinal={transform.localScale} | coube=False");
+        if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsItem))
             return false;
-        }
 
         Vector3 tamanhoInicial = boundsItem.size;
         float fatorAplicado = Mathf.Min(1f, MenorFator(boundsPermitido.size, tamanhoInicial));
@@ -37,13 +34,13 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
         for (int i = 0; i < 12; i++)
         {
-            if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem, out qtdRenderers, out qtdColliders))
+            if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
                 break;
 
             CentralizarNoSlot(slotTransform, boundsItem, boundsPermitido);
             Physics.SyncTransforms();
 
-            if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem, out qtdRenderers, out qtdColliders))
+            if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
                 break;
 
             tamanhoFinal = boundsItem.size;
@@ -59,19 +56,17 @@ public class ItemInventarioEscalavel : MonoBehaviour
             AplicarEscalaLocal(escalaLocalOriginal * fatorAplicado);
         }
 
-        if (!coube && TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem, out qtdRenderers, out qtdColliders))
+        if (!coube && TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
         {
             CentralizarNoSlot(slotTransform, boundsItem, boundsPermitido);
             Physics.SyncTransforms();
 
-            if (TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem, out qtdRenderers, out qtdColliders))
+            if (TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
             {
                 tamanhoFinal = boundsItem.size;
                 coube = BoundsDentroDoPermitido(boundsItem, boundsPermitido);
             }
         }
-
-        Debug.Log($"[InventarioEscala] item={name} | slot={NomeDoSlot(slotCollider, pontoReferencia)} | margem={margem:F3} | renderers={qtdRenderers} | colliders={qtdColliders} | tamanhoInicial={tamanhoInicial} | tamanhoPermitido={boundsPermitido.size} | fator={fatorAplicado:F4} | escalaFinal={transform.localScale} | coube={coube}");
 
         return coube;
     }
@@ -124,11 +119,9 @@ public class ItemInventarioEscalavel : MonoBehaviour
         Physics.SyncTransforms();
     }
 
-    private bool TentarObterBoundsNoEspacoDoSlot(Transform slotTransform, Vector3 centroInicial, out Bounds boundsLocal, out int quantidadeRenderers, out int quantidadeColliders)
+    private bool TentarObterBoundsNoEspacoDoSlot(Transform slotTransform, Vector3 centroInicial, out Bounds boundsLocal)
     {
         boundsLocal = new Bounds(centroInicial, Vector3.zero);
-        quantidadeRenderers = 0;
-        quantidadeColliders = 0;
         bool achou = false;
 
         Collider[] colliders = GetComponentsInChildren<Collider>(true);
@@ -136,7 +129,6 @@ public class ItemInventarioEscalavel : MonoBehaviour
         {
             if (col == null || !col.enabled || !col.transform.IsChildOf(transform)) continue;
 
-            quantidadeColliders++;
             EncapsularBoundsNoSlot(slotTransform, col.bounds, ref boundsLocal, ref achou);
         }
 
@@ -145,7 +137,6 @@ public class ItemInventarioEscalavel : MonoBehaviour
         {
             if (r == null || !r.transform.IsChildOf(transform)) continue;
 
-            quantidadeRenderers++;
             EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
         }
 
@@ -215,13 +206,5 @@ public class ItemInventarioEscalavel : MonoBehaviour
     private static float DividirSeguro(float valor, float divisor)
     {
         return Mathf.Approximately(divisor, 0f) ? valor : valor / divisor;
-    }
-
-    private static string NomeDoSlot(BoxCollider slotCollider, Transform pontoReferencia)
-    {
-        if (pontoReferencia != null)
-            return pontoReferencia.name;
-
-        return slotCollider != null ? slotCollider.name : "sem slot";
     }
 }
