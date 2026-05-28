@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 6709080080726887269}
   - component: {fileID: 8635421680934004284}
   - component: {fileID: 1012568170112565356}
+  - component: {fileID: 4285873618043168583}
   m_Layer: 0
   m_Name: tronco
   m_TagString: Untagged
@@ -119,7 +120,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
 --- !u!114 &8635421680934004284
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -272,3 +273,17 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
   m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
+--- !u!114 &4285873618043168583
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1360994071702760}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ef4c75ea065ef409f2d527d32e4eef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioEscalavel
+  escalaOriginalSalva: 0
+  escalaOriginalMundo: {x: 0, y: 0, z: 0}
