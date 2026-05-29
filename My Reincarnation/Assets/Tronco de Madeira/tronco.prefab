@@ -12,9 +12,10 @@ GameObject:
   - component: {fileID: 33809962535929728}
   - component: {fileID: 23164466822775924}
   - component: {fileID: 6709080080726887269}
-  - component: {fileID: 8635421680934004284}
   - component: {fileID: 1012568170112565356}
+  - component: {fileID: 8635421680934004284}
   - component: {fileID: 4285873618043168583}
+  - component: {fileID: 1986869704227592117}
   m_Layer: 0
   m_Name: tronco
   m_TagString: Untagged
@@ -121,6 +122,27 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 2
+--- !u!65 &1012568170112565356
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1360994071702760}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
+  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!114 &8635421680934004284
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -252,27 +274,6 @@ MonoBehaviour:
   m_MaxAngularVelocityDelta: 20
   pontoMaoDireita: {fileID: 0}
   pontoMaoEsquerda: {fileID: 0}
---- !u!65 &1012568170112565356
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1360994071702760}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.0000001, y: 2, z: 1.0000002}
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!114 &4285873618043168583
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -287,3 +288,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioEscalavel
   escalaOriginalSalva: 0
   escalaOriginalMundo: {x: 0, y: 0, z: 0}
+--- !u!114 &1986869704227592117
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1360994071702760}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fdcde03f7844e94888d45fb3479b89f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioDados
+  nomeItem: Tronco
+  prefabParaStack: {fileID: 1360994071702760}
