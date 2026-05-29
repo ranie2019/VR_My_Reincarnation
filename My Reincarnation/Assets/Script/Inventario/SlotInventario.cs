@@ -26,6 +26,11 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     [Header("Stack")]
     [SerializeField] private int limiteStack = 99;
 
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip somAdicionarItem;
+    [SerializeField] private AudioClip somRetirarItem;
+
     private readonly List<XRGrabInteractable> pilhaItens = new();
     private readonly Dictionary<XRGrabInteractable, EstadoOriginalItem> estadosOriginais = new();
 
@@ -42,6 +47,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     {
         if (socketInteractor == null)
             socketInteractor = GetComponent<XRSocketInteractor>();
+
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
 
         if (contadorTMP == null)
             contadorTMP = GetComponentInChildren<TMP_Text>(true);
@@ -381,6 +389,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         AtualizarContadorTMP();
 
         TrocarTopoSelecionado(topoAnterior, itemExtra);
+        TocarSom(somAdicionarItem);
         return true;
     }
 
@@ -800,6 +809,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         AplicarVisualNoSlot(item);
         RegistrarFiltroNoItemGuardado();
         AtualizarContadorTMP();
+        TocarSom(somAdicionarItem);
     }
 
     private void PosicionarItemNoPontoDoSlot(Transform item)
@@ -845,6 +855,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         RemoverFiltroDoItemGuardado();
 
         pilhaItens.RemoveAt(pilhaItens.Count - 1);
+        TocarSom(somRetirarItem);
         LogFisicaItem("Retirar item do inventario", itemRemovido);
 
         itemGuardado = null;
@@ -982,6 +993,12 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         return ativos;
+    }
+
+    private void TocarSom(AudioClip clip)
+    {
+        if (audioSource != null && clip != null)
+            audioSource.PlayOneShot(clip);
     }
 
     private static void LogFisicaItem(string etapa, XRGrabInteractable item)

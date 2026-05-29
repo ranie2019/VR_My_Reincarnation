@@ -18,6 +18,8 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
     [SerializeField] private bool aceitarComponentesXRRelacionados = true;
     [SerializeField] private bool procurarInteractorXRNosFilhos = true;
     [SerializeField] private bool rolarEnquantoPermaneceEmContato = true;
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip somClique;
 
     private float proximoToquePermitido;
 
@@ -28,6 +30,9 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
 
     private void Awake()
     {
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
         BuscarInventarioScrollSeNecessario();
     }
 
@@ -84,18 +89,29 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
             return;
 
         proximoToquePermitido = Time.time + cooldown;
-        ExecutarRolagem();
+        if (ExecutarRolagem())
+            TocarSom(somClique);
     }
 
-    private void ExecutarRolagem()
+    private bool ExecutarRolagem()
     {
         if (inventarioScroll == null)
-            return;
+            return false;
+
+        int linhaInicialAntes = inventarioScroll.LinhaInicial;
 
         if (direcaoMovimentoSlots == DirecaoMovimentoSlots.SubirSlots)
             inventarioScroll.RolarBaixo();
         else
             inventarioScroll.RolarCima();
+
+        return inventarioScroll.LinhaInicial != linhaInicialAntes;
+    }
+
+    private void TocarSom(AudioClip clip)
+    {
+        if (audioSource != null && clip != null)
+            audioSource.PlayOneShot(clip);
     }
 
     private bool BuscarInventarioScrollSeNecessario()
