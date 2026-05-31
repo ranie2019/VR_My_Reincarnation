@@ -22,6 +22,7 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
     [SerializeField] private AudioClip somClique;
 
     private float proximoToquePermitido;
+    private bool botaoAtivo = true;
 
     private void Reset()
     {
@@ -76,6 +77,9 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
 
     private void TentarExecutarRolagem(Collider other)
     {
+        if (!botaoAtivo)
+            return;
+
         if (other == null)
             return;
 
@@ -95,6 +99,9 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
 
     private bool ExecutarRolagem()
     {
+        if (!botaoAtivo)
+            return false;
+
         if (inventarioScroll == null)
             return false;
 
@@ -110,8 +117,16 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
 
     private void TocarSom(AudioClip clip)
     {
+        if (!botaoAtivo)
+            return;
+
         if (audioSource != null && clip != null)
             audioSource.PlayOneShot(clip);
+    }
+
+    public void SetBotaoAtivo(bool ativo)
+    {
+        botaoAtivo = ativo;
     }
 
     private bool BuscarInventarioScrollSeNecessario()

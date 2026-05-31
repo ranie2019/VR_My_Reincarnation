@@ -16,6 +16,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     [Header("Socket do slot")]
     [SerializeField] private XRSocketInteractor socketInteractor;
+    [SerializeField] private Transform pontoEncaixe;
 
     [Header("Margem de seguranca (0.9 = 90% do slot)")]
     [SerializeField] private float margemDeSeguranca = 0.9f;
@@ -31,6 +32,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     [SerializeField] private AudioClip somAdicionarItem;
     [SerializeField] private AudioClip somRetirarItem;
 
+    [Header("Debug temporario")]
+    [SerializeField] private bool debugDiagnosticoEncaixe = true;
+
     private readonly List<XRGrabInteractable> pilhaItens = new();
     private readonly Dictionary<XRGrabInteractable, EstadoOriginalItem> estadosOriginais = new();
 
@@ -41,23 +45,19 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private bool visivelNaRolagem = true;
     private bool operacaoInternaSocket;
     private bool atualizandoTopo;
-    private Vector3 tamanhoDoSlot;
 
     private void Awake()
     {
         if (socketInteractor == null)
             socketInteractor = GetComponent<XRSocketInteractor>();
 
+        SincronizarPontoEncaixeDoSocket();
+
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
         if (contadorTMP == null)
             contadorTMP = GetComponentInChildren<TMP_Text>(true);
-
-        var col = GetComponent<BoxCollider>();
-        tamanhoDoSlot = col != null
-            ? Vector3.Scale(col.size, transform.lossyScale)
-            : Vector3.one * 0.1f;
 
         AtualizarContadorTMP();
     }
@@ -92,6 +92,17 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     {
         margemDeSeguranca = Mathf.Clamp(margemDeSeguranca, 0.01f, 1f);
         limiteStack = Mathf.Clamp(limiteStack, 1, 99);
+
+        if (socketInteractor == null)
+            socketInteractor = GetComponent<XRSocketInteractor>();
+
+        SincronizarPontoEncaixeDoSocket();
+    }
+
+    private void LateUpdate()
+    {
+        if (DeveManterPivotNoPontoEncaixe())
+            PosicionarItemNoPontoDoSlot(itemGuardado.transform);
     }
 
     public bool canProcess => isActiveAndEnabled;
@@ -151,10 +162,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return PodeInteragirCom(itemGuardado.transform);
 
         if (EhOutroSocket(interactor))
-        {
-            LogEstadoItem("Rejeitado: outro socket tentou selecionar item guardado", itemGuardado);
             return false;
-        }
 
         return inventarioAberto && visivelNaRolagem && !atualizandoTopo;
     }
@@ -232,6 +240,59 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         itemGuardado.selectFilters.Remove(this);
     }
 
+    private void SincronizarPontoEncaixeDoSocket()
+    {
+        if (socketInteractor == null)
+            return;
+
+        if (pontoEncaixe == null)
+            pontoEncaixe = BuscarPontoEncaixeNoSlot();
+
+        if (pontoEncaixe == null)
+            pontoEncaixe = socketInteractor.attachTransform;
+
+        if (pontoEncaixe != null && socketInteractor.attachTransform != pontoEncaixe)
+            socketInteractor.attachTransform = pontoEncaixe;
+    }
+
+    private Transform BuscarPontoEncaixeNoSlot()
+    {
+        Transform direto = transform.Find("PontoEncaixe");
+        if (direto != null)
+            return direto;
+
+        Transform[] filhos = GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < filhos.Length; i++)
+        {
+            if (filhos[i] != transform && filhos[i].name == "PontoEncaixe")
+                return filhos[i];
+        }
+
+        return null;
+    }
+
+    private bool DeveManterPivotNoPontoEncaixe()
+    {
+        return itemGuardado != null &&
+               socketInteractor != null &&
+               socketInteractor.IsSelecting(itemGuardado) &&
+               SelecionadoApenasPeloSocket(itemGuardado);
+    }
+
+    private bool SelecionadoApenasPeloSocket(XRGrabInteractable item)
+    {
+        if (item == null || item.interactorsSelecting.Count == 0)
+            return false;
+
+        for (int i = 0; i < item.interactorsSelecting.Count; i++)
+        {
+            if (!EhSocketDoSlot(item.interactorsSelecting[i]))
+                return false;
+        }
+
+        return true;
+    }
+
     // --- STACK LIFO -----------------------------------------------------------
 
     private XRGrabInteractable TopoDaPilha()
@@ -257,7 +318,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (estado == null || !estado.estaNoInventario || estado.slotAtual == this)
             return false;
 
-        LogEstadoItem($"Rejeitado em {contexto}: item pertence a outro slot", item, estado);
         return true;
     }
 
@@ -271,10 +331,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         var estado = ObterEstadoInventario(item, false);
         if (estado != null && estado.estaNoInventario && estado.slotAtual == this && !pilhaItens.Contains(item))
-        {
-            LogEstadoItem($"Rejeitado em {contexto}: estado aponta para este slot, mas item nao esta na pilha", item, estado);
             return false;
-        }
 
         return true;
     }
@@ -286,7 +343,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return null;
 
         estado.MarcarAceito(this, escondido);
-        LogEstadoItem($"Item aceito por este slot ({contexto})", item, estado);
         return estado;
     }
 
@@ -297,7 +353,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
 
         estado.MarcarTopo(this);
-        LogEstadoItem("Item virou topo da pilha", item, estado);
     }
 
     private void MarcarItemComoEscondidoNaPilha(XRGrabInteractable item)
@@ -307,7 +362,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
 
         estado.MarcarEscondido(this);
-        LogEstadoItem("Item escondido na pilha", item, estado);
     }
 
     private void LiberarEstadoInventarioDoItem(XRGrabInteractable item)
@@ -317,7 +371,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
 
         estado.Liberar();
-        LogEstadoItem("Item saiu do inventario", item, estado);
     }
 
     private void RejeitarSelecaoDoSocket(XRGrabInteractable item, string contexto)
@@ -327,8 +380,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         if (!socketInteractor.IsSelecting(item))
             return;
-
-        LogEstadoItem($"Rejeitando selecao do socket ({contexto})", item);
 
         bool operacaoAnterior = operacaoInternaSocket;
         operacaoInternaSocket = true;
@@ -457,7 +508,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         MarcarItemComoEscondidoNaPilha(item);
-        LogFisicaItem("Esconder item na pilha", item);
     }
 
     private void AplicarVisualNoSlot(XRGrabInteractable item)
@@ -497,9 +547,12 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         GarantirEscalaOriginal(item.transform);
+        LogDiagnosticoEncaixe("AplicarVisualNoSlot antes do posicionamento", item);
         PosicionarItemNoPontoDoSlot(item.transform);
         AjustarEscalaAdaptativa(item.transform);
-        LogEscalaItem("Aplicar escala visual do slot", item, estado);
+        PosicionarItemNoPontoDoSlot(item.transform);
+        LogDiagnosticoEncaixe("AplicarVisualNoSlot depois do posicionamento", item);
+        StartCoroutine(LogDiagnosticoEncaixeAposUmFrame(item));
         Physics.SyncTransforms();
     }
 
@@ -599,7 +652,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
                 rbFallback.WakeUp();
             }
 
-            LogFisicaItem("Restaurar fisica sem estado salvo", item);
             return;
         }
 
@@ -643,7 +695,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             rb.WakeUp();
         }
 
-        LogFisicaItem("Fisica restaurada", item);
     }
 
     private void RestaurarEscalaEParentParaMundo(XRGrabInteractable item)
@@ -651,14 +702,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (item == null)
             return;
 
-        string parentAntes = ObterNomeParent(item.transform);
-        Vector3 localScaleAntes = item.transform.localScale;
-        Vector3 lossyScaleAntes = item.transform.lossyScale;
-
         if (!estadosOriginais.TryGetValue(item, out EstadoOriginalItem estado))
         {
             item.transform.SetParent(null, true);
-            Debug.Log($"[SlotInventario][Escala] Restaurar escala/parent sem estado salvo | item={item.name} | parentAntes={parentAntes} | parentDepois={ObterNomeParent(item.transform)} | localScaleAntes={localScaleAntes} | lossyScaleAntes={lossyScaleAntes} | escalaOriginalSalva=sem estado | localScaleDepois={item.transform.localScale} | lossyScaleDepois={item.transform.lossyScale}");
             return;
         }
 
@@ -670,8 +716,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         item.transform.localScale = estado.LossyScaleOriginal;
         item.SetTargetLocalScale(estado.LossyScaleOriginal);
-
-        Debug.Log($"[SlotInventario][Escala] Restaurar escala/parent ao sair | item={item.name} | parentAntes={parentAntes} | parentDepois={ObterNomeParent(item.transform)} | localScaleAntes={localScaleAntes} | lossyScaleAntes={lossyScaleAntes} | escalaOriginalSalva={estado.LossyScaleOriginal} | localScaleDepois={item.transform.localScale} | lossyScaleDepois={item.transform.lossyScale}");
     }
 
     private void RestaurarEscalaOriginalDoEstado(XRGrabInteractable item, EstadoOriginalItem estado, bool restaurarTargetOriginal)
@@ -723,8 +767,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         var estado = new EstadoOriginalItem(item);
         estadosOriginais.Add(item, estado);
-        LogEscalaItem("Salvar escala original", item, estado);
-        LogFisicaItem("Salvar estado fisico", item);
 
         var escalaComp = item.GetComponent<EscalaOriginalItem>();
         if (escalaComp == null)
@@ -814,15 +856,26 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private void PosicionarItemNoPontoDoSlot(Transform item)
     {
-        Transform pontoEncaixe = socketInteractor != null ? socketInteractor.attachTransform : null;
+        Transform ponto = ObterPontoEncaixe();
 
-        if (pontoEncaixe != null)
+        if (ponto != null)
         {
-            item.SetPositionAndRotation(pontoEncaixe.position, pontoEncaixe.rotation);
+            item.SetPositionAndRotation(ponto.position, ponto.rotation);
             return;
         }
 
         item.SetPositionAndRotation(transform.position, transform.rotation);
+    }
+
+    private Transform ObterPontoEncaixe()
+    {
+        if (pontoEncaixe != null)
+            return pontoEncaixe;
+
+        if (socketInteractor != null && socketInteractor.attachTransform != null)
+            return socketInteractor.attachTransform;
+
+        return transform;
     }
 
     // --- RETIRADA -------------------------------------------------------------
@@ -856,7 +909,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         pilhaItens.RemoveAt(pilhaItens.Count - 1);
         TocarSom(somRetirarItem);
-        LogFisicaItem("Retirar item do inventario", itemRemovido);
 
         itemGuardado = null;
         RestaurarItemParaMundo(itemRemovido);
@@ -944,27 +996,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             escalaComp.MarcarEscalaAplicada(this, margem);
     }
 
-    private bool TentarObterBoundsDoSlot(out Bounds bounds)
-    {
-        var col = GetComponent<Collider>();
-        if (col != null)
-        {
-            bounds = col.bounds;
-            return true;
-        }
-
-        if (visualSlot != null && TentarObterBounds(visualSlot.transform, out bounds))
-            return true;
-
-        bounds = new Bounds(transform.position, tamanhoDoSlot);
-        return TamanhoValido(tamanhoDoSlot);
-    }
-
-    private static bool TamanhoValido(Vector3 tamanho)
-    {
-        return tamanho.x > 0f && tamanho.y > 0f && tamanho.z > 0f;
-    }
-
     private static float DividirSeguro(float valor, float divisor)
     {
         return Mathf.Approximately(divisor, 0f) ? valor : valor / divisor;
@@ -980,107 +1011,41 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         );
     }
 
-    private static int ContarCollidersAtivos(XRGrabInteractable item)
-    {
-        if (item == null)
-            return 0;
-
-        int ativos = 0;
-        foreach (var collider in item.GetComponentsInChildren<Collider>(true))
-        {
-            if (collider != null && collider.enabled)
-                ativos++;
-        }
-
-        return ativos;
-    }
-
     private void TocarSom(AudioClip clip)
     {
         if (audioSource != null && clip != null)
             audioSource.PlayOneShot(clip);
     }
 
-    private static void LogFisicaItem(string etapa, XRGrabInteractable item)
+    private IEnumerator LogDiagnosticoEncaixeAposUmFrame(XRGrabInteractable item)
     {
-        if (item == null)
-        {
-            Debug.Log($"[SlotInventario][Fisica] {etapa} | item=null");
-            return;
-        }
+        yield return null;
 
-        Rigidbody rb = item.GetComponent<Rigidbody>();
-        string fisica = rb != null
-            ? $"isKinematic={rb.isKinematic} useGravity={rb.useGravity} detectCollisions={rb.detectCollisions}"
-            : "sem Rigidbody";
-
-        Debug.Log($"[SlotInventario][Fisica] {etapa} | item={item.name} | {fisica} | collidersAtivos={ContarCollidersAtivos(item)}");
+        if (item != null)
+            LogDiagnosticoEncaixe("AplicarVisualNoSlot apos 1 frame", item);
     }
 
-    private void LogEstadoItem(string etapa, XRGrabInteractable item, EstadoItemInventario estado = null)
+    private void LogDiagnosticoEncaixe(string etapa, XRGrabInteractable item)
     {
-        if (item == null)
-        {
-            Debug.Log($"[SlotInventario][StackLock] {etapa} | item=null | slotAtual={name} | pilha={pilhaItens.Count}");
+        if (!debugDiagnosticoEncaixe || item == null)
             return;
-        }
 
-        if (estado == null)
-            estado = ObterEstadoInventario(item, false);
-        string slotDono = estado != null && estado.slotAtual != null ? estado.slotAtual.name : "null";
-        bool estaNoInventario = estado != null && estado.estaNoInventario;
-        bool estaEscondido = estado != null && estado.estaEscondidoNaPilha;
-        bool processando = estado != null && estado.estaSendoProcessado;
+        Transform ponto = ObterPontoEncaixe();
+        Transform socketAttach = socketInteractor != null ? socketInteractor.attachTransform : null;
+        Transform itemAttach = socketInteractor != null ? item.GetAttachTransform(socketInteractor) : item.attachTransform;
 
-        Debug.Log($"[SlotInventario][StackLock] {etapa} | item={item.name} | slotAtual={name} | slotDono={slotDono} | estaNoInventario={estaNoInventario} | estaEscondidoNaPilha={estaEscondido} | estaSendoProcessado={processando} | pilhaItens.Count={pilhaItens.Count}");
+        Debug.Log(
+            $"[SlotInventario][EncaixePivot] {etapa} | slot={name} | item={item.name} | " +
+            $"pontoEncaixe={DescreverTransform(ponto)} | socketAttach={DescreverTransform(socketAttach)} | " +
+            $"itemAttach={DescreverTransform(itemAttach)} | itemPosition={item.transform.position} | itemRotation={item.transform.rotation.eulerAngles}",
+            this);
     }
 
-    private static void LogEscalaItem(string etapa, XRGrabInteractable item, EstadoOriginalItem estado)
+    private static string DescreverTransform(Transform alvo)
     {
-        if (item == null)
-        {
-            Debug.Log($"[SlotInventario][Escala] {etapa} | item=null");
-            return;
-        }
-
-        Transform itemTransform = item.transform;
-        string escalaOriginal = estado != null
-            ? $"localOriginal={estado.LocalScaleOriginal} lossyOriginal={estado.LossyScaleOriginal} targetOriginal={estado.TargetLocalScaleOriginal}"
-            : "sem escala original salva";
-
-        Debug.Log($"[SlotInventario][Escala] {etapa} | item={item.name} | localScaleAtual={itemTransform.localScale} | lossyScaleAtual={itemTransform.lossyScale} | {escalaOriginal} | parentAtual={ObterNomeParent(itemTransform)}");
-    }
-
-    private static string ObterNomeParent(Transform itemTransform)
-    {
-        return itemTransform != null && itemTransform.parent != null
-            ? itemTransform.parent.name
+        return alvo != null
+            ? $"{alvo.name} pos={alvo.position} rot={alvo.rotation.eulerAngles}"
             : "null";
-    }
-
-    private bool TentarObterBounds(Transform item, out Bounds bounds)
-    {
-        Renderer[] renderers = item.GetComponentsInChildren<Renderer>(true);
-        bounds = new Bounds(item.position, Vector3.zero);
-        bool achou = false;
-
-        foreach (Renderer r in renderers)
-        {
-            if (r == null)
-                continue;
-
-            if (!achou)
-            {
-                bounds = r.bounds;
-                achou = true;
-            }
-            else
-            {
-                bounds.Encapsulate(r.bounds);
-            }
-        }
-
-        return achou;
     }
 
     // --- ABRIR / FECHAR INVENTARIO -------------------------------------------

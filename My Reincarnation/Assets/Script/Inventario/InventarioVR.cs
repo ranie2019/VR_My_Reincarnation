@@ -10,6 +10,8 @@ public class InventarioVR : MonoBehaviour
 
     [SerializeField] private GameObject painelInventario;
     [SerializeField] private SlotInventario[] slots;
+    [SerializeField] private Collider[] collidersBotoesRolagem;
+    [SerializeField] private BotaoRolagemInventarioVR[] botoesRolagem;
 
     private bool aberto = false;
 
@@ -51,6 +53,7 @@ public class InventarioVR : MonoBehaviour
 
         if (aberto)
         {
+            AtualizarBotoesRolagem(true);
             SetPainelVisivel(true);
             AtualizarSlots(true);
             return;
@@ -58,6 +61,7 @@ public class InventarioVR : MonoBehaviour
 
         AtualizarSlots(false);
         SetPainelVisivel(false);
+        AtualizarBotoesRolagem(false);
     }
 
     private void SetPainelVisivel(bool visivel)
@@ -84,6 +88,27 @@ public class InventarioVR : MonoBehaviour
         {
             if (slot != null)
                 slot.SetInventarioAberto(inventarioAberto);
+        }
+    }
+
+    private void AtualizarBotoesRolagem(bool ativo)
+    {
+        if (collidersBotoesRolagem != null)
+        {
+            foreach (var colliderBotao in collidersBotoesRolagem)
+            {
+                if (colliderBotao != null)
+                    colliderBotao.enabled = ativo;
+            }
+        }
+
+        if (botoesRolagem == null)
+            return;
+
+        foreach (var botaoRolagem in botoesRolagem)
+        {
+            if (botaoRolagem != null)
+                botaoRolagem.SetBotaoAtivo(ativo);
         }
     }
 }
