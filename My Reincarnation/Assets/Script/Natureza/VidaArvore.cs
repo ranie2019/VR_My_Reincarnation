@@ -25,9 +25,6 @@ public class VidaArvore : MonoBehaviour
     [SerializeField] private AudioClip somMorte;
     [SerializeField] private float volumeSomMorte = 1f;
 
-    [Header("Debug temporário")]
-    [SerializeField] private bool debugDiagnosticoContato = true;
-
     private bool emCooldown;
     private bool morreu;
     private int ultimoFrameSomHit = -1;
@@ -112,10 +109,7 @@ public class VidaArvore : MonoBehaviour
     private void ReceberHitPorCollision(Collision collision, string origemEvento)
     {
         if (collision == null)
-        {
-            LogDiagnosticoContatoArvore(origemEvento, null, null, false, "Collision nula.");
             return;
-        }
 
         TocarSomHit();
 
@@ -123,43 +117,24 @@ public class VidaArvore : MonoBehaviour
         bool transformEhMachado = TransformEhMachado(collision.transform);
 
         if (morreu)
-        {
-            LogDiagnosticoContatoArvore(origemEvento, collision.collider, collision.transform, false, "Árvore já morreu.");
             return;
-        }
 
         if (emCooldown)
-        {
-            LogDiagnosticoContatoArvore(origemEvento, collision.collider, collision.transform, false, "Cooldown ativo.");
             return;
-        }
 
         if (colliderEhMachado || transformEhMachado)
         {
-            LogDiagnosticoContatoArvore(origemEvento, collision.collider, collision.transform, true, "Machado detectado por Collision.");
             TomarDano(danoPorHit);
             return;
         }
-
-        LogDiagnosticoContatoArvore(origemEvento, collision.collider, collision.transform, false, "Não encontrou tag/componente Machado.");
     }
 
     private void ReceberHitPorTrigger(Collider other, string origemEvento)
     {
         if (other == null)
-        {
-            LogDiagnosticoContatoArvore(origemEvento, null, null, false, "Collider nulo.");
             return;
-        }
 
         TocarSomHit();
-
-        bool colliderEhMachado = ColliderEhMachado(other);
-        string motivo = colliderEhMachado
-            ? "Trigger detectado; dano por trigger e controlado pelo Machado.OnTriggerEnter."
-            : "Não encontrou tag/componente Machado.";
-
-        LogDiagnosticoContatoArvore(origemEvento, other, other.transform, false, motivo);
     }
 
     private bool ColliderEhMachado(Collider colliderContato)
@@ -203,44 +178,6 @@ public class VidaArvore : MonoBehaviour
         return !string.IsNullOrWhiteSpace(tagAtual) &&
                !string.IsNullOrWhiteSpace(tagEsperada) &&
                string.Equals(tagAtual, tagEsperada, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void LogDiagnosticoContatoArvore(string evento, Collider colliderContato, Transform transformContato, bool aceito, string motivo)
-    {
-        if (!debugDiagnosticoContato)
-            return;
-
-        Transform contato = transformContato != null
-            ? transformContato
-            : colliderContato != null ? colliderContato.transform : null;
-
-        Rigidbody rb = colliderContato != null ? colliderContato.attachedRigidbody : null;
-        Transform root = contato != null ? contato.root : null;
-        int layer = contato != null ? contato.gameObject.layer : -1;
-        string layerNome = layer >= 0 ? LayerMask.LayerToName(layer) : "sem layer";
-        bool encontrouMachadoNoCollider = ColliderEhMachado(colliderContato);
-        bool encontrouMachadoNoTransform = TransformEhMachado(contato);
-
-        string colliderInfo = colliderContato != null
-            ? $"{colliderContato.GetType().Name} enabled={colliderContato.enabled} isTrigger={colliderContato.isTrigger}"
-            : "sem collider";
-
-        string rbInfo = rb != null
-            ? $"{rb.name} isKinematic={rb.isKinematic} useGravity={rb.useGravity} detectCollisions={rb.detectCollisions}"
-            : "sem attachedRigidbody";
-
-        Debug.Log(
-            $"[VidaArvore][{evento}] arvore={name} aceito={aceito} motivo=\"{motivo}\" " +
-            $"contato={(contato != null ? contato.name : "null")} tag={ObterTagSegura(contato)} " +
-            $"layer={layer}:{layerNome} root={(root != null ? root.name : "null")} collider={colliderInfo} " +
-            $"attachedRigidbody={rbInfo} encontrouMachadoCollider={encontrouMachadoNoCollider} " +
-            $"encontrouMachadoTransform={encontrouMachadoNoTransform} cooldown={emCooldown} morreu={morreu}",
-            this);
-    }
-
-    private static string ObterTagSegura(Transform alvo)
-    {
-        return alvo != null ? alvo.tag : "null";
     }
 
     public bool ReceberDanoDeMachado(GameObject origem)

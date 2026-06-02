@@ -78,7 +78,6 @@ public class SlimeIA : MonoBehaviour
     [SerializeField] private float raioAtaque = 0.35f;
     [SerializeField] private float alcanceAtaque = 1.2f;
     [SerializeField] private LayerMask layersAtaque = ~0;
-    [SerializeField] private bool debugAtaque = true;
 
     [Header("Investida")]
     [SerializeField] private float distanciaInvestida = 1.5f;
@@ -148,7 +147,6 @@ public class SlimeIA : MonoBehaviour
     private float tempoRestanteObservando;
     private float proximaBuscaPlayer;
     private float proximoAtaque;
-    private float proximoLogCooldownAtaque;
     private Coroutine rotinaDano;
     private Coroutine rotinaInvestidaAtaque;
     private bool impactoAtaqueResolvido;
@@ -171,7 +169,9 @@ public class SlimeIA : MonoBehaviour
     private bool temHit;
     private bool temDie;
     private bool morto;
+    private bool experienciaJaEntregue;
     private Transform ultimoPlayerResponsavel;
+    private ExperienciaInimigo experienciaInimigo;
     private readonly Dictionary<int, float> proximoDanoPorOrigem = new Dictionary<int, float>();
     private static readonly string[] NomesMembrosDano =
     {
@@ -206,6 +206,8 @@ public class SlimeIA : MonoBehaviour
 
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
+
+        experienciaInimigo = GetComponent<ExperienciaInimigo>();
 
         vidaMaxima = Mathf.Max(1, vidaMaxima);
         vidaAtual = Mathf.Clamp(vidaAtual <= 0 ? vidaMaxima : vidaAtual, 1, vidaMaxima);
@@ -747,13 +749,7 @@ public class SlimeIA : MonoBehaviour
         }
 
         if (Time.time < proximoAtaque)
-        {
-            RegistrarLogCooldownAtaque();
             return;
-        }
-
-        if (debugAtaque)
-            Debug.Log($"[SlimeIA] Slime entrou no alcance de ataque: {name}.", this);
 
         IniciarInvestidaAtaque();
     }
@@ -804,9 +800,6 @@ public class SlimeIA : MonoBehaviour
         Vector3 direcao = ObterDirecaoHorizontalInvestida();
         OlharNaDirecaoInstantaneo(direcao);
 
-        if (debugAtaque)
-            Debug.Log($"[SlimeIA] Slime iniciou investida: {name}.", this);
-
         Vector3 posicaoAlvo = posicaoInicial + direcao * distanciaInvestida;
         float duracao = Mathf.Max(0.01f, duracaoInvestida);
         float tempo = 0f;
@@ -830,9 +823,6 @@ public class SlimeIA : MonoBehaviour
                 ResolverImpactoCollider(hitBloqueioPasso.collider);
                 AplicarPosicaoInvestida(posicaoInicial);
 
-                if (debugAtaque && hitBloqueioPasso.collider != null)
-                    Debug.Log($"[SlimeIA] Slime colidiu durante investida e voltou para posicao inicial: {hitBloqueioPasso.collider.name}.", this);
-
                 break;
             }
 
@@ -851,22 +841,6 @@ public class SlimeIA : MonoBehaviour
         RetomarAgentDepoisInvestida();
         investidaAtaqueEmAndamento = false;
         rotinaInvestidaAtaque = null;
-
-        if (debugAtaque)
-        {
-            Debug.Log($"[SlimeIA] Slime terminou ataque: {name}.", this);
-            if (!morto && alvoPlayer != null && DistanciaXZ(transform.position, alvoPlayer.position) <= distanciaAtaque)
-                Debug.Log($"[SlimeIA] Slime atacando novamente porque Player ainda esta no alcance: {name}.", this);
-        }
-    }
-
-    private void RegistrarLogCooldownAtaque()
-    {
-        if (!debugAtaque || Time.time < proximoLogCooldownAtaque)
-            return;
-
-        proximoLogCooldownAtaque = Time.time + 0.35f;
-        Debug.Log($"[SlimeIA] Slime aguardando cooldown: {name}.", this);
     }
 
     private void PausarAgentParaInvestida()
@@ -1056,20 +1030,11 @@ public class SlimeIA : MonoBehaviour
         {
             impactoAtaqueResolvido = true;
             RegistrarBloqueioSeForEscudo(col, alvoPlayer);
-
-            if (debugAtaque)
-                Debug.Log($"[SlimeIA] {name} teve ataque bloqueado por {col.name}.", this);
-
             return;
         }
 
         impactoAtaqueResolvido = true;
-        bool danoAplicado = TentarAplicarDanoNoPlayer(alvoPlayer, danoAtaque);
-        if (debugAtaque)
-        {
-            string resultado = danoAplicado ? "dano aplicado" : "sem componente de vida no Player";
-            Debug.Log($"[SlimeIA] {name} acertou {alvoPlayer.name}: {resultado}.", this);
-        }
+        TentarAplicarDanoNoPlayer(alvoPlayer, danoAtaque);
     }
 
     private void ResolverImpactoAtaque()
@@ -1078,11 +1043,7 @@ public class SlimeIA : MonoBehaviour
             return;
 
         if (!TentarObterPrimeiroHitAtaque(alvoPlayer, out RaycastHit hit))
-        {
-            if (debugAtaque)
-                Debug.Log($"[SlimeIA] {name} resolveu impacto sem atingir collider.", this);
             return;
-        }
 
         Collider col = hit.collider;
         if (col == null)
@@ -1438,9 +1399,6 @@ public class SlimeIA : MonoBehaviour
 
     private void DesenharGizmosAtaque()
     {
-        if (!debugAtaque)
-            return;
-
         Vector3 origem = ObterOrigemAtaque();
         Vector3 direcao = Application.isPlaying && alvoPlayer != null ? ObterDirecaoAtaque(alvoPlayer) : ObterFrentePlana();
         Vector3 destino = origem + direcao * AlcanceEfetivoAtaque();
@@ -1691,13 +1649,25 @@ public class SlimeIA : MonoBehaviour
         PararSomAndar();
         MudarEstado(EstadoSlime.Morto);
         TocarSomMorrer();
+        EntregarExperienciaAoMorrer();
         SpawnarPrefabsNormais();
         SpawnarPrefabsMissao();
 
-        if (debugAtaque)
-            Debug.Log($"[SlimeIA] Slime morreu: {name}.", this);
-
         Destroy(gameObject, tempoParaMorrer);
+    }
+
+    private void EntregarExperienciaAoMorrer()
+    {
+        if (experienciaJaEntregue)
+            return;
+
+        experienciaJaEntregue = true;
+
+        if (experienciaInimigo == null)
+            experienciaInimigo = GetComponent<ExperienciaInimigo>();
+
+        if (experienciaInimigo != null)
+            experienciaInimigo.EntregarExperienciaParaPlayerMaisProximo();
     }
 
     private void SpawnarPrefabsNormais()

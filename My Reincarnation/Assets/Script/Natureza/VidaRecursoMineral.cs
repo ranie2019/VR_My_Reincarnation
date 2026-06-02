@@ -27,8 +27,6 @@ public class VidaRecursoMineral : MonoBehaviour
     [SerializeField] private AudioClip somMorte;
     [SerializeField] private float volumeSomMorte = 1f;
 
-    [Header("Debug temporário")]
-    [SerializeField] private bool debugDiagnosticoContato = true;
 
     private bool emCooldown;
     private bool morreu;
@@ -118,7 +116,6 @@ public class VidaRecursoMineral : MonoBehaviour
     {
         if (collision == null)
         {
-            LogDiagnosticoContatoMineral(origemEvento, null, null, false, "Collision nula.");
             return;
         }
 
@@ -129,31 +126,26 @@ public class VidaRecursoMineral : MonoBehaviour
 
         if (morreu)
         {
-            LogDiagnosticoContatoMineral(origemEvento, collision.collider, collision.transform, false, "Recurso mineral ja foi destruido.");
             return;
         }
 
         if (emCooldown)
         {
-            LogDiagnosticoContatoMineral(origemEvento, collision.collider, collision.transform, false, "Cooldown ativo.");
             return;
         }
 
         if (colliderEhPicareta || transformEhPicareta)
         {
-            LogDiagnosticoContatoMineral(origemEvento, collision.collider, collision.transform, true, "Picareta detectada por Collision.");
             TomarDano(danoPorHit);
             return;
         }
 
-        LogDiagnosticoContatoMineral(origemEvento, collision.collider, collision.transform, false, "Nao encontrou tag/componente Picareta.");
     }
 
     private void ReceberHitPorTrigger(Collider other, string origemEvento)
     {
         if (other == null)
         {
-            LogDiagnosticoContatoMineral(origemEvento, null, null, false, "Collider nulo.");
             return;
         }
 
@@ -163,13 +155,11 @@ public class VidaRecursoMineral : MonoBehaviour
 
         if (morreu)
         {
-            LogDiagnosticoContatoMineral(origemEvento, other, other.transform, false, "Recurso mineral ja foi destruido.");
             return;
         }
 
         if (emCooldown)
         {
-            LogDiagnosticoContatoMineral(origemEvento, other, other.transform, false, "Cooldown ativo.");
             return;
         }
 
@@ -177,16 +167,13 @@ public class VidaRecursoMineral : MonoBehaviour
         {
             if (aplicarDanoPorTriggerDireto)
             {
-                LogDiagnosticoContatoMineral(origemEvento, other, other.transform, true, "Picareta detectada por Trigger.");
                 TomarDano(danoPorHit);
                 return;
             }
 
-            LogDiagnosticoContatoMineral(origemEvento, other, other.transform, false, "Picareta detectada por Trigger, mas dano direto por trigger esta desativado.");
             return;
         }
 
-        LogDiagnosticoContatoMineral(origemEvento, other, other.transform, false, "Nao encontrou tag/componente Picareta.");
     }
 
     private bool ColliderEhPicareta(Collider colliderContato)
@@ -253,44 +240,6 @@ public class VidaRecursoMineral : MonoBehaviour
         return !string.IsNullOrWhiteSpace(tagAtual) &&
                !string.IsNullOrWhiteSpace(tagEsperada) &&
                string.Equals(tagAtual, tagEsperada, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void LogDiagnosticoContatoMineral(string evento, Collider colliderContato, Transform transformContato, bool aceito, string motivo)
-    {
-        if (!debugDiagnosticoContato)
-            return;
-
-        Transform contato = transformContato != null
-            ? transformContato
-            : colliderContato != null ? colliderContato.transform : null;
-
-        Rigidbody rb = colliderContato != null ? colliderContato.attachedRigidbody : null;
-        Transform root = contato != null ? contato.root : null;
-        int layer = contato != null ? contato.gameObject.layer : -1;
-        string layerNome = layer >= 0 ? LayerMask.LayerToName(layer) : "sem layer";
-        bool encontrouPicaretaNoCollider = ColliderEhPicareta(colliderContato);
-        bool encontrouPicaretaNoTransform = TransformEhPicareta(contato);
-
-        string colliderInfo = colliderContato != null
-            ? $"{colliderContato.GetType().Name} enabled={colliderContato.enabled} isTrigger={colliderContato.isTrigger}"
-            : "sem collider";
-
-        string rbInfo = rb != null
-            ? $"{rb.name} isKinematic={rb.isKinematic} useGravity={rb.useGravity} detectCollisions={rb.detectCollisions}"
-            : "sem attachedRigidbody";
-
-        Debug.Log(
-            $"[VidaRecursoMineral][{evento}] mineral={name} aceito={aceito} motivo=\"{motivo}\" " +
-            $"contato={(contato != null ? contato.name : "null")} tag={ObterTagSegura(contato)} " +
-            $"layer={layer}:{layerNome} root={(root != null ? root.name : "null")} collider={colliderInfo} " +
-            $"attachedRigidbody={rbInfo} encontrouPicaretaCollider={encontrouPicaretaNoCollider} " +
-            $"encontrouPicaretaTransform={encontrouPicaretaNoTransform} cooldown={emCooldown} morreu={morreu}",
-            this);
-    }
-
-    private static string ObterTagSegura(Transform alvo)
-    {
-        return alvo != null ? alvo.tag : "null";
     }
 
     public bool ReceberDanoDePicareta(GameObject origem)

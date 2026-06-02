@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 9206863076228226764}
   - component: {fileID: 8900474738893511074}
   - component: {fileID: 2147096935551787010}
+  - component: {fileID: 8765013490624175002}
   m_Layer: 0
   m_Name: Slime Verde
   m_TagString: Untagged
@@ -104,7 +105,6 @@ MonoBehaviour:
   layersAtaque:
     serializedVersion: 2
     m_Bits: 4294967295
-  debugAtaque: 1
   distanciaInvestida: 1.5
   alturaInvestida: 0.6
   duracaoInvestida: 0.35
@@ -134,6 +134,20 @@ MonoBehaviour:
   animator: {fileID: 0}
   rb: {fileID: 0}
   usarNavMeshAgent: 1
+--- !u!114 &8765013490624175002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 332626234346422910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9322d2d170d4fca97052ac0cfca6720, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
+  experienciaAoMorrer: 50
+  experienciaEntregue: 0
 --- !u!1 &1601991933917108835
 GameObject:
   m_ObjectHideFlags: 0

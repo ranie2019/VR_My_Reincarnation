@@ -32,9 +32,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     [SerializeField] private AudioClip somAdicionarItem;
     [SerializeField] private AudioClip somRetirarItem;
 
-    [Header("Debug temporario")]
-    [SerializeField] private bool debugDiagnosticoEncaixe = true;
-
     private readonly List<XRGrabInteractable> pilhaItens = new();
     private readonly Dictionary<XRGrabInteractable, EstadoOriginalItem> estadosOriginais = new();
 
@@ -547,12 +544,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         GarantirEscalaOriginal(item.transform);
-        LogDiagnosticoEncaixe("AplicarVisualNoSlot antes do posicionamento", item);
         PosicionarItemNoPontoDoSlot(item.transform);
         AjustarEscalaAdaptativa(item.transform);
         PosicionarItemNoPontoDoSlot(item.transform);
-        LogDiagnosticoEncaixe("AplicarVisualNoSlot depois do posicionamento", item);
-        StartCoroutine(LogDiagnosticoEncaixeAposUmFrame(item));
         Physics.SyncTransforms();
     }
 
@@ -1015,37 +1009,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     {
         if (audioSource != null && clip != null)
             audioSource.PlayOneShot(clip);
-    }
-
-    private IEnumerator LogDiagnosticoEncaixeAposUmFrame(XRGrabInteractable item)
-    {
-        yield return null;
-
-        if (item != null)
-            LogDiagnosticoEncaixe("AplicarVisualNoSlot apos 1 frame", item);
-    }
-
-    private void LogDiagnosticoEncaixe(string etapa, XRGrabInteractable item)
-    {
-        if (!debugDiagnosticoEncaixe || item == null)
-            return;
-
-        Transform ponto = ObterPontoEncaixe();
-        Transform socketAttach = socketInteractor != null ? socketInteractor.attachTransform : null;
-        Transform itemAttach = socketInteractor != null ? item.GetAttachTransform(socketInteractor) : item.attachTransform;
-
-        Debug.Log(
-            $"[SlotInventario][EncaixePivot] {etapa} | slot={name} | item={item.name} | " +
-            $"pontoEncaixe={DescreverTransform(ponto)} | socketAttach={DescreverTransform(socketAttach)} | " +
-            $"itemAttach={DescreverTransform(itemAttach)} | itemPosition={item.transform.position} | itemRotation={item.transform.rotation.eulerAngles}",
-            this);
-    }
-
-    private static string DescreverTransform(Transform alvo)
-    {
-        return alvo != null
-            ? $"{alvo.name} pos={alvo.position} rot={alvo.rotation.eulerAngles}"
-            : "null";
     }
 
     // --- ABRIR / FECHAR INVENTARIO -------------------------------------------
