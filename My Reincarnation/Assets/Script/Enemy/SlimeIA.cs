@@ -50,6 +50,12 @@ public class SlimeIA : MonoBehaviour
         public bool exigirMissaoAtiva = true;
     }
 
+    [Header("Vida")]
+    [SerializeField] private int vidaMaxima = 5;
+    [SerializeField] private int vidaAtual = 5;
+    [SerializeField] private float tempoAnimacaoDano = 0.35f;
+    [SerializeField] private float tempoParaMorrer = 3f;
+
     [Header("Patrulha")]
     [SerializeField] private Transform[] pontosPatrulha;
     [SerializeField] private float velocidadePatrulha = 1.2f;
@@ -63,28 +69,35 @@ public class SlimeIA : MonoBehaviour
     [SerializeField] private LayerMask layersObstaculo;
     [SerializeField] private float distanciaIniciarPerseguicao = 5f;
 
-    [Header("Debug visual")]
-    [SerializeField] private bool desenharGizmos = true;
-    [SerializeField] private bool desenharGizmosSempre = true;
-    [SerializeField] private float alturaOlhos = 0.8f;
-    [SerializeField] private Transform pontoOlhos;
-
-    [Header("Perseguicao e ataque")]
+    [Header("Ataque")]
     [SerializeField] private float velocidadePerseguicao = 2.4f;
     [SerializeField] private float distanciaAtaque = 1.3f;
-    [SerializeField] private float cooldownAtaque = 1.5f;
+    [SerializeField] private int danoAtaque = 1;
+    [SerializeField] private Transform pontoOrigemAtaque;
+    [SerializeField] private float alturaOrigemAtaque = 0.7f;
+    [SerializeField] private float raioAtaque = 0.35f;
+    [SerializeField] private float alcanceAtaque = 1.2f;
+    [SerializeField] private LayerMask layersAtaque = ~0;
+    [SerializeField] private bool debugAtaque = true;
 
-    [Header("Vida")]
-    [SerializeField] private int vidaMaxima = 5;
-    [SerializeField] private int vidaAtual = 5;
-    [SerializeField] private bool morto;
-    [SerializeField] private float tempoAnimacaoDano = 0.35f;
-    [SerializeField] private bool destruirDepoisDeMorrer;
-    [SerializeField] private float tempoParaDestruirDepoisDaMorte = 3f;
+    [Header("Investida")]
+    [SerializeField] private float distanciaInvestida = 1.5f;
+    [SerializeField] private float alturaInvestida = 0.6f;
+    [SerializeField] private float duracaoInvestida = 0.35f;
+    [SerializeField] private float cooldownAtaque = 1.2f;
+    [SerializeField] private float raioVerificacaoColisaoInvestida = 0.35f;
+    [SerializeField] private LayerMask layersBloqueioInvestida = ~0;
+    [SerializeField] private float margemParedeInvestida = 0.15f;
 
     [Header("Dano recebido")]
     [SerializeField] private TagDanoPermitida[] tagsQueCausamDano;
     [SerializeField] private float cooldownReceberDano = 0.25f;
+
+    [Header("Debug")]
+    [SerializeField] private bool desenharGizmos = true;
+    [SerializeField] private bool desenharGizmosSempre = true;
+    [SerializeField] private float alturaOlhos = 0.8f;
+    [SerializeField] private Transform pontoOlhos;
 
     [Header("Spawn normal ao morrer")]
     [SerializeField] private SpawnNormalConfig[] prefabsSpawnNormal;
@@ -103,11 +116,12 @@ public class SlimeIA : MonoBehaviour
     [SerializeField] private float volumeDano = 1f;
     [SerializeField] private float volumeMorrer = 1f;
 
-    [Header("Componentes")]
+    [Header("Componentes opcionais")]
     [SerializeField] private Animator animator;
     [SerializeField] private Rigidbody rb;
-    [SerializeField] private NavMeshAgent agent;
     [SerializeField] private bool usarNavMeshAgent = true;
+    private NavMeshAgent agent;
+    private CharacterController characterController;
 
     private const float VelocidadeRotacao = 8f;
     private const float IntervaloBuscaPlayer = 0.35f;
@@ -120,6 +134,12 @@ public class SlimeIA : MonoBehaviour
     private static readonly int AtacarHash = Animator.StringToHash("Atacar");
     private static readonly int PerseguirHash = Animator.StringToHash("Perseguir");
     private static readonly int AlertaHash = Animator.StringToHash("Alerta");
+    private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
+    private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
+    private static readonly int IsDeadHash = Animator.StringToHash("IsDead");
+    private static readonly int AttackHash = Animator.StringToHash("Attack");
+    private static readonly int HitHash = Animator.StringToHash("Hit");
+    private static readonly int DieHash = Animator.StringToHash("Die");
 
     private EstadoSlime estadoAtual = EstadoSlime.Parado;
     private EstadoSlime estadoAntesDano = EstadoSlime.Parado;
@@ -128,7 +148,13 @@ public class SlimeIA : MonoBehaviour
     private float tempoRestanteObservando;
     private float proximaBuscaPlayer;
     private float proximoAtaque;
+    private float proximoLogCooldownAtaque;
     private Coroutine rotinaDano;
+    private Coroutine rotinaInvestidaAtaque;
+    private bool impactoAtaqueResolvido;
+    private bool investidaAtaqueEmAndamento;
+    private bool agentPausadoPelaInvestida;
+    private bool agentUpdatePositionAntesInvestida;
     private bool somAndarTocando;
     private bool somMorteTocado;
     private bool temAndar;
@@ -138,8 +164,15 @@ public class SlimeIA : MonoBehaviour
     private bool temAtacar;
     private bool temPerseguir;
     private bool temAlerta;
+    private bool temIsMoving;
+    private bool temIsRunning;
+    private bool temIsDead;
+    private bool temAttack;
+    private bool temHit;
+    private bool temDie;
+    private bool morto;
     private Transform ultimoPlayerResponsavel;
-    private readonly Dictionary<int, float> proximoDanoPorOrigem = new();
+    private readonly Dictionary<int, float> proximoDanoPorOrigem = new Dictionary<int, float>();
     private static readonly string[] NomesMembrosDano =
     {
         "dano",
@@ -160,10 +193,13 @@ public class SlimeIA : MonoBehaviour
     private void Awake()
     {
         if (animator == null)
-            animator = GetComponent<Animator>();
+            animator = GetComponentInChildren<Animator>();
 
         if (rb == null)
             rb = GetComponent<Rigidbody>();
+
+        if (characterController == null)
+            characterController = GetComponent<CharacterController>();
 
         if (agent == null)
             agent = GetComponent<NavMeshAgent>();
@@ -197,6 +233,7 @@ public class SlimeIA : MonoBehaviour
 
     private void OnDisable()
     {
+        CancelarImpactoAtaquePendente();
         PararSomAndar();
     }
 
@@ -211,11 +248,20 @@ public class SlimeIA : MonoBehaviour
         distanciaIniciarPerseguicao = Mathf.Max(0f, distanciaIniciarPerseguicao);
         alturaOlhos = Mathf.Max(0f, alturaOlhos);
         distanciaAtaque = Mathf.Max(0f, distanciaAtaque);
+        danoAtaque = Mathf.Max(0, danoAtaque);
         cooldownAtaque = Mathf.Max(0f, cooldownAtaque);
+        alturaOrigemAtaque = Mathf.Max(0f, alturaOrigemAtaque);
+        raioAtaque = Mathf.Max(0.01f, raioAtaque);
+        alcanceAtaque = Mathf.Max(0.01f, alcanceAtaque);
+        distanciaInvestida = Mathf.Max(0f, distanciaInvestida);
+        alturaInvestida = Mathf.Max(0f, alturaInvestida);
+        duracaoInvestida = Mathf.Max(0.01f, duracaoInvestida);
+        raioVerificacaoColisaoInvestida = Mathf.Max(0.01f, raioVerificacaoColisaoInvestida);
+        margemParedeInvestida = Mathf.Max(0f, margemParedeInvestida);
         vidaMaxima = Mathf.Max(1, vidaMaxima);
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         tempoAnimacaoDano = Mathf.Max(0f, tempoAnimacaoDano);
-        tempoParaDestruirDepoisDaMorte = Mathf.Max(0f, tempoParaDestruirDepoisDaMorte);
+        tempoParaMorrer = Mathf.Max(0f, tempoParaMorrer);
         cooldownReceberDano = Mathf.Max(0f, cooldownReceberDano);
         NormalizarSpawnsNormais();
         NormalizarSpawnsMissao();
@@ -260,6 +306,8 @@ public class SlimeIA : MonoBehaviour
             Morrer();
             return;
         }
+
+        SetTriggerSeguro(HitHash, temHit);
 
         if (rotinaDano != null)
             StopCoroutine(rotinaDano);
@@ -414,7 +462,7 @@ public class SlimeIA : MonoBehaviour
         if (origem == null)
             return false;
 
-        HashSet<Component> componentesVisitados = new();
+        HashSet<Component> componentesVisitados = new HashSet<Component>();
         Component[] componentesPais = origem.GetComponentsInParent<Component>(true);
         for (int i = 0; i < componentesPais.Length; i++)
         {
@@ -660,7 +708,8 @@ public class SlimeIA : MonoBehaviour
         }
 
         float distancia = DistanciaXZ(transform.position, alvoPlayer.position);
-        if (distancia <= distanciaAtaque)
+        if (distancia <= distanciaAtaque ||
+            (ExisteBloqueadorEntreInimigoEPlayer(alvoPlayer, out RaycastHit hitBloqueio) && hitBloqueio.distance <= AlcanceEfetivoAtaque()))
         {
             MudarEstado(EstadoSlime.Atacando);
             return;
@@ -678,22 +727,542 @@ public class SlimeIA : MonoBehaviour
             return;
         }
 
+        if (investidaAtaqueEmAndamento)
+        {
+            OlharPara(alvoPlayer.position);
+            return;
+        }
+
         PararMovimento();
         OlharPara(alvoPlayer.position);
 
         float distancia = DistanciaXZ(transform.position, alvoPlayer.position);
-        if (distancia > distanciaAtaque)
+        bool bloqueadorEmAlcance = ExisteBloqueadorEntreInimigoEPlayer(alvoPlayer, out RaycastHit hitBloqueio) &&
+                                   hitBloqueio.distance <= AlcanceEfetivoAtaque();
+
+        if (distancia > distanciaAtaque && !bloqueadorEmAlcance)
         {
             MudarEstado(distancia <= distanciaIniciarPerseguicao ? EstadoSlime.Perseguindo : EstadoSlime.Alerta);
             return;
         }
 
-        if (Time.time >= proximoAtaque)
+        if (Time.time < proximoAtaque)
         {
-            proximoAtaque = Time.time + cooldownAtaque;
-            TocarSomUmaVez(somAtacar, volumeAtacar);
-            Debug.Log($"[SlimeIA] {name} atacou {alvoPlayer.name}.", this);
+            RegistrarLogCooldownAtaque();
+            return;
         }
+
+        if (debugAtaque)
+            Debug.Log($"[SlimeIA] Slime entrou no alcance de ataque: {name}.", this);
+
+        IniciarInvestidaAtaque();
+    }
+
+    private bool ExisteBloqueadorEntreInimigoEPlayer(Transform playerAlvo, out RaycastHit hitBloqueio)
+    {
+        hitBloqueio = default;
+        if (!TentarObterPrimeiroHitAtaque(playerAlvo, out RaycastHit primeiroHit))
+            return false;
+
+        if (ColliderBloqueiaMesmoSendoDoPlayer(primeiroHit.collider))
+        {
+            hitBloqueio = primeiroHit;
+            return true;
+        }
+
+        if (PertenceAoPlayerAlvo(primeiroHit.collider, playerAlvo))
+            return false;
+
+        hitBloqueio = primeiroHit;
+        return true;
+    }
+
+    private void IniciarInvestidaAtaque()
+    {
+        if (investidaAtaqueEmAndamento || alvoPlayer == null)
+            return;
+
+        proximoAtaque = Time.time + cooldownAtaque;
+        TocarSomUmaVez(somAtacar, volumeAtacar);
+        SetTriggerSeguro(AttackHash, temAttack);
+
+        if (rotinaInvestidaAtaque != null)
+            StopCoroutine(rotinaInvestidaAtaque);
+
+        rotinaInvestidaAtaque = StartCoroutine(InvestidaAtaque());
+    }
+
+    private IEnumerator InvestidaAtaque()
+    {
+        investidaAtaqueEmAndamento = true;
+        impactoAtaqueResolvido = false;
+
+        PararMovimento();
+        PausarAgentParaInvestida();
+
+        Vector3 posicaoInicial = transform.position;
+        Vector3 direcao = ObterDirecaoHorizontalInvestida();
+        OlharNaDirecaoInstantaneo(direcao);
+
+        if (debugAtaque)
+            Debug.Log($"[SlimeIA] Slime iniciou investida: {name}.", this);
+
+        Vector3 posicaoAlvo = posicaoInicial + direcao * distanciaInvestida;
+        float duracao = Mathf.Max(0.01f, duracaoInvestida);
+        float tempo = 0f;
+        bool colidiuDuranteInvestida = false;
+
+        while (tempo < duracao && !morto)
+        {
+            tempo += Time.deltaTime;
+            float t = Mathf.Clamp01(tempo / duracao);
+
+            Vector3 posicaoHorizontal = Vector3.Lerp(posicaoInicial, posicaoAlvo, t);
+            float alturaPulo = Mathf.Sin(t * Mathf.PI) * alturaInvestida;
+            Vector3 posicaoDesejada = new Vector3(posicaoHorizontal.x, posicaoInicial.y + alturaPulo, posicaoHorizontal.z);
+
+            bool bloqueadoNoPasso = MoverInvestidaComColisao(posicaoDesejada, direcao, out RaycastHit hitBloqueioPasso);
+            OlharNaDirecaoInstantaneo(direcao);
+
+            if (bloqueadoNoPasso)
+            {
+                colidiuDuranteInvestida = true;
+                ResolverImpactoCollider(hitBloqueioPasso.collider);
+                AplicarPosicaoInvestida(posicaoInicial);
+
+                if (debugAtaque && hitBloqueioPasso.collider != null)
+                    Debug.Log($"[SlimeIA] Slime colidiu durante investida e voltou para posicao inicial: {hitBloqueioPasso.collider.name}.", this);
+
+                break;
+            }
+
+            yield return null;
+        }
+
+        if (!morto && !colidiuDuranteInvestida)
+        {
+            Vector3 posicaoFinal = AjustarPosicaoFinalInvestida(transform.position, posicaoInicial.y);
+            AplicarPosicaoInvestida(posicaoFinal);
+
+            if (!impactoAtaqueResolvido)
+                ResolverImpactoAtaque();
+        }
+
+        RetomarAgentDepoisInvestida();
+        investidaAtaqueEmAndamento = false;
+        rotinaInvestidaAtaque = null;
+
+        if (debugAtaque)
+        {
+            Debug.Log($"[SlimeIA] Slime terminou ataque: {name}.", this);
+            if (!morto && alvoPlayer != null && DistanciaXZ(transform.position, alvoPlayer.position) <= distanciaAtaque)
+                Debug.Log($"[SlimeIA] Slime atacando novamente porque Player ainda esta no alcance: {name}.", this);
+        }
+    }
+
+    private void RegistrarLogCooldownAtaque()
+    {
+        if (!debugAtaque || Time.time < proximoLogCooldownAtaque)
+            return;
+
+        proximoLogCooldownAtaque = Time.time + 0.35f;
+        Debug.Log($"[SlimeIA] Slime aguardando cooldown: {name}.", this);
+    }
+
+    private void PausarAgentParaInvestida()
+    {
+        if (!UsandoAgent())
+            return;
+
+        agentPausadoPelaInvestida = true;
+        agentUpdatePositionAntesInvestida = agent.updatePosition;
+        agent.isStopped = true;
+
+        if (agent.hasPath)
+            agent.ResetPath();
+
+        agent.updatePosition = false;
+    }
+
+    private void RetomarAgentDepoisInvestida()
+    {
+        if (!agentPausadoPelaInvestida)
+            return;
+
+        agentPausadoPelaInvestida = false;
+
+        if (agent == null || !agent.enabled)
+            return;
+
+        if (agent.isOnNavMesh)
+            agent.Warp(transform.position);
+
+        agent.updatePosition = agentUpdatePositionAntesInvestida;
+
+        if (!morto)
+            agent.isStopped = false;
+    }
+
+    private Vector3 ObterDirecaoHorizontalInvestida()
+    {
+        Vector3 direcao = alvoPlayer != null ? alvoPlayer.position - transform.position : transform.forward;
+        direcao.y = 0f;
+
+        if (direcao.sqrMagnitude <= 0.0001f)
+        {
+            direcao = transform.forward;
+            direcao.y = 0f;
+        }
+
+        if (direcao.sqrMagnitude <= 0.0001f)
+            return Vector3.forward;
+
+        return direcao.normalized;
+    }
+
+    private void OlharNaDirecaoInstantaneo(Vector3 direcao)
+    {
+        direcao.y = 0f;
+        if (direcao.sqrMagnitude <= 0.0001f)
+            return;
+
+        transform.rotation = Quaternion.LookRotation(direcao.normalized, Vector3.up);
+        CorrigirInclinacao();
+    }
+
+    private bool MoverInvestidaComColisao(Vector3 posicaoDesejada, Vector3 direcaoPadrao, out RaycastHit hitBloqueio)
+    {
+        hitBloqueio = default;
+
+        Vector3 posicaoAtual = transform.position;
+        Vector3 deltaHorizontal = new Vector3(
+            posicaoDesejada.x - posicaoAtual.x,
+            0f,
+            posicaoDesejada.z - posicaoAtual.z);
+
+        if (deltaHorizontal.sqrMagnitude > 0.0001f)
+        {
+            Vector3 direcao = deltaHorizontal.normalized;
+            float distancia = deltaHorizontal.magnitude;
+
+            if (TentarObterBloqueioInvestida(posicaoAtual, direcao, distancia, out hitBloqueio))
+                return true;
+        }
+        else if (direcaoPadrao.sqrMagnitude > 0.0001f && TentarObterBloqueioInvestida(posicaoAtual, direcaoPadrao.normalized, 0.05f, out hitBloqueio))
+        {
+            return true;
+        }
+
+        AplicarPosicaoInvestida(posicaoDesejada);
+        return false;
+    }
+
+    private bool TentarObterBloqueioInvestida(Vector3 origem, Vector3 direcao, float distancia, out RaycastHit hitBloqueio)
+    {
+        hitBloqueio = default;
+
+        if (direcao.sqrMagnitude <= 0.0001f || distancia <= 0f)
+            return false;
+
+        RaycastHit[] hits = Physics.SphereCastAll(
+            ObterOrigemCastInvestida(origem),
+            raioVerificacaoColisaoInvestida,
+            direcao.normalized,
+            distancia + margemParedeInvestida,
+            layersBloqueioInvestida,
+            QueryTriggerInteraction.Ignore);
+
+        if (hits == null || hits.Length == 0)
+            return false;
+
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider col = hits[i].collider;
+            if (col == null || PertenceAEsteInimigo(col))
+                continue;
+
+            hitBloqueio = hits[i];
+            return true;
+        }
+
+        return false;
+    }
+
+    private Vector3 ObterOrigemCastInvestida(Vector3 posicaoBase)
+    {
+        float alturaCast = Mathf.Max(alturaOrigemAtaque, raioVerificacaoColisaoInvestida + 0.05f);
+        return posicaoBase + Vector3.up * alturaCast;
+    }
+
+    private Vector3 AjustarPosicaoFinalInvestida(Vector3 posicaoAtual, float yPadrao)
+    {
+        Vector3 posicaoFinal = new Vector3(posicaoAtual.x, yPadrao, posicaoAtual.z);
+        float alturaBusca = Mathf.Max(alturaInvestida + raioVerificacaoColisaoInvestida + 1f, 1.5f);
+        Vector3 origem = posicaoFinal + Vector3.up * alturaBusca;
+
+        RaycastHit[] hits = Physics.RaycastAll(
+            origem,
+            Vector3.down,
+            alturaBusca + 2f,
+            layersBloqueioInvestida,
+            QueryTriggerInteraction.Ignore);
+
+        if (hits == null || hits.Length == 0)
+            return posicaoFinal;
+
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider col = hits[i].collider;
+            if (col == null || PertenceAEsteInimigo(col) || PertenceAoPlayerAlvo(col, alvoPlayer))
+                continue;
+
+            posicaoFinal.y = hits[i].point.y;
+            return posicaoFinal;
+        }
+
+        return posicaoFinal;
+    }
+
+    private void AplicarPosicaoInvestida(Vector3 posicao)
+    {
+        if (rb != null)
+        {
+            if (!rb.isKinematic)
+                rb.linearVelocity = Vector3.zero;
+
+            rb.MovePosition(posicao);
+            return;
+        }
+
+        if (characterController != null && characterController.enabled)
+        {
+            characterController.Move(posicao - transform.position);
+            return;
+        }
+
+        transform.position = posicao;
+    }
+
+    private void ResolverImpactoCollider(Collider col)
+    {
+        if (col == null || alvoPlayer == null || impactoAtaqueResolvido)
+            return;
+
+        if (ColliderBloqueiaMesmoSendoDoPlayer(col) || !PertenceAoPlayerAlvo(col, alvoPlayer))
+        {
+            impactoAtaqueResolvido = true;
+            RegistrarBloqueioSeForEscudo(col, alvoPlayer);
+
+            if (debugAtaque)
+                Debug.Log($"[SlimeIA] {name} teve ataque bloqueado por {col.name}.", this);
+
+            return;
+        }
+
+        impactoAtaqueResolvido = true;
+        bool danoAplicado = TentarAplicarDanoNoPlayer(alvoPlayer, danoAtaque);
+        if (debugAtaque)
+        {
+            string resultado = danoAplicado ? "dano aplicado" : "sem componente de vida no Player";
+            Debug.Log($"[SlimeIA] {name} acertou {alvoPlayer.name}: {resultado}.", this);
+        }
+    }
+
+    private void ResolverImpactoAtaque()
+    {
+        if (morto || alvoPlayer == null || estadoAtual != EstadoSlime.Atacando)
+            return;
+
+        if (!TentarObterPrimeiroHitAtaque(alvoPlayer, out RaycastHit hit))
+        {
+            if (debugAtaque)
+                Debug.Log($"[SlimeIA] {name} resolveu impacto sem atingir collider.", this);
+            return;
+        }
+
+        Collider col = hit.collider;
+        if (col == null)
+            return;
+
+        ResolverImpactoCollider(col);
+    }
+
+    private bool TentarObterPrimeiroHitAtaque(Transform playerAlvo, out RaycastHit primeiroHit)
+    {
+        primeiroHit = default;
+
+        Vector3 origem = ObterOrigemAtaque();
+        Vector3 direcao = ObterDirecaoAtaque(playerAlvo);
+        float alcance = AlcanceEfetivoAtaque();
+
+        if (direcao.sqrMagnitude <= 0.0001f || alcance <= 0f)
+            return false;
+
+        RaycastHit[] hits = Physics.SphereCastAll(
+            origem,
+            raioAtaque,
+            direcao.normalized,
+            alcance,
+            layersAtaque,
+            QueryTriggerInteraction.Ignore);
+
+        if (hits == null || hits.Length == 0)
+            return false;
+
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider col = hits[i].collider;
+            if (col == null || PertenceAEsteInimigo(col))
+                continue;
+
+            primeiroHit = hits[i];
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TentarAplicarDanoNoPlayer(Transform playerAlvo, int dano)
+    {
+        if (playerAlvo == null || dano <= 0)
+            return false;
+
+        Component[] componentes = playerAlvo.GetComponentsInChildren<Component>(true);
+        for (int i = 0; i < componentes.Length; i++)
+        {
+            Component componente = componentes[i];
+            if (componente == null || componente == this)
+                continue;
+
+            MethodInfo metodo = componente.GetType().GetMethod(
+                "ReceberDano",
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                new[] { typeof(int) },
+                null);
+
+            if (metodo == null)
+                continue;
+
+            metodo.Invoke(componente, new object[] { dano });
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool ColliderBloqueiaMesmoSendoDoPlayer(Collider col)
+    {
+        if (col == null)
+            return false;
+
+        Escudo escudo = col.GetComponentInParent<Escudo>();
+        if (escudo != null && !escudo.Quebrado)
+            return true;
+
+        return col.GetComponentInParent<Espada>() != null;
+    }
+
+    private bool PertenceAoPlayerAlvo(Collider col, Transform playerAlvo)
+    {
+        if (col == null || playerAlvo == null)
+            return false;
+
+        Transform t = col.transform;
+        if (t == playerAlvo || t.IsChildOf(playerAlvo))
+            return true;
+
+        if (col.attachedRigidbody != null)
+        {
+            Transform rbTransform = col.attachedRigidbody.transform;
+            if (rbTransform == playerAlvo || rbTransform.IsChildOf(playerAlvo))
+                return true;
+        }
+
+        Transform root = t.root;
+        return root != null && (root == playerAlvo || root.IsChildOf(playerAlvo));
+    }
+
+    private bool PertenceAEsteInimigo(Collider col)
+    {
+        if (col == null)
+            return false;
+
+        Transform t = col.transform;
+        if (t == transform || t.IsChildOf(transform))
+            return true;
+
+        if (col.attachedRigidbody != null)
+        {
+            Transform rbTransform = col.attachedRigidbody.transform;
+            if (rbTransform == transform || rbTransform.IsChildOf(transform))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void RegistrarBloqueioSeForEscudo(Collider col, Transform playerAlvo)
+    {
+        if (col == null)
+            return;
+
+        Escudo escudo = col.GetComponentInParent<Escudo>();
+        if (escudo != null && escudo.EstaProtegendoPlayer(playerAlvo))
+            escudo.RegistrarBloqueio(gameObject);
+    }
+
+    private Vector3 ObterOrigemAtaque()
+    {
+        if (pontoOrigemAtaque != null)
+            return pontoOrigemAtaque.position;
+
+        return transform.position + Vector3.up * alturaOrigemAtaque;
+    }
+
+    private Vector3 ObterDirecaoAtaque(Transform playerAlvo)
+    {
+        Vector3 origem = ObterOrigemAtaque();
+        Vector3 direcao = playerAlvo != null
+            ? playerAlvo.position + Vector3.up * alturaOrigemAtaque - origem
+            : ObterFrenteAtaque();
+
+        if (direcao.sqrMagnitude <= 0.0001f)
+            direcao = ObterFrenteAtaque();
+
+        return direcao.normalized;
+    }
+
+    private Vector3 ObterFrenteAtaque()
+    {
+        if (pontoOrigemAtaque != null)
+            return pontoOrigemAtaque.forward;
+
+        return transform.forward;
+    }
+
+    private float AlcanceEfetivoAtaque()
+    {
+        return Mathf.Max(0.01f, alcanceAtaque);
+    }
+
+    private void CancelarImpactoAtaquePendente()
+    {
+        if (rotinaInvestidaAtaque != null)
+        {
+            StopCoroutine(rotinaInvestidaAtaque);
+            rotinaInvestidaAtaque = null;
+        }
+
+        investidaAtaqueEmAndamento = false;
+        impactoAtaqueResolvido = false;
+        RetomarAgentDepoisInvestida();
     }
 
     private void AtualizarAlvoPlayer()
@@ -819,6 +1388,7 @@ public class SlimeIA : MonoBehaviour
 
         DesenharArcoVisao(origem, raioCampoVisao, anguloCampoVisao, new Color(0f, 0.8f, 1f, 1f));
         DesenharArcoVisao(origem, distanciaIniciarPerseguicao, anguloCampoVisao, new Color(1f, 0.35f, 0.1f, 1f));
+        DesenharGizmosAtaque();
 
         Transform alvoGizmo = ObterAlvoParaGizmo();
         if (alvoGizmo == null || !EstaDentroDoRaioEAngulo(alvoGizmo, out float distancia))
@@ -864,6 +1434,21 @@ public class SlimeIA : MonoBehaviour
             Gizmos.DrawLine(anterior, atual);
             anterior = atual;
         }
+    }
+
+    private void DesenharGizmosAtaque()
+    {
+        if (!debugAtaque)
+            return;
+
+        Vector3 origem = ObterOrigemAtaque();
+        Vector3 direcao = Application.isPlaying && alvoPlayer != null ? ObterDirecaoAtaque(alvoPlayer) : ObterFrentePlana();
+        Vector3 destino = origem + direcao * AlcanceEfetivoAtaque();
+
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(origem, raioAtaque);
+        Gizmos.DrawLine(origem, destino);
+        Gizmos.DrawWireSphere(destino, raioAtaque);
     }
 
     private Transform ObterAlvoParaGizmo()
@@ -966,33 +1551,44 @@ public class SlimeIA : MonoBehaviour
         switch (estadoAtual)
         {
             case EstadoSlime.Patrulhando:
-                AtualizarAnimator(true, false, false, false, false, false, false);
+                AtualizarAnimator(true, false, false, false, false, false, false, true, false, false);
                 break;
             case EstadoSlime.Observando:
-                AtualizarAnimator(false, true, false, false, false, false, false);
+                AtualizarAnimator(false, true, false, false, false, false, false, false, false, false);
                 break;
             case EstadoSlime.Alerta:
-                AtualizarAnimator(false, false, true, false, false, false, false);
+                AtualizarAnimator(false, false, true, false, false, false, false, false, false, false);
                 break;
             case EstadoSlime.Perseguindo:
-                AtualizarAnimator(true, false, false, true, false, false, false);
+                AtualizarAnimator(true, false, false, true, false, false, false, true, true, false);
                 break;
             case EstadoSlime.Atacando:
-                AtualizarAnimator(false, false, false, true, true, false, false);
+                AtualizarAnimator(false, false, false, true, true, false, false, false, false, false);
                 break;
             case EstadoSlime.TomandoDano:
-                AtualizarAnimator(false, false, false, false, false, true, false);
+                AtualizarAnimator(false, false, false, false, false, true, false, false, false, false);
                 break;
             case EstadoSlime.Morto:
-                AtualizarAnimator(false, false, false, false, false, false, true);
+                AtualizarAnimator(false, false, false, false, false, false, true, false, false, true);
+                SetTriggerSeguro(DieHash, temDie);
                 break;
             default:
-                AtualizarAnimator(false, false, false, false, false, false, false);
+                AtualizarAnimator(false, false, false, false, false, false, false, false, false, false);
                 break;
         }
     }
 
-    private void AtualizarAnimator(bool andar, bool observa, bool alerta, bool perseguir, bool atacar, bool dano, bool morrer)
+    private void AtualizarAnimator(
+        bool andar,
+        bool observa,
+        bool alerta,
+        bool perseguir,
+        bool atacar,
+        bool dano,
+        bool morrer,
+        bool isMoving,
+        bool isRunning,
+        bool isDead)
     {
         SetBoolSeguro(AndarHash, temAndar, andar);
         SetBoolSeguro(ObservaHash, temObserva, observa);
@@ -1001,12 +1597,21 @@ public class SlimeIA : MonoBehaviour
         SetBoolSeguro(AtacarHash, temAtacar, atacar);
         SetBoolSeguro(DanoHash, temDano, dano);
         SetBoolSeguro(MorrerHash, temMorrer, morrer);
+        SetBoolSeguro(IsMovingHash, temIsMoving, isMoving);
+        SetBoolSeguro(IsRunningHash, temIsRunning, isRunning);
+        SetBoolSeguro(IsDeadHash, temIsDead, isDead);
     }
 
     private void SetBoolSeguro(int hash, bool existeParametro, bool valor)
     {
         if (animator != null && existeParametro)
             animator.SetBool(hash, valor);
+    }
+
+    private void SetTriggerSeguro(int hash, bool existeParametro)
+    {
+        if (animator != null && existeParametro)
+            animator.SetTrigger(hash);
     }
 
     private void AtualizarAudioPorEstado()
@@ -1081,6 +1686,7 @@ public class SlimeIA : MonoBehaviour
             rotinaDano = null;
         }
 
+        CancelarImpactoAtaquePendente();
         PararMovimento();
         PararSomAndar();
         MudarEstado(EstadoSlime.Morto);
@@ -1088,8 +1694,10 @@ public class SlimeIA : MonoBehaviour
         SpawnarPrefabsNormais();
         SpawnarPrefabsMissao();
 
-        if (destruirDepoisDeMorrer)
-            Destroy(gameObject, tempoParaDestruirDepoisDaMorte);
+        if (debugAtaque)
+            Debug.Log($"[SlimeIA] Slime morreu: {name}.", this);
+
+        Destroy(gameObject, tempoParaMorrer);
     }
 
     private void SpawnarPrefabsNormais()
@@ -1293,6 +1901,20 @@ public class SlimeIA : MonoBehaviour
 
     private void AtualizarCacheParametrosAnimator()
     {
+        temAndar = false;
+        temDano = false;
+        temMorrer = false;
+        temObserva = false;
+        temAtacar = false;
+        temPerseguir = false;
+        temAlerta = false;
+        temIsMoving = false;
+        temIsRunning = false;
+        temIsDead = false;
+        temAttack = false;
+        temHit = false;
+        temDie = false;
+
         if (animator == null)
             return;
 
@@ -1315,6 +1937,18 @@ public class SlimeIA : MonoBehaviour
                 temPerseguir = true;
             else if (parametro.nameHash == AlertaHash && parametro.type == AnimatorControllerParameterType.Bool)
                 temAlerta = true;
+            else if (parametro.nameHash == IsMovingHash && parametro.type == AnimatorControllerParameterType.Bool)
+                temIsMoving = true;
+            else if (parametro.nameHash == IsRunningHash && parametro.type == AnimatorControllerParameterType.Bool)
+                temIsRunning = true;
+            else if (parametro.nameHash == IsDeadHash && parametro.type == AnimatorControllerParameterType.Bool)
+                temIsDead = true;
+            else if (parametro.nameHash == AttackHash && parametro.type == AnimatorControllerParameterType.Trigger)
+                temAttack = true;
+            else if (parametro.nameHash == HitHash && parametro.type == AnimatorControllerParameterType.Trigger)
+                temHit = true;
+            else if (parametro.nameHash == DieHash && parametro.type == AnimatorControllerParameterType.Trigger)
+                temDie = true;
         }
     }
 }
