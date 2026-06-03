@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Text;
 using UnityEngine;
@@ -6,6 +7,9 @@ using UnityEngine;
 public class StatusPlayer : MonoBehaviour
 {
     private const float MultiplicadorVidaManaPorNivel = 1.10f;
+    private const int ValorInicialAtributo = 10;
+
+    public event Action StatusAlterado;
 
     [Header("Identidade")]
     [SerializeField] private string nome = "Ranie";
@@ -21,6 +25,11 @@ public class StatusPlayer : MonoBehaviour
     [SerializeField] private int pontosStatusDisponiveis;
     [SerializeField] private int pontosStatusPorNivel = 10;
 
+    [Header("Level Up")]
+    public AudioSource audioSource;
+    public AudioClip somLevelUp;
+    public ParticleSystem efeitoLevelUp;
+
     [Header("Vida e Mana")]
     [SerializeField] private int vidaAtual = 100;
     [SerializeField] private int vidaMaxima = 100;
@@ -28,21 +37,21 @@ public class StatusPlayer : MonoBehaviour
     [SerializeField] private int manaMaxima = 50;
 
     [Header("Atributos Base")]
-    [SerializeField] private int forca;
-    [SerializeField] private int constituicao;
-    [SerializeField] private int agilidade;
-    [SerializeField] private int velocidade;
-    [SerializeField] private int inteligencia;
-    [SerializeField] private int espirito;
-    [SerializeField] private int sorte;
+    [SerializeField] private int forca = ValorInicialAtributo;
+    [SerializeField] private int constituicao = ValorInicialAtributo;
+    [SerializeField] private int agilidade = ValorInicialAtributo;
+    [SerializeField] private int velocidade = ValorInicialAtributo;
+    [SerializeField] private int inteligencia = ValorInicialAtributo;
+    [SerializeField] private int espirito = ValorInicialAtributo;
+    [SerializeField] private int sorte = ValorInicialAtributo;
 
     [Header("Atributos Extras")]
-    [SerializeField] private int destreza;
-    [SerializeField] private int vigor;
-    [SerializeField] private int percepcao;
-    [SerializeField] private int resistencia;
+    [SerializeField] private int destreza = ValorInicialAtributo;
+    [SerializeField] private int vigor = ValorInicialAtributo;
+    [SerializeField] private int percepcao = ValorInicialAtributo;
+    [SerializeField] private int resistencia = ValorInicialAtributo;
     [SerializeField] private int mana;
-    [SerializeField] private int carisma;
+    [SerializeField] private int carisma = ValorInicialAtributo;
     [SerializeField] private int critico;
     [SerializeField] private int defesa;
 
@@ -65,6 +74,14 @@ public class StatusPlayer : MonoBehaviour
     [SerializeField] private int bonusCritico;
     [SerializeField] private int bonusDefesa;
 
+    private void Awake()
+    {
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
+        GarantirAtributosIniciais();
+    }
+
     private void OnValidate()
     {
         nivel = Mathf.Max(0, nivel);
@@ -77,6 +94,7 @@ public class StatusPlayer : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         manaMaxima = Mathf.Max(1, manaMaxima);
         manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+        GarantirAtributosIniciais();
     }
 
     public void ReceberExperiencia(int quantidade)
@@ -86,6 +104,7 @@ public class StatusPlayer : MonoBehaviour
 
         experienciaAtual += quantidade;
         VerificarLevelUp();
+        NotificarStatusAlterado();
     }
 
     private void VerificarLevelUp()
@@ -110,6 +129,7 @@ public class StatusPlayer : MonoBehaviour
         manaMaxima = Mathf.Max(1, Mathf.CeilToInt(manaMaxima * MultiplicadorVidaManaPorNivel));
         vidaAtual = vidaMaxima;
         manaAtual = manaMaxima;
+        TocarFeedbackLevelUp();
     }
 
     public bool GastarPontoEmAtributo(string nomeAtributo)
@@ -122,56 +142,177 @@ public class StatusPlayer : MonoBehaviour
         switch (atributo)
         {
             case "forca":
-                forca += 1;
-                break;
+            case "strength":
+                return AdicionarPontoForca();
             case "constituicao":
-                constituicao += 1;
-                break;
+            case "constitution":
+                return AdicionarPontoConstituicao();
             case "agilidade":
-                agilidade += 1;
-                break;
+            case "agility":
+                return AdicionarPontoAgilidade();
             case "velocidade":
-                velocidade += 1;
-                break;
+            case "speed":
+                return AdicionarPontoVelocidade();
             case "inteligencia":
-                inteligencia += 1;
-                break;
+            case "intelligence":
+                return AdicionarPontoInteligencia();
             case "espirito":
-                espirito += 1;
-                break;
+            case "spirit":
+                return AdicionarPontoEspirito();
             case "sorte":
-                sorte += 1;
-                break;
+            case "luck":
+                return AdicionarPontoSorte();
             case "destreza":
-                destreza += 1;
-                break;
+            case "dexterity":
+                return AdicionarPontoDestreza();
+            case "force":
             case "vigor":
-                vigor += 1;
-                break;
+                return AdicionarPontoForcaExtra();
             case "percepcao":
-                percepcao += 1;
-                break;
+            case "perception":
+                return AdicionarPontoPercepcao();
             case "resistencia":
-                resistencia += 1;
-                break;
+            case "resistance":
+                return AdicionarPontoResistencia();
             case "mana":
-                mana += 1;
-                break;
+                return AdicionarPontoMana();
             case "carisma":
-                carisma += 1;
-                break;
+            case "charisma":
+                return AdicionarPontoCarisma();
             case "critico":
-                critico += 1;
-                break;
+                return AdicionarPontoCritico();
             case "defesa":
-                defesa += 1;
-                break;
+                return AdicionarPontoDefesa();
             default:
                 return false;
         }
+    }
 
+    public bool AdicionarPontoForca()
+    {
+        return ConsumirPontoStatus(() => forca += 1);
+    }
+
+    public bool AdicionarPontoConstituicao()
+    {
+        return ConsumirPontoStatus(() => constituicao += 1);
+    }
+
+    public bool AdicionarPontoAgilidade()
+    {
+        return ConsumirPontoStatus(() => agilidade += 1);
+    }
+
+    public bool AdicionarPontoVelocidade()
+    {
+        return ConsumirPontoStatus(() => velocidade += 1);
+    }
+
+    public bool AdicionarPontoInteligencia()
+    {
+        return ConsumirPontoStatus(() => inteligencia += 1);
+    }
+
+    public bool AdicionarPontoEspirito()
+    {
+        return ConsumirPontoStatus(() => espirito += 1);
+    }
+
+    public bool AdicionarPontoDestreza()
+    {
+        return ConsumirPontoStatus(() => destreza += 1);
+    }
+
+    public bool AdicionarPontoForcaExtra()
+    {
+        return ConsumirPontoStatus(() => vigor += 1);
+    }
+
+    public bool AdicionarPontoVigor()
+    {
+        return AdicionarPontoForcaExtra();
+    }
+
+    public bool AdicionarPontoPercepcao()
+    {
+        return ConsumirPontoStatus(() => percepcao += 1);
+    }
+
+    public bool AdicionarPontoResistencia()
+    {
+        GarantirResistenciaInicial();
+        return ConsumirPontoStatus(() => resistencia += 1);
+    }
+
+    public bool AdicionarPontoCarisma()
+    {
+        return ConsumirPontoStatus(() => carisma += 1);
+    }
+
+    public bool AdicionarPontoSorte()
+    {
+        return ConsumirPontoStatus(() => sorte += 1);
+    }
+
+    public bool AdicionarPontoMana()
+    {
+        return ConsumirPontoStatus(() => mana += 1);
+    }
+
+    public bool AdicionarPontoCritico()
+    {
+        return ConsumirPontoStatus(() => critico += 1);
+    }
+
+    public bool AdicionarPontoDefesa()
+    {
+        return ConsumirPontoStatus(() => defesa += 1);
+    }
+
+    private bool ConsumirPontoStatus(Action adicionarAtributo)
+    {
+        if (pontosStatusDisponiveis <= 0 || adicionarAtributo == null)
+            return false;
+
+        adicionarAtributo();
         pontosStatusDisponiveis -= 1;
+        NotificarStatusAlterado();
         return true;
+    }
+
+    private void GarantirAtributosIniciais()
+    {
+        forca = Mathf.Max(ValorInicialAtributo, forca);
+        constituicao = Mathf.Max(ValorInicialAtributo, constituicao);
+        agilidade = Mathf.Max(ValorInicialAtributo, agilidade);
+        velocidade = Mathf.Max(ValorInicialAtributo, velocidade);
+        inteligencia = Mathf.Max(ValorInicialAtributo, inteligencia);
+        espirito = Mathf.Max(ValorInicialAtributo, espirito);
+        sorte = Mathf.Max(ValorInicialAtributo, sorte);
+        destreza = Mathf.Max(ValorInicialAtributo, destreza);
+        vigor = Mathf.Max(ValorInicialAtributo, vigor);
+        percepcao = Mathf.Max(ValorInicialAtributo, percepcao);
+        GarantirResistenciaInicial();
+        carisma = Mathf.Max(ValorInicialAtributo, carisma);
+    }
+
+    private void GarantirResistenciaInicial()
+    {
+        resistencia = Mathf.Max(ValorInicialAtributo, resistencia);
+    }
+
+    private void TocarFeedbackLevelUp()
+    {
+        if (audioSource != null && somLevelUp != null)
+            audioSource.PlayOneShot(somLevelUp);
+
+        if (efeitoLevelUp != null)
+            efeitoLevelUp.Play();
+    }
+
+    private void NotificarStatusAlterado()
+    {
+        StatusAlterado?.Invoke();
     }
 
     private static string NormalizarNomeAtributo(string nomeAtributo)
@@ -301,6 +442,7 @@ public class StatusPlayer : MonoBehaviour
 
     public int GetResistencia()
     {
+        GarantirResistenciaInicial();
         return resistencia;
     }
 
@@ -451,6 +593,7 @@ public class StatusPlayer : MonoBehaviour
 
     public int GetResistenciaTotal()
     {
+        GarantirResistenciaInicial();
         return resistencia + bonusResistencia;
     }
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.UI;
 
 [DisallowMultipleComponent]
 public class SlimeIA : MonoBehaviour
@@ -18,13 +19,6 @@ public class SlimeIA : MonoBehaviour
         Atacando,
         TomandoDano,
         Morto
-    }
-
-    [Serializable]
-    public class TagDanoPermitida
-    {
-        public string tag;
-        public int danoFallback = 1;
     }
 
     [Serializable]
@@ -55,6 +49,12 @@ public class SlimeIA : MonoBehaviour
     [SerializeField] private int vidaAtual = 5;
     [SerializeField] private float tempoAnimacaoDano = 0.35f;
     [SerializeField] private float tempoParaMorrer = 3f;
+
+    [Header("UI Vida")]
+    [SerializeField] private Image imagemBarraVida;
+    [SerializeField] private Canvas canvasVida;
+    [SerializeField] private bool buscarBarraVidaAutomaticamente = true;
+    [SerializeField] private bool esconderCanvasAoMorrer = true;
 
     [Header("Patrulha")]
     [SerializeField] private Transform[] pontosPatrulha;
@@ -89,8 +89,7 @@ public class SlimeIA : MonoBehaviour
     [SerializeField] private float margemParedeInvestida = 0.15f;
 
     [Header("Dano recebido")]
-    [SerializeField] private TagDanoPermitida[] tagsQueCausamDano;
-    [SerializeField] private float cooldownReceberDano = 0.25f;
+    [SerializeField] private string[] tagsQueCausamDano;
 
     [Header("Debug")]
     [SerializeField] private bool desenharGizmos = true;
@@ -172,7 +171,6 @@ public class SlimeIA : MonoBehaviour
     private bool experienciaJaEntregue;
     private Transform ultimoPlayerResponsavel;
     private ExperienciaInimigo experienciaInimigo;
-    private readonly Dictionary<int, float> proximoDanoPorOrigem = new Dictionary<int, float>();
     private static readonly string[] NomesMembrosDano =
     {
         "dano",
@@ -211,6 +209,8 @@ public class SlimeIA : MonoBehaviour
 
         vidaMaxima = Mathf.Max(1, vidaMaxima);
         vidaAtual = Mathf.Clamp(vidaAtual <= 0 ? vidaMaxima : vidaAtual, 1, vidaMaxima);
+        ConfigurarUIVida();
+        AtualizarBarraVida();
 
         if (agent != null)
         {
@@ -264,13 +264,43 @@ public class SlimeIA : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         tempoAnimacaoDano = Mathf.Max(0f, tempoAnimacaoDano);
         tempoParaMorrer = Mathf.Max(0f, tempoParaMorrer);
-        cooldownReceberDano = Mathf.Max(0f, cooldownReceberDano);
         NormalizarSpawnsNormais();
         NormalizarSpawnsMissao();
         volumeAndar = Mathf.Clamp01(volumeAndar);
         volumeAtacar = Mathf.Clamp01(volumeAtacar);
         volumeDano = Mathf.Clamp01(volumeDano);
         volumeMorrer = Mathf.Clamp01(volumeMorrer);
+        AtualizarBarraVida();
+    }
+
+    private void ConfigurarUIVida()
+    {
+        if (buscarBarraVidaAutomaticamente && imagemBarraVida == null)
+            imagemBarraVida = ProcurarImagemBarraVida();
+
+        if (canvasVida == null)
+            canvasVida = GetComponentInChildren<Canvas>(true);
+    }
+
+    private Image ProcurarImagemBarraVida()
+    {
+        Image[] imagens = GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < imagens.Length; i++)
+        {
+            Image imagem = imagens[i];
+            if (imagem != null && string.Equals(imagem.name, "Vida Frente", StringComparison.Ordinal))
+                return imagem;
+        }
+
+        return null;
+    }
+
+    private void AtualizarBarraVida()
+    {
+        if (imagemBarraVida == null)
+            return;
+
+        imagemBarraVida.fillAmount = vidaMaxima > 0 ? Mathf.Clamp01((float)vidaAtual / vidaMaxima) : 0f;
     }
 
     private void Update()
@@ -285,10 +315,21 @@ public class SlimeIA : MonoBehaviour
 
     public void ReceberDano(int dano)
     {
-        ReceberDano(dano, null);
+        ReceberDano(dano, (GameObject)null);
     }
 
-    private void ReceberDano(int dano, Transform playerResponsavel)
+    public void ReceberDano(int dano, GameObject origemDano)
+    {
+        RegistrarPrimeiroAtacante(origemDano);
+        AplicarDanoRecebido(dano, IdentificarPlayerResponsavel(null, origemDano != null ? origemDano.transform : null));
+    }
+
+    public void ReceberDano(int dano, Transform origemDano)
+    {
+        ReceberDano(dano, origemDano != null ? origemDano.gameObject : null);
+    }
+
+    private void AplicarDanoRecebido(int dano, Transform playerResponsavel)
     {
         if (morto)
             return;
@@ -301,6 +342,8 @@ public class SlimeIA : MonoBehaviour
             ultimoPlayerResponsavel = playerResponsavel;
 
         vidaAtual -= danoFinal;
+        vidaAtual = Mathf.Max(0, vidaAtual);
+        AtualizarBarraVida();
         TocarSomUmaVez(somDano, volumeDano);
 
         if (vidaAtual <= 0)
@@ -348,33 +391,40 @@ public class SlimeIA : MonoBehaviour
         if (morto || outroCollider == null)
             return;
 
-        if (!TentarObterTagDanoPermitida(outroCollider, out TagDanoPermitida configTag, out Transform origemTag))
-            return;
-
-        int chaveOrigem = ObterChaveOrigemDano(outroCollider, origemTag);
-        if (proximoDanoPorOrigem.TryGetValue(chaveOrigem, out float proximoPermitido) && Time.time < proximoPermitido)
+        if (!TentarObterTagAutorizada(outroCollider, out Transform origemTag))
             return;
 
         if (!TentarObterDanoDaArma(outroCollider, origemTag, out int dano))
-            dano = configTag != null ? configTag.danoFallback : 0;
+            return;
 
         dano = Mathf.Max(0, dano);
         if (dano == 0)
             return;
 
-        proximoDanoPorOrigem[chaveOrigem] = Time.time + cooldownReceberDano;
-        ReceberDano(dano, IdentificarPlayerResponsavel(outroCollider, origemTag));
+        RegistrarPrimeiroAtacante(outroCollider.gameObject);
+        AplicarDanoRecebido(dano, IdentificarPlayerResponsavel(outroCollider, origemTag));
     }
 
-    private bool TentarObterTagDanoPermitida(Collider outroCollider, out TagDanoPermitida configTag, out Transform origemTag)
+    private void RegistrarPrimeiroAtacante(GameObject origemDano)
     {
-        configTag = null;
+        if (origemDano == null)
+            return;
+
+        if (experienciaInimigo == null)
+            experienciaInimigo = GetComponent<ExperienciaInimigo>();
+
+        if (experienciaInimigo != null)
+            experienciaInimigo.RegistrarPrimeiroAtacante(origemDano);
+    }
+
+    private bool TentarObterTagAutorizada(Collider outroCollider, out Transform origemTag)
+    {
         origemTag = null;
 
         if (tagsQueCausamDano == null || tagsQueCausamDano.Length == 0 || outroCollider == null)
             return false;
 
-        Transform transformComTag = ProcurarTransformComTagPermitida(outroCollider.transform, out configTag);
+        Transform transformComTag = ProcurarTransformComTagPermitida(outroCollider.transform);
         if (transformComTag != null)
         {
             origemTag = transformComTag;
@@ -384,7 +434,7 @@ public class SlimeIA : MonoBehaviour
         Rigidbody rbContato = outroCollider.attachedRigidbody;
         if (rbContato != null)
         {
-            transformComTag = ProcurarTransformComTagPermitida(rbContato.transform, out configTag);
+            transformComTag = ProcurarTransformComTagPermitida(rbContato.transform);
             if (transformComTag != null)
             {
                 origemTag = transformComTag;
@@ -393,7 +443,7 @@ public class SlimeIA : MonoBehaviour
         }
 
         Transform root = outroCollider.transform.root;
-        if (root != null && TentarObterConfigPorTag(root.tag, out configTag))
+        if (root != null && TagEstaPermitida(root.tag))
         {
             origemTag = root;
             return true;
@@ -402,39 +452,33 @@ public class SlimeIA : MonoBehaviour
         return false;
     }
 
-    private Transform ProcurarTransformComTagPermitida(Transform origem, out TagDanoPermitida configTag)
+    private Transform ProcurarTransformComTagPermitida(Transform origem)
     {
         Transform atual = origem;
         while (atual != null)
         {
-            if (TentarObterConfigPorTag(atual.tag, out configTag))
+            if (TagEstaPermitida(atual.tag))
                 return atual;
 
             atual = atual.parent;
         }
 
-        configTag = null;
         return null;
     }
 
-    private bool TentarObterConfigPorTag(string tagAtual, out TagDanoPermitida configTag)
+    private bool TagEstaPermitida(string tagAtual)
     {
-        configTag = null;
-
         if (string.IsNullOrWhiteSpace(tagAtual) || tagsQueCausamDano == null)
             return false;
 
         for (int i = 0; i < tagsQueCausamDano.Length; i++)
         {
-            TagDanoPermitida config = tagsQueCausamDano[i];
-            if (config == null || string.IsNullOrWhiteSpace(config.tag))
+            string tagPermitida = tagsQueCausamDano[i];
+            if (string.IsNullOrWhiteSpace(tagPermitida))
                 continue;
 
-            if (string.Equals(tagAtual, config.tag, StringComparison.Ordinal))
-            {
-                configTag = config;
+            if (string.Equals(tagAtual, tagPermitida, StringComparison.Ordinal))
                 return true;
-            }
         }
 
         return false;
@@ -555,17 +599,6 @@ public class SlimeIA : MonoBehaviour
         }
     }
 
-    private int ObterChaveOrigemDano(Collider outroCollider, Transform origemTag)
-    {
-        if (outroCollider != null && outroCollider.attachedRigidbody != null)
-            return outroCollider.attachedRigidbody.gameObject.GetInstanceID();
-
-        if (origemTag != null)
-            return origemTag.root.gameObject.GetInstanceID();
-
-        return outroCollider != null ? outroCollider.transform.root.gameObject.GetInstanceID() : 0;
-    }
-
     private Transform IdentificarPlayerResponsavel(Collider outroCollider, Transform origemTag)
     {
         Transform player = ProcurarTransformComTagPlayer(origemTag);
@@ -587,6 +620,11 @@ public class SlimeIA : MonoBehaviour
         }
 
         return alvoPlayer;
+    }
+
+    private Transform IdentificarPlayerResponsavel(Collider outroCollider)
+    {
+        return IdentificarPlayerResponsavel(outroCollider, outroCollider != null ? outroCollider.transform : null);
     }
 
     private Transform ProcurarTransformComTagPlayer(Transform origem)
@@ -1637,6 +1675,7 @@ public class SlimeIA : MonoBehaviour
 
         morto = true;
         vidaAtual = 0;
+        AtualizarBarraVida();
 
         if (rotinaDano != null)
         {
@@ -1653,6 +1692,9 @@ public class SlimeIA : MonoBehaviour
         SpawnarPrefabsNormais();
         SpawnarPrefabsMissao();
 
+        if (esconderCanvasAoMorrer && canvasVida != null)
+            canvasVida.gameObject.SetActive(false);
+
         Destroy(gameObject, tempoParaMorrer);
     }
 
@@ -1667,7 +1709,7 @@ public class SlimeIA : MonoBehaviour
             experienciaInimigo = GetComponent<ExperienciaInimigo>();
 
         if (experienciaInimigo != null)
-            experienciaInimigo.EntregarExperienciaParaPlayerMaisProximo();
+            experienciaInimigo.EntregarExperiencia();
     }
 
     private void SpawnarPrefabsNormais()

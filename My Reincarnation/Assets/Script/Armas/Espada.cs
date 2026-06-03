@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
@@ -18,6 +21,16 @@ public class Espada : MonoBehaviour
     [SerializeField] private int desgastePorDanoCausado = 1;
     [SerializeField] private bool destruirQuandoVidaZerar = true;
 
+    [Header("Texto Durabilidade")]
+    public TMP_Text textoValorAtual;
+    public TMP_Text textoValorTotal;
+
+    [Header("Efeito LED Texto")]
+    public Color corTextoA = Color.white;
+    public Color corTextoB = Color.cyan;
+    public float velocidadePiscarTexto = 2f;
+    public bool usarEfeitoLedTexto = true;
+
     [Header("Tags que recebem dano")]
     [SerializeField] private string[] tagsAlvoDano;
 
@@ -25,14 +38,19 @@ public class Espada : MonoBehaviour
     [SerializeField] private float cooldownDanoMesmoAlvo = 0.35f;
 
     private Transform donoAtualPlayer;
+    private Transform raizTextoDurabilidade;
     private XRGrabInteractable grabInteractable;
     private bool quebrada;
     private readonly Dictionary<int, float> proximoDanoPermitidoPorAlvo = new();
+    private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
 
     private void Awake()
     {
         grabInteractable = GetComponent<XRGrabInteractable>();
         NormalizarVida();
+        EncontrarTextosDurabilidadeSeNecessario(true);
+        AtualizarTextoDurabilidade(true);
+        AplicarCorTexto(corTextoA);
     }
 
     private void OnEnable()
@@ -66,6 +84,14 @@ public class Espada : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         desgastePorDanoCausado = Mathf.Max(0, desgastePorDanoCausado);
         cooldownDanoMesmoAlvo = Mathf.Max(0f, cooldownDanoMesmoAlvo);
+        velocidadePiscarTexto = Mathf.Max(0f, velocidadePiscarTexto);
+        AtualizarTextoDurabilidade(false);
+    }
+
+    private void LateUpdate()
+    {
+        RotacionarTextoParaCamera();
+        AtualizarEfeitoLedTexto();
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -91,6 +117,33 @@ public class Espada : MonoBehaviour
     private void OnSelectExited(SelectExitEventArgs args)
     {
         AtualizarDonoPelaSelecaoAtual();
+    }
+
+    public GameObject GetDonoAtual()
+    {
+        if (donoAtualPlayer == null)
+            AtualizarDonoPelaSelecaoAtual();
+
+        return donoAtualPlayer != null ? donoAtualPlayer.gameObject : null;
+    }
+
+    public StatusPlayer GetStatusPlayerDonoAtual()
+    {
+        GameObject dono = GetDonoAtual();
+        if (dono == null)
+            return null;
+
+        StatusPlayer statusPlayer = dono.GetComponent<StatusPlayer>();
+        if (statusPlayer != null)
+            return statusPlayer;
+
+        statusPlayer = dono.GetComponentInParent<StatusPlayer>();
+        if (statusPlayer != null)
+            return statusPlayer;
+
+        return dono.transform.root != null
+            ? dono.transform.root.GetComponentInChildren<StatusPlayer>(true)
+            : null;
     }
 
     private void ProcessarPossivelDano(Collider outroCollider)
@@ -129,6 +182,215 @@ public class Espada : MonoBehaviour
             vidaAtual = vidaMaxima;
 
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
+        AtualizarTextoDurabilidade(false);
+    }
+
+    private void EncontrarTextosDurabilidadeSeNecessario(bool criarSeNecessario = false)
+    {
+        if (textoValorAtual != null && textoValorTotal != null)
+            return;
+
+        TMP_Text[] textos = GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < textos.Length; i++)
+        {
+            TMP_Text texto = textos[i];
+            if (texto == null)
+                continue;
+
+            string nome = NormalizarNome(texto.gameObject.name);
+
+            if (textoValorAtual == null && (nome == "valoratual" || nome == "atual"))
+                textoValorAtual = texto;
+
+            if (textoValorTotal == null && (nome == "valortotal" || nome == "total"))
+                textoValorTotal = texto;
+        }
+
+        if (criarSeNecessario && Application.isPlaying && (textoValorAtual == null || textoValorTotal == null))
+            CriarTextosDurabilidadeSeNecessario();
+    }
+
+    private void AtualizarTextoDurabilidade(bool criarSeNecessario = false)
+    {
+        EncontrarTextosDurabilidadeSeNecessario(criarSeNecessario);
+
+        if (textoValorAtual != null)
+            textoValorAtual.text = FormatarValorDurabilidade(vidaAtual);
+
+        if (textoValorTotal != null)
+            textoValorTotal.text = FormatarValorDurabilidade(vidaMaxima);
+    }
+
+    private string FormatarValorDurabilidade(int valor)
+    {
+        return Mathf.Max(0, valor).ToString("N0", CulturaDurabilidade);
+    }
+
+    private void AtualizarEfeitoLedTexto()
+    {
+        EncontrarTextosDurabilidadeSeNecessario(true);
+
+        Color cor = corTextoA;
+        if (usarEfeitoLedTexto && velocidadePiscarTexto > 0f)
+        {
+            float t = Mathf.PingPong(Time.time * velocidadePiscarTexto, 1f);
+            cor = Color.Lerp(corTextoA, corTextoB, t);
+        }
+
+        AplicarCorTexto(cor);
+    }
+
+    private void CriarTextosDurabilidadeSeNecessario()
+    {
+        Canvas canvas = GetComponentInChildren<Canvas>(true);
+        if (canvas == null)
+            canvas = CriarCanvasDurabilidade();
+
+        Transform raiz = canvas.transform;
+
+        if (textoValorAtual == null)
+            textoValorAtual = CriarTextoDurabilidade(raiz, "Valor Atual", new Vector2(-45f, 0f), TextAlignmentOptions.Right);
+
+        if (!ExisteSeparadorDurabilidade(raiz))
+            CriarTextoDurabilidade(raiz, "Separador", Vector2.zero, TextAlignmentOptions.Center).text = "/";
+
+        if (textoValorTotal == null)
+            textoValorTotal = CriarTextoDurabilidade(raiz, "Valor Total", new Vector2(45f, 0f), TextAlignmentOptions.Left);
+
+        raizTextoDurabilidade = raiz;
+    }
+
+    private Canvas CriarCanvasDurabilidade()
+    {
+        GameObject canvasObj = new GameObject("Canvas Durabilidade", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+        canvasObj.transform.SetParent(transform, false);
+
+        RectTransform rect = canvasObj.GetComponent<RectTransform>();
+        rect.localPosition = new Vector3(0f, 0.55f, -0.35f);
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = Vector3.one * 0.01f;
+        rect.sizeDelta = new Vector2(160f, 40f);
+
+        Canvas canvas = canvasObj.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = ObterCameraTextoDurabilidade();
+        canvas.sortingOrder = 10;
+
+        CanvasScaler scaler = canvasObj.GetComponent<CanvasScaler>();
+        scaler.dynamicPixelsPerUnit = 10f;
+        scaler.referencePixelsPerUnit = 100f;
+
+        return canvas;
+    }
+
+    private TMP_Text CriarTextoDurabilidade(Transform parent, string nome, Vector2 posicao, TextAlignmentOptions alinhamento)
+    {
+        GameObject textoObj = new GameObject(nome, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        textoObj.transform.SetParent(parent, false);
+
+        RectTransform rect = textoObj.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = posicao;
+        rect.sizeDelta = new Vector2(80f, 30f);
+
+        TextMeshProUGUI texto = textoObj.GetComponent<TextMeshProUGUI>();
+        texto.text = "0";
+        texto.fontSize = 24f;
+        texto.enableAutoSizing = true;
+        texto.fontSizeMin = 10f;
+        texto.fontSizeMax = 26f;
+        texto.alignment = alinhamento;
+        texto.raycastTarget = false;
+        texto.color = corTextoA;
+
+        return texto;
+    }
+
+    private bool ExisteSeparadorDurabilidade(Transform raiz)
+    {
+        TMP_Text[] textos = raiz.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < textos.Length; i++)
+        {
+            TMP_Text texto = textos[i];
+            if (texto == null)
+                continue;
+
+            string nome = NormalizarNome(texto.gameObject.name);
+            if (nome == "separador" || texto.text.Trim() == "/")
+                return true;
+        }
+
+        return false;
+    }
+
+    private void AplicarCorTexto(Color cor)
+    {
+        if (textoValorAtual != null)
+            textoValorAtual.color = cor;
+
+        if (textoValorTotal != null)
+            textoValorTotal.color = cor;
+    }
+
+    private void RotacionarTextoParaCamera()
+    {
+        Transform raizTexto = ObterRaizTextoDurabilidade();
+        if (raizTexto == null)
+            return;
+
+        Camera cameraAlvo = ObterCameraTextoDurabilidade();
+        if (cameraAlvo == null)
+            return;
+
+        Transform cameraTransform = cameraAlvo.transform;
+        raizTexto.LookAt(
+            raizTexto.position + cameraTransform.rotation * Vector3.forward,
+            cameraTransform.rotation * Vector3.up);
+    }
+
+    private Transform ObterRaizTextoDurabilidade()
+    {
+        if (raizTextoDurabilidade != null)
+            return raizTextoDurabilidade;
+
+        EncontrarTextosDurabilidadeSeNecessario(true);
+
+        if (textoValorAtual != null && textoValorAtual.transform.parent != null)
+            raizTextoDurabilidade = textoValorAtual.transform.parent;
+        else if (textoValorTotal != null && textoValorTotal.transform.parent != null)
+            raizTextoDurabilidade = textoValorTotal.transform.parent;
+
+        return raizTextoDurabilidade;
+    }
+
+    private Camera ObterCameraTextoDurabilidade()
+    {
+        if (donoAtualPlayer == null)
+            AtualizarDonoPelaSelecaoAtual();
+
+        if (donoAtualPlayer != null)
+        {
+            Camera cameraDoDono = donoAtualPlayer.GetComponentInChildren<Camera>(true);
+            if (cameraDoDono != null)
+                return cameraDoDono;
+        }
+
+        if (Camera.main != null)
+            return Camera.main;
+
+        return FindFirstObjectByType<Camera>();
+    }
+
+    private string NormalizarNome(string texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+            return string.Empty;
+
+        return texto.Trim().ToLowerInvariant()
+            .Replace(" ", string.Empty)
+            .Replace("_", string.Empty)
+            .Replace("-", string.Empty);
     }
 
     private bool PodeAplicarDanoAgora(GameObject alvo)
@@ -337,6 +599,27 @@ public class Espada : MonoBehaviour
             if (componente == null || componente == this)
                 continue;
 
+            MethodInfo metodoComOrigem = componente.GetType().GetMethod(
+                "ReceberDano",
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                new[] { typeof(int), typeof(GameObject) },
+                null);
+
+            if (metodoComOrigem != null)
+            {
+                try
+                {
+                    metodoComOrigem.Invoke(componente, new object[] { dano, gameObject });
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[Espada] Falha ao aplicar dano em '{componente.name}' via ReceberDano(int, GameObject): {e.Message}");
+                    return false;
+                }
+            }
+
             MethodInfo metodo = componente.GetType().GetMethod(
                 "ReceberDano",
                 BindingFlags.Instance | BindingFlags.Public,
@@ -422,6 +705,7 @@ public class Espada : MonoBehaviour
             return;
 
         vidaAtual = Mathf.Max(0, vidaAtual - desgastePorDanoCausado);
+        AtualizarTextoDurabilidade(true);
 
         if (vidaAtual <= 0)
             QuebrarEspada();
@@ -434,6 +718,7 @@ public class Espada : MonoBehaviour
 
         quebrada = true;
         vidaAtual = 0;
+        AtualizarTextoDurabilidade(true);
 
         if (destruirQuandoVidaZerar)
             Destroy(gameObject);
