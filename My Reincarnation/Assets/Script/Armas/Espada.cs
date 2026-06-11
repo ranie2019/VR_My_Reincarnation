@@ -36,17 +36,33 @@ public class Espada : MonoBehaviour
 
     [Header("Cooldown")]
     [SerializeField] private float cooldownDanoMesmoAlvo = 0.35f;
+    [SerializeField] private float tempoIgnorarDonoAposSoltar = 1f;
+
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip somHit;
+    [SerializeField] private AudioClip somQuebra;
+    [SerializeField] private float volumeHit = 1f;
+    [SerializeField] private float volumeQuebra = 1f;
+    [SerializeField] private float cooldownSomHit = 0.1f;
 
     private Transform donoAtualPlayer;
+    private Transform ultimoDonoPlayer;
     private Transform raizTextoDurabilidade;
     private XRGrabInteractable grabInteractable;
     private bool quebrada;
+    private float ignorarUltimoDonoAte;
+    private float proximoSomHitPermitido;
     private readonly Dictionary<int, float> proximoDanoPermitidoPorAlvo = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
 
     private void Awake()
     {
         grabInteractable = GetComponent<XRGrabInteractable>();
+
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
         NormalizarVida();
         EncontrarTextosDurabilidadeSeNecessario(true);
         AtualizarTextoDurabilidade(true);
@@ -57,6 +73,9 @@ public class Espada : MonoBehaviour
     {
         if (grabInteractable == null)
             grabInteractable = GetComponent<XRGrabInteractable>();
+
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
 
         if (grabInteractable != null)
         {
@@ -74,6 +93,8 @@ public class Espada : MonoBehaviour
         }
 
         donoAtualPlayer = null;
+        ultimoDonoPlayer = null;
+        ignorarUltimoDonoAte = 0f;
         proximoDanoPermitidoPorAlvo.Clear();
     }
 
@@ -84,6 +105,10 @@ public class Espada : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         desgastePorDanoCausado = Mathf.Max(0, desgastePorDanoCausado);
         cooldownDanoMesmoAlvo = Mathf.Max(0f, cooldownDanoMesmoAlvo);
+        tempoIgnorarDonoAposSoltar = Mathf.Max(0f, tempoIgnorarDonoAposSoltar);
+        volumeHit = Mathf.Max(0f, volumeHit);
+        volumeQuebra = Mathf.Max(0f, volumeQuebra);
+        cooldownSomHit = Mathf.Max(0f, cooldownSomHit);
         velocidadePiscarTexto = Mathf.Max(0f, velocidadePiscarTexto);
         AtualizarTextoDurabilidade(false);
     }
@@ -112,11 +137,27 @@ public class Espada : MonoBehaviour
         Transform interactorTransform = ObterTransformInteractor(args.interactorObject);
         Transform novoDono = EncontrarPlayerDonoAPartirDoTransform(interactorTransform);
         donoAtualPlayer = novoDono;
+        ultimoDonoPlayer = novoDono;
+        ignorarUltimoDonoAte = 0f;
     }
 
     private void OnSelectExited(SelectExitEventArgs args)
     {
+        Transform donoAntesDeSoltar = donoAtualPlayer;
         AtualizarDonoPelaSelecaoAtual();
+
+        if (donoAtualPlayer != null)
+        {
+            ultimoDonoPlayer = donoAtualPlayer;
+            ignorarUltimoDonoAte = 0f;
+            return;
+        }
+
+        if (donoAntesDeSoltar != null && tempoIgnorarDonoAposSoltar > 0f)
+        {
+            ultimoDonoPlayer = donoAntesDeSoltar;
+            ignorarUltimoDonoAte = Time.time + tempoIgnorarDonoAposSoltar;
+        }
     }
 
     public GameObject GetDonoAtual()
@@ -161,16 +202,17 @@ public class Espada : MonoBehaviour
         if (alvoResolvido == null || EhParteDaPropriaEspada(alvoResolvido))
             return;
 
-        if (PertenceAoDonoAtual(alvoResolvido) || EstaAcopladoAoMesmoDono(alvoResolvido))
+        if (PertenceAoDonoAtual(alvoResolvido) || PertenceAoDonoRecente(alvoResolvido) || EstaAcopladoAoMesmoDono(alvoResolvido) || EstaAcopladoAoDonoRecente(alvoResolvido))
             return;
 
         if (!PodeAplicarDanoAgora(alvoResolvido))
             return;
 
-        bool danoAplicadoOuAlvoPlayerValido = TentarAplicarDano(alvoResolvido, danoEspada);
-        if (!danoAplicadoOuAlvoPlayerValido)
+        bool danoAplicado = TentarAplicarDano(alvoResolvido, danoEspada);
+        if (!danoAplicado)
             return;
 
+        TocarSomHit();
         ReduzirVidaDaEspada();
     }
 
@@ -556,9 +598,50 @@ public class Espada : MonoBehaviour
         return false;
     }
 
+    private bool PertenceAoDonoRecente(GameObject obj)
+    {
+        if (!DeveIgnorarUltimoDono() || obj == null)
+            return false;
+
+        Transform alvo = obj.transform;
+        if (alvo == ultimoDonoPlayer || alvo.IsChildOf(ultimoDonoPlayer))
+            return true;
+
+        Transform playerDoAlvo = EncontrarPlayerDonoAPartirDoTransform(alvo);
+        return playerDoAlvo == ultimoDonoPlayer;
+    }
+
+    private bool EstaAcopladoAoDonoRecente(GameObject obj)
+    {
+        if (!DeveIgnorarUltimoDono() || obj == null)
+            return false;
+
+        if (InteractableEstaSelecionadoPeloDono(obj.GetComponentInParent<XRGrabInteractable>(), ultimoDonoPlayer))
+            return true;
+
+        XRGrabInteractable[] interactablesFilhos = obj.GetComponentsInChildren<XRGrabInteractable>(true);
+        for (int i = 0; i < interactablesFilhos.Length; i++)
+        {
+            if (InteractableEstaSelecionadoPeloDono(interactablesFilhos[i], ultimoDonoPlayer))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool DeveIgnorarUltimoDono()
+    {
+        return ultimoDonoPlayer != null && Time.time <= ignorarUltimoDonoAte;
+    }
+
     private bool InteractableEstaSelecionadoPeloDono(XRGrabInteractable interactable)
     {
-        if (interactable == null || interactable == grabInteractable)
+        return InteractableEstaSelecionadoPeloDono(interactable, donoAtualPlayer);
+    }
+
+    private bool InteractableEstaSelecionadoPeloDono(XRGrabInteractable interactable, Transform dono)
+    {
+        if (interactable == null || interactable == grabInteractable || dono == null)
             return false;
 
         for (int i = 0; i < interactable.interactorsSelecting.Count; i++)
@@ -566,7 +649,7 @@ public class Espada : MonoBehaviour
             Transform interactorTransform = ObterTransformInteractor(interactable.interactorsSelecting[i]);
             Transform player = EncontrarPlayerDonoAPartirDoTransform(interactorTransform);
 
-            if (player == donoAtualPlayer)
+            if (player == dono)
                 return true;
         }
 
@@ -584,7 +667,7 @@ public class Espada : MonoBehaviour
         if (EhPlayer(alvo))
         {
             Debug.LogWarning($"[Espada] Alvo Player '{alvo.name}' foi atingido, mas nao possui metodo publico ReceberDano(int).");
-            return true;
+            return false;
         }
 
         return false;
@@ -719,8 +802,26 @@ public class Espada : MonoBehaviour
         quebrada = true;
         vidaAtual = 0;
         AtualizarTextoDurabilidade(true);
+        TocarSomQuebra();
 
         if (destruirQuandoVidaZerar)
             Destroy(gameObject);
+    }
+
+    private void TocarSomHit()
+    {
+        if (Time.time < proximoSomHitPermitido)
+            return;
+
+        proximoSomHitPermitido = Time.time + cooldownSomHit;
+
+        if (audioSource != null && somHit != null)
+            audioSource.PlayOneShot(somHit, volumeHit);
+    }
+
+    private void TocarSomQuebra()
+    {
+        if (somQuebra != null)
+            AudioSource.PlayClipAtPoint(somQuebra, transform.position, volumeQuebra);
     }
 }

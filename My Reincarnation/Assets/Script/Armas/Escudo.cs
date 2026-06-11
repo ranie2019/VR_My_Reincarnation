@@ -32,6 +32,7 @@ public class Escudo : MonoBehaviour
 
     [Header("Cooldown")]
     [SerializeField] private float cooldownBloqueioMesmoObjeto = 0.25f;
+    [SerializeField] private float tempoIgnorarDonoAposSoltar = 1f;
 
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
@@ -41,9 +42,11 @@ public class Escudo : MonoBehaviour
     [SerializeField] private float volumeQuebrar = 1f;
 
     private Transform donoAtualPlayer;
+    private Transform ultimoDonoPlayer;
     private Transform raizTextoDurabilidade;
     private XRGrabInteractable grabInteractable;
     private bool quebrado;
+    private float ignorarUltimoDonoAte;
     private readonly Dictionary<int, float> proximoBloqueioPermitidoPorObjeto = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
 
@@ -88,6 +91,8 @@ public class Escudo : MonoBehaviour
         }
 
         donoAtualPlayer = null;
+        ultimoDonoPlayer = null;
+        ignorarUltimoDonoAte = 0f;
         proximoBloqueioPermitidoPorObjeto.Clear();
     }
 
@@ -97,6 +102,7 @@ public class Escudo : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         desgastePorBloqueio = Mathf.Max(0, desgastePorBloqueio);
         cooldownBloqueioMesmoObjeto = Mathf.Max(0f, cooldownBloqueioMesmoObjeto);
+        tempoIgnorarDonoAposSoltar = Mathf.Max(0f, tempoIgnorarDonoAposSoltar);
         volumeBloqueio = Mathf.Max(0f, volumeBloqueio);
         volumeQuebrar = Mathf.Max(0f, volumeQuebrar);
         velocidadePiscarTexto = Mathf.Max(0f, velocidadePiscarTexto);
@@ -129,11 +135,27 @@ public class Escudo : MonoBehaviour
     {
         Transform interactorTransform = ObterTransformInteractor(args.interactorObject);
         donoAtualPlayer = EncontrarPlayerDonoAPartirDoTransform(interactorTransform);
+        ultimoDonoPlayer = donoAtualPlayer;
+        ignorarUltimoDonoAte = 0f;
     }
 
     private void OnSelectExited(SelectExitEventArgs args)
     {
+        Transform donoAntesDeSoltar = donoAtualPlayer;
         AtualizarDonoPelaSelecaoAtual();
+
+        if (donoAtualPlayer != null)
+        {
+            ultimoDonoPlayer = donoAtualPlayer;
+            ignorarUltimoDonoAte = 0f;
+            return;
+        }
+
+        if (donoAntesDeSoltar != null && tempoIgnorarDonoAposSoltar > 0f)
+        {
+            ultimoDonoPlayer = donoAntesDeSoltar;
+            ignorarUltimoDonoAte = Time.time + tempoIgnorarDonoAposSoltar;
+        }
     }
 
     public bool EstaProtegendoPlayer(Transform player)
@@ -155,7 +177,7 @@ public class Escudo : MonoBehaviour
         if (!TagPodeDesgastarEscudo(origemDano, out GameObject origemResolvida))
             return false;
 
-        if (PertenceAoDonoAtual(origemResolvida) || EstaAcopladoAoMesmoDono(origemResolvida))
+        if (PertenceAoDonoAtual(origemResolvida) || PertenceAoDonoRecente(origemResolvida) || EstaAcopladoAoMesmoDono(origemResolvida) || EstaAcopladoAoDonoRecente(origemResolvida))
             return false;
 
         // TODO futuro:
@@ -178,7 +200,7 @@ public class Escudo : MonoBehaviour
         if (origemResolvida == null || EhParteDoProprioEscudo(origemResolvida))
             return false;
 
-        if (PertenceAoDonoAtual(origemResolvida) || EstaAcopladoAoMesmoDono(origemResolvida))
+        if (PertenceAoDonoAtual(origemResolvida) || PertenceAoDonoRecente(origemResolvida) || EstaAcopladoAoMesmoDono(origemResolvida) || EstaAcopladoAoDonoRecente(origemResolvida))
             return false;
 
         if (!PodeBloquearAgora(origemResolvida))
@@ -561,6 +583,33 @@ public class Escudo : MonoBehaviour
 
         Transform donoDoObjeto = ObterDonoAtualDoObjeto(obj);
         return donoDoObjeto == donoAtualPlayer;
+    }
+
+    private bool PertenceAoDonoRecente(GameObject obj)
+    {
+        if (!DeveIgnorarUltimoDono() || obj == null)
+            return false;
+
+        Transform alvo = obj.transform;
+        if (alvo == ultimoDonoPlayer || alvo.IsChildOf(ultimoDonoPlayer))
+            return true;
+
+        Transform donoDoObjeto = ObterDonoAtualDoObjeto(obj);
+        return donoDoObjeto == ultimoDonoPlayer;
+    }
+
+    private bool EstaAcopladoAoDonoRecente(GameObject obj)
+    {
+        if (!DeveIgnorarUltimoDono() || obj == null)
+            return false;
+
+        Transform donoDoObjeto = ObterDonoAtualDoObjeto(obj);
+        return donoDoObjeto == ultimoDonoPlayer;
+    }
+
+    private bool DeveIgnorarUltimoDono()
+    {
+        return ultimoDonoPlayer != null && Time.time <= ignorarUltimoDonoAte;
     }
 
     private Transform ObterDonoAtualDoObjeto(GameObject obj)

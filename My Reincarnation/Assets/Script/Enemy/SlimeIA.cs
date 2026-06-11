@@ -91,6 +91,9 @@ public class SlimeIA : MonoBehaviour
     [Header("Dano recebido")]
     [SerializeField] private string[] tagsQueCausamDano;
 
+    [Header("Respawn")]
+    [SerializeField] private string idRespawnMonstro = "SlimeVerde";
+
     [Header("Debug")]
     [SerializeField] private bool desenharGizmos = true;
     [SerializeField] private bool desenharGizmosSempre = true;
@@ -1691,6 +1694,17 @@ public class SlimeIA : MonoBehaviour
         EntregarExperienciaAoMorrer();
         SpawnarPrefabsNormais();
         SpawnarPrefabsMissao();
+        if (RespawnMonstro.Instancia != null)
+        {
+            RespawnMonstro.Instancia.AgendarRespawn(
+                idRespawnMonstro,
+                transform.position,
+                transform.rotation);
+        }
+        else
+        {
+            Debug.LogWarning("[SlimeIA] RespawnMonstro nao encontrado na cena.", this);
+        }
 
         if (esconderCanvasAoMorrer && canvasVida != null)
             canvasVida.gameObject.SetActive(false);

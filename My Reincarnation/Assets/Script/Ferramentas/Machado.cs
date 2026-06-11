@@ -4,6 +4,7 @@ using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Serialization;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
@@ -31,14 +32,27 @@ public class Machado : MonoBehaviour
     public bool usarEfeitoLedTexto = true;
 
     [Header("Tags")]
-    [Tooltip("Tag do objeto que pode receber impacto extra (opcional).")]
-    [SerializeField] private string tagAlvo = "Tree";
+    [SerializeField] private string[] tagsQuePodemReceberDano = { "Tree", "Arvore", "Madeira" };
+
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [FormerlySerializedAs("somHit")]
+    [SerializeField] private AudioClip somCorte;
+    [SerializeField] private AudioClip somOutros;
+    [SerializeField] private AudioClip somQuebra;
+    [FormerlySerializedAs("volumeHit")]
+    [SerializeField] private float volumeCorte = 1f;
+    [SerializeField] private float volumeOutros = 1f;
+    [SerializeField] private float volumeQuebra = 1f;
+    [FormerlySerializedAs("cooldownSomHit")]
+    [SerializeField] private float cooldownSomColisao = 0.1f;
 
     private Transform donoAtualPlayer;
     private Transform raizTextoDurabilidade;
     private Rigidbody rb;
     private XRGrabInteractable grabInteractable;
     private bool quebrado;
+    private float proximoSomColisaoPermitido;
     private readonly HashSet<VidaArvore> arvoresDentroDoTrigger = new();
     private readonly Dictionary<VidaArvore, int> contatosPorArvore = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
@@ -51,6 +65,10 @@ public class Machado : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         grabInteractable = GetComponent<XRGrabInteractable>();
+
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
         NormalizarVida();
         EncontrarTextosDurabilidadeSeNecessario(true);
         AtualizarTextoDurabilidade(true);
@@ -61,6 +79,9 @@ public class Machado : MonoBehaviour
     {
         if (grabInteractable == null)
             grabInteractable = GetComponent<XRGrabInteractable>();
+
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
 
         if (grabInteractable != null)
         {
@@ -88,6 +109,10 @@ public class Machado : MonoBehaviour
         vidaMaxima = Mathf.Max(1, vidaMaxima);
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         desgastePorUso = Mathf.Max(0, desgastePorUso);
+        volumeCorte = Mathf.Max(0f, volumeCorte);
+        volumeOutros = Mathf.Max(0f, volumeOutros);
+        volumeQuebra = Mathf.Max(0f, volumeQuebra);
+        cooldownSomColisao = Mathf.Max(0f, cooldownSomColisao);
         velocidadePiscarTexto = Mathf.Max(0f, velocidadePiscarTexto);
         AtualizarTextoDurabilidade(false);
     }
@@ -100,10 +125,12 @@ public class Machado : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (Quebrado)
+        if (Quebrado || collision == null)
             return;
 
-        if (impactForce > 0f && rb != null && collision.gameObject.CompareTag(tagAlvo))
+        TentarAplicarDanoPorContato(collision.collider);
+
+        if (impactForce > 0f && rb != null && TagPodeReceberDano(collision.collider))
             ApplyImpactForce(collision);
     }
 
@@ -163,19 +190,45 @@ public class Machado : MonoBehaviour
 
     private void TentarAplicarDanoPorEntradaTrigger(Collider other)
     {
+        TentarAplicarDanoPorContato(other, true);
+    }
+
+    private void TentarAplicarDanoPorContato(Collider other, bool controlarEntradaTrigger = false)
+    {
+        if (other == null || DeveIgnorarObjeto(other))
+            return;
+
+        if (!TagPodeReceberDano(other))
+        {
+            TocarSomOutros();
+            return;
+        }
+
         VidaArvore arvore = BuscarVidaArvore(other);
         if (arvore == null)
+        {
+            TocarSomOutros();
             return;
+        }
 
-        if (contatosPorArvore.TryGetValue(arvore, out int contatos))
-            contatosPorArvore[arvore] = contatos + 1;
-        else
-            contatosPorArvore.Add(arvore, 1);
+        if (controlarEntradaTrigger)
+        {
+            if (contatosPorArvore.TryGetValue(arvore, out int contatos))
+                contatosPorArvore[arvore] = contatos + 1;
+            else
+                contatosPorArvore.Add(arvore, 1);
 
-        if (!arvoresDentroDoTrigger.Add(arvore))
+            if (!arvoresDentroDoTrigger.Add(arvore))
+                return;
+        }
+
+        if (!arvore.ReceberDanoDeMachado(gameObject))
+        {
+            TocarSomOutros();
             return;
+        }
 
-        arvore.ReceberDanoDeMachado(gameObject);
+        TocarSomCorte();
         ReduzirVidaDoMachado();
     }
 
@@ -463,9 +516,41 @@ public class Machado : MonoBehaviour
         quebrado = true;
         vidaAtual = 0;
         AtualizarTextoDurabilidade(true);
+        TocarSomQuebra();
 
         if (destruirQuandoVidaZerar)
             Destroy(gameObject);
+    }
+
+    private void TocarSomCorte()
+    {
+        TocarSomColisao(somCorte, volumeCorte);
+    }
+
+    private void TocarSomOutros()
+    {
+        TocarSomColisao(somOutros, volumeOutros);
+    }
+
+    private void TocarSomColisao(AudioClip clip, float volume)
+    {
+        if (Time.time < proximoSomColisaoPermitido)
+            return;
+
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
+        if (audioSource == null || clip == null)
+            return;
+
+        proximoSomColisaoPermitido = Time.time + cooldownSomColisao;
+        audioSource.PlayOneShot(clip, volume);
+    }
+
+    private void TocarSomQuebra()
+    {
+        if (somQuebra != null)
+            AudioSource.PlayClipAtPoint(somQuebra, transform.position, volumeQuebra);
     }
 
     private VidaArvore BuscarVidaArvore(Collider alvo)
@@ -487,5 +572,82 @@ public class Machado : MonoBehaviour
 
         Transform root = alvo.transform.root;
         return root != null ? root.GetComponentInChildren<VidaArvore>() : null;
+    }
+
+    private bool TagPodeReceberDano(Collider alvo)
+    {
+        if (alvo == null)
+            return false;
+
+        if (TransformTemTagPermitida(alvo.transform))
+            return true;
+
+        Rigidbody alvoRb = alvo.attachedRigidbody;
+        return alvoRb != null && TransformTemTagPermitida(alvoRb.transform);
+    }
+
+    private bool TransformTemTagPermitida(Transform origem)
+    {
+        Transform atual = origem;
+
+        while (atual != null)
+        {
+            if (TagPodeReceberDano(atual.gameObject))
+                return true;
+
+            atual = atual.parent;
+        }
+
+        return false;
+    }
+
+    private bool TagPodeReceberDano(GameObject objeto)
+    {
+        if (objeto == null || tagsQuePodemReceberDano == null)
+            return false;
+
+        string tagObjeto = objeto.tag;
+        for (int i = 0; i < tagsQuePodemReceberDano.Length; i++)
+        {
+            string tagPermitida = tagsQuePodemReceberDano[i];
+            if (!string.IsNullOrWhiteSpace(tagPermitida) && string.Equals(tagObjeto, tagPermitida, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool DeveIgnorarObjeto(Collider alvo)
+    {
+        if (alvo == null)
+            return true;
+
+        if (DeveIgnorarObjeto(alvo.gameObject))
+            return true;
+
+        Rigidbody alvoRb = alvo.attachedRigidbody;
+        return alvoRb != null && DeveIgnorarObjeto(alvoRb.gameObject);
+    }
+
+    private bool DeveIgnorarObjeto(GameObject objeto)
+    {
+        if (objeto == null)
+            return true;
+
+        Transform alvo = objeto.transform;
+        if (alvo == transform || alvo.IsChildOf(transform))
+            return true;
+
+        if (donoAtualPlayer == null)
+            AtualizarDonoPelaSelecaoAtual();
+
+        if (donoAtualPlayer == null)
+            return false;
+
+        if (alvo == donoAtualPlayer || alvo.IsChildOf(donoAtualPlayer))
+            return true;
+
+        Transform playerDoAlvo = EncontrarPlayerDonoAPartirDoTransform(alvo);
+        return playerDoAlvo == donoAtualPlayer;
     }
 }
