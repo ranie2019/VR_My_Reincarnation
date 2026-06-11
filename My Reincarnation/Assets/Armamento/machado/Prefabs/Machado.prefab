@@ -397,6 +397,7 @@ GameObject:
   - component: {fileID: 5132475091541837821}
   - component: {fileID: 970484908549920743}
   - component: {fileID: 2842212008126869909}
+  - component: {fileID: 8289239998318004629}
   m_Layer: 0
   m_Name: Machado
   m_TagString: Machado
@@ -624,17 +625,126 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Machado
   impactForce: 1
-  vidaMaxima: 100
-  vidaAtual: 100
+  vidaMaxima: 65
+  vidaAtual: 65
   desgastePorUso: 1
-  destruirQuandoVidaZerar: 0
+  destruirQuandoVidaZerar: 1
   textoValorAtual: {fileID: 8229267997207992314}
   textoValorTotal: {fileID: 6518629121091685350}
   corTextoA: {r: 1, g: 1, b: 1, a: 1}
   corTextoB: {r: 0, g: 1, b: 1, a: 1}
   velocidadePiscarTexto: 2
   usarEfeitoLedTexto: 1
-  tagAlvo: Tree
+  tagsQuePodemReceberDano:
+  - Tree
+  - Rock
+  - Metal
+  - Enemy
+  audioSource: {fileID: 8289239998318004629}
+  somCorte: {fileID: 8300000, guid: 5fa2a1e03047f4f37a8f475c272636e7, type: 3}
+  somOutros: {fileID: 8300000, guid: 800d6d7b2d089ba438d8c2cc145af3c6, type: 3}
+  somQuebra: {fileID: 8300000, guid: f6b35339496eb7e458633ae91afb010b, type: 3}
+  volumeCorte: 1
+  volumeOutros: 1
+  volumeQuebra: 1
+  cooldownSomColisao: 0.1
+--- !u!82 &8289239998318004629
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5723095663688161233}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 10
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &6050644633813705339
 GameObject:
   m_ObjectHideFlags: 0
@@ -700,7 +810,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 100
+  m_text: 65
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1005,7 +1115,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 100
+  m_text: 65
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
