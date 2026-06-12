@@ -18,6 +18,9 @@ public class VidaArvore : MonoBehaviour
     [SerializeField] private GameObject prefabAoDestruir;
     [SerializeField] private Vector3 offsetSpawn = Vector3.zero;
 
+    [Header("Respawn")]
+    [SerializeField] private string respawnId = "";
+
     [Header("Áudio")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip somHit;
@@ -229,6 +232,22 @@ public class VidaArvore : MonoBehaviour
 
         if (prefabAoDestruir != null)
             Instantiate(prefabAoDestruir, transform.position + offsetSpawn, transform.rotation);
+
+        if (RespawnNatureza.Instancia != null && !string.IsNullOrWhiteSpace(respawnId))
+        {
+            RespawnNatureza.Instancia.AgendarRespawn(
+                respawnId,
+                transform.position,
+                transform.rotation);
+        }
+        else if (RespawnNatureza.Instancia == null)
+        {
+            Debug.LogWarning("[VidaArvore] RespawnNatureza nao encontrado na cena.", this);
+        }
+        else if (string.IsNullOrWhiteSpace(respawnId))
+        {
+            Debug.LogWarning("[VidaArvore] Respawn ID vazio. Respawn da arvore nao sera agendado.", this);
+        }
 
         Destroy(gameObject);
     }
