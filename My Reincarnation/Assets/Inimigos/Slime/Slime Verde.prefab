@@ -214,12 +214,12 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  velocidadePatrulha: 1.2
+  velocidadePatrulha: 1.5
   distanciaChegadaPonto: 0.35
   tempoObservando: 2
   tagPlayer: Player
   raioCampoVisao: 15
-  anguloCampoVisao: 195
+  anguloCampoVisao: 210
   layersObstaculo:
     serializedVersion: 2
     m_Bits: 0
@@ -246,7 +246,7 @@ MonoBehaviour:
   tagsQueCausamDano:
   - Sword
   - Machado
-  idRespawnMonstro: SlimeVerde
+  idRespawnMonstro: Slime Verde
   desenharGizmos: 1
   desenharGizmosSempre: 1
   alturaOlhos: 0.8
@@ -282,7 +282,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9322d2d170d4fca97052ac0cfca6720, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
-  experienciaAoMorrer: 10
+  experienciaAoMorrer: 5
 --- !u!82 &384598592461434145
 AudioSource:
   m_ObjectHideFlags: 0
