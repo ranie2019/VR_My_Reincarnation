@@ -7,6 +7,38 @@ public class ItemInventarioEscalavel : MonoBehaviour
     [HideInInspector] public bool escalaOriginalSalva = false;
     [HideInInspector] public Vector3 escalaOriginalMundo;
 
+    public bool PossuiEscalaOriginalMundoValida()
+    {
+        return escalaOriginalSalva && EscalaValida(escalaOriginalMundo);
+    }
+
+    public Vector3 ObterEscalaOriginalMundo()
+    {
+        return escalaOriginalMundo;
+    }
+
+    public void DefinirEscalaOriginalMundo(Vector3 escalaOriginal)
+    {
+        if (!EscalaValida(escalaOriginal))
+            return;
+
+        if (PossuiEscalaOriginalMundoValida())
+        {
+            SincronizarComEscalaOriginalItem();
+            return;
+        }
+
+        escalaOriginalMundo = escalaOriginal;
+        escalaOriginalSalva = true;
+
+        var escalaComp = GetComponent<EscalaOriginalItem>();
+        if (escalaComp != null)
+        {
+            escalaComp.escalaOriginal = escalaOriginal;
+            escalaComp.inicializado = true;
+        }
+    }
+
     public bool AjustarParaSlot(BoxCollider slotCollider, float margemDeSeguranca, Transform pontoReferencia)
     {
         if (slotCollider == null) return false;
@@ -76,16 +108,15 @@ public class ItemInventarioEscalavel : MonoBehaviour
         var escalaComp = GetComponent<EscalaOriginalItem>();
         if (escalaComp != null && escalaComp.inicializado)
         {
-            if (!escalaOriginalSalva)
+            if (EscalaValida(escalaComp.escalaOriginal))
             {
                 escalaOriginalMundo = escalaComp.escalaOriginal;
                 escalaOriginalSalva = true;
+                return;
             }
-
-            return;
         }
 
-        if (escalaOriginalSalva)
+        if (PossuiEscalaOriginalMundoValida())
             return;
 
         escalaOriginalMundo = transform.lossyScale;
@@ -96,6 +127,16 @@ public class ItemInventarioEscalavel : MonoBehaviour
             escalaComp.escalaOriginal = escalaOriginalMundo;
             escalaComp.inicializado = true;
         }
+    }
+
+    private void SincronizarComEscalaOriginalItem()
+    {
+        var escalaComp = GetComponent<EscalaOriginalItem>();
+        if (escalaComp == null || escalaComp.inicializado)
+            return;
+
+        escalaComp.escalaOriginal = escalaOriginalMundo;
+        escalaComp.inicializado = true;
     }
 
     private Vector3 ConverterEscalaMundoParaLocal(Vector3 escalaMundo)
@@ -201,6 +242,14 @@ public class ItemInventarioEscalavel : MonoBehaviour
     private static bool TamanhoValido(Vector3 tamanho)
     {
         return tamanho.x > 0f && tamanho.y > 0f && tamanho.z > 0f;
+    }
+
+    private static bool EscalaValida(Vector3 escala)
+    {
+        const float minimo = 0.0001f;
+        return Mathf.Abs(escala.x) > minimo &&
+               Mathf.Abs(escala.y) > minimo &&
+               Mathf.Abs(escala.z) > minimo;
     }
 
     private static float DividirSeguro(float valor, float divisor)

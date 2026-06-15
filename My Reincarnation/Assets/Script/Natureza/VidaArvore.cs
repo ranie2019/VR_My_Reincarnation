@@ -21,16 +21,8 @@ public class VidaArvore : MonoBehaviour
     [Header("Respawn")]
     [SerializeField] private string respawnId = "";
 
-    [Header("Áudio")]
-    [SerializeField] private AudioSource audioSource;
-    [SerializeField] private AudioClip somHit;
-    [SerializeField] private float volumeSom = 1f;
-    [SerializeField] private AudioClip somMorte;
-    [SerializeField] private float volumeSomMorte = 1f;
-
     private bool emCooldown;
     private bool morreu;
-    private int ultimoFrameSomHit = -1;
 
     private class RepassadorFisica : MonoBehaviour
     {
@@ -66,16 +58,10 @@ public class VidaArvore : MonoBehaviour
         tagMachado = "Machado";
         danoPorHit = 1;
         cooldownHit = 0.25f;
-        volumeSom = 1f;
-        volumeSomMorte = 1f;
-        audioSource = GetComponent<AudioSource>();
     }
 
     private void Awake()
     {
-        if (audioSource == null)
-            audioSource = GetComponent<AudioSource>();
-
         vidaAtual = Mathf.Clamp(vidaAtual, 1, Mathf.Max(1, vidaMax));
 
         InstalarRepassadoresNosFilhos();
@@ -87,8 +73,6 @@ public class VidaArvore : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 1, vidaMax);
         danoPorHit = Mathf.Max(1, danoPorHit);
         cooldownHit = Mathf.Max(0f, cooldownHit);
-        volumeSom = Mathf.Clamp01(volumeSom);
-        volumeSomMorte = Mathf.Clamp01(volumeSomMorte);
     }
 
     private void InstalarRepassadoresNosFilhos()
@@ -114,8 +98,6 @@ public class VidaArvore : MonoBehaviour
         if (collision == null)
             return;
 
-        TocarSomHit();
-
         bool colliderEhMachado = ColliderEhMachado(collision.collider);
         bool transformEhMachado = TransformEhMachado(collision.transform);
 
@@ -137,7 +119,6 @@ public class VidaArvore : MonoBehaviour
         if (other == null)
             return;
 
-        TocarSomHit();
     }
 
     private bool ColliderEhMachado(Collider colliderContato)
@@ -204,8 +185,6 @@ public class VidaArvore : MonoBehaviour
 
         vidaAtual -= dano;
 
-        TocarSomHit();
-
         if (vidaAtual <= 0)
         {
             Morrer();
@@ -228,7 +207,6 @@ public class VidaArvore : MonoBehaviour
             return;
 
         morreu = true;
-        TocarSomMorte();
 
         if (prefabAoDestruir != null)
             Instantiate(prefabAoDestruir, transform.position + offsetSpawn, transform.rotation);
@@ -250,26 +228,5 @@ public class VidaArvore : MonoBehaviour
         }
 
         Destroy(gameObject);
-    }
-
-    private void TocarSom(AudioClip clip)
-    {
-        if (audioSource != null && clip != null)
-            audioSource.PlayOneShot(clip, volumeSom);
-    }
-
-    private void TocarSomHit()
-    {
-        if (Time.frameCount == ultimoFrameSomHit)
-            return;
-
-        ultimoFrameSomHit = Time.frameCount;
-        TocarSom(somHit);
-    }
-
-    private void TocarSomMorte()
-    {
-        if (somMorte != null)
-            AudioSource.PlayClipAtPoint(somMorte, transform.position, volumeSomMorte);
     }
 }

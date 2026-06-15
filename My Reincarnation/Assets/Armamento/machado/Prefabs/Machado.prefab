@@ -398,6 +398,7 @@ GameObject:
   - component: {fileID: 970484908549920743}
   - component: {fileID: 2842212008126869909}
   - component: {fileID: 8289239998318004629}
+  - component: {fileID: 6316650081487951724}
   m_Layer: 0
   m_Name: Machado
   m_TagString: Machado
@@ -745,6 +746,29 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &6316650081487951724
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5723095663688161233}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  itemId: Machado
+  nomeItem: Machado
+  prefabReferencia: {fileID: 5723095663688161233}
+  salvarNoInventario: 1
+  usarNomeDoObjetoSeIdVazio: 1
+  destruirOriginalAoCarregarSeEstiverNoInventario: 1
+  estaNoInventario: 0
+  salvarQuandoSoltoNaCena: 1
+  instanciaId: Machado
+  durabilidadeAtual: -1
+  dadosExtrasJson: 
 --- !u!1 &6050644633813705339
 GameObject:
   m_ObjectHideFlags: 0

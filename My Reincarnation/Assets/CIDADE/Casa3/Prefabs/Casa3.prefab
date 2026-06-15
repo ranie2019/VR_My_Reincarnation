@@ -387,7 +387,7 @@ Transform:
   m_GameObject: {fileID: 1410931762301266021}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -1, z: -0, w: 0}
-  m_LocalPosition: {x: 0.88, y: -0.27997994, z: 0.63}
+  m_LocalPosition: {x: 0.88, y: -0.009, z: 0.63}
   m_LocalScale: {x: 5.3501, y: 4.449785, z: 5.3501}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2143,6 +2143,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4531423688896120761}
+  - component: {fileID: 2474614455164296910}
   m_Layer: 0
   m_Name: Casa3
   m_TagString: Untagged
@@ -2167,6 +2168,33 @@ Transform:
   - {fileID: 5928460994498528491}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+--- !u!54 &2474614455164296910
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3866632177848540419}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 126
+  m_CollisionDetection: 2
 --- !u!1 &4036554628220692338
 GameObject:
   m_ObjectHideFlags: 0

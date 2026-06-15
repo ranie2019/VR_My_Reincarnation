@@ -20884,6 +20884,8 @@ GameObject:
   - component: {fileID: 224471924320959148}
   - component: {fileID: 8765013490624175001}
   - component: {fileID: 5498195054280104757}
+  - component: {fileID: 3747426977683751788}
+  - component: {fileID: 7037282777829442671}
   m_Layer: 2
   m_Name: Player
   m_TagString: Player
@@ -21202,6 +21204,68 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &3747426977683751788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7354459025459628327}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 352e87b0c7144ef296bc2be764f9552a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObjetoPersistente
+  objectId: 28c25074cd1643a88d63978ecae02b91
+  tipoObjeto: Player
+  salvarAtivo: 1
+  salvarPosicao: 1
+  salvarRotacao: 1
+  salvarEscala: 1
+  estadoJson: 
+  gerarIdAutomaticoSeVazio: 1
+--- !u!114 &7037282777829442671
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7354459025459628327}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 273db5b90869411dabc0ee97cbed5dc0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InventarioSaveAdapter
+  inventario: {fileID: 8935363952407055934}
+  slots:
+  - {fileID: 3270942157315969102}
+  - {fileID: 3463485835905909104}
+  - {fileID: 7529710520360562876}
+  - {fileID: 6371449465736098900}
+  - {fileID: 956551335369041253}
+  - {fileID: 1723448210367248217}
+  - {fileID: 2121535268766103726}
+  - {fileID: 2121535268766103726}
+  - {fileID: 3344479099567640126}
+  - {fileID: 4773000520567308920}
+  - {fileID: 7151103012628409048}
+  - {fileID: 323564992447898473}
+  - {fileID: 4713707920510036818}
+  - {fileID: 6447545832208826226}
+  - {fileID: 6141098598874759687}
+  - {fileID: 8966144084621629192}
+  - {fileID: 277566833429713559}
+  - {fileID: 3498802138313008755}
+  - {fileID: 503685782764206140}
+  - {fileID: 5719245841225347213}
+  - {fileID: 2863667500079937262}
+  - {fileID: 3411093201500046733}
+  - {fileID: 5521321704373916653}
+  - {fileID: 4845916416286159790}
+  parentItensRestaurados: {fileID: 3589603610798094618}
+  limparInventarioAntesCarregar: 1
+  destruirOriginaisSalvosNoInventario: 1
+  debugInventarioSave: 1
 --- !u!1 &7355745788822022968
 GameObject:
   m_ObjectHideFlags: 0
@@ -25109,7 +25173,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.01
-  far clip plane: 1000
+  far clip plane: 5000
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -25293,6 +25357,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Canvas Status
       objectReference: {fileID: 0}
+    - target: {fileID: 1488562257502910989, guid: a3c3654e42705864594850aae5b80385, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4079501351103011699, guid: a3c3654e42705864594850aae5b80385, type: 3}
       propertyPath: m_SizeDelta.x
       value: 0.073787
@@ -25346,10 +25414,6 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 592255684607606569}
     - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
-      propertyPath: textoResistenciaBaseValor
-      value: 
-      objectReference: {fileID: 7565228295857013155}
-    - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
       propertyPath: textoForcaBonusValor
       value: 
       objectReference: {fileID: 5700065221915783856}
@@ -25373,10 +25437,6 @@ PrefabInstance:
       propertyPath: textoCarismaBaseValor
       value: 
       objectReference: {fileID: 1905524918957757166}
-    - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
-      propertyPath: textoResistenciaBonusValor
-      value: 
-      objectReference: {fileID: 990692573876187716}
     - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
       propertyPath: textoCarismaBonusValor
       value: 
@@ -25422,6 +25482,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 245885748092694951}
     - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
+      propertyPath: textoResistenciaBaseValor
+      value: 
+      objectReference: {fileID: 7565228295857013155}
+    - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
       propertyPath: textoVelocidadeBonusValor
       value: 
       objectReference: {fileID: 7780740798810284098}
@@ -25437,6 +25501,10 @@ PrefabInstance:
       propertyPath: textoInteligenciaBaseValor
       value: 
       objectReference: {fileID: 423252567474542664}
+    - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
+      propertyPath: textoResistenciaBonusValor
+      value: 
+      objectReference: {fileID: 990692573876187716}
     - target: {fileID: 6785798274398102210, guid: a3c3654e42705864594850aae5b80385, type: 3}
       propertyPath: textoConstituicaoBonusValor
       value: 

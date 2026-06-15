@@ -55,9 +55,20 @@ public class Picareta : MonoBehaviour
     private XRGrabInteractable grabInteractable;
     private bool quebrada;
     private float proximoSomColisaoPermitido;
+    private Vector3 ultimaPosicaoAudioSegurado;
+    private Quaternion ultimaRotacaoAudioSegurado;
+    private float velocidadeLinearAudioSegurado;
+    private float velocidadeAngularAudioSegurado;
+    private float proximoAudioSeguradoPermitido;
+    private bool temAmostraAudioSegurado;
     private readonly HashSet<VidaRecursoMineral> recursosDentroDoTrigger = new();
     private readonly Dictionary<VidaRecursoMineral, int> contatosPorRecurso = new();
+    private readonly HashSet<Collider> contatosAudioSeguradoAtivos = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
+    private const string PrefixoDebugAudio = "[AUDIO FERRAMENTA DEBUG]";
+    private const float VelocidadeMinimaAudioSegurado = 0.25f;
+    private const float VelocidadeAngularMinimaAudioSegurado = 45f;
+    private const float CooldownMinimoAudioSegurado = 0.2f;
 
     public int VidaAtual => vidaAtual;
     public int VidaMaxima => vidaMaxima;
@@ -103,6 +114,7 @@ public class Picareta : MonoBehaviour
         donoAtualPlayer = null;
         recursosDentroDoTrigger.Clear();
         contatosPorRecurso.Clear();
+        contatosAudioSeguradoAtivos.Clear();
     }
 
     private void OnValidate()
@@ -125,6 +137,7 @@ public class Picareta : MonoBehaviour
     {
         RotacionarTextoParaCamera();
         AtualizarEfeitoLedTexto();
+        AtualizarMovimentoAudioSegurado();
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -132,11 +145,60 @@ public class Picareta : MonoBehaviour
         if (Quebrada || collision == null)
             return;
 
-        TocarSomPorTag(collision.collider != null ? collision.collider.gameObject : collision.gameObject);
-        TentarAplicarDano(collision.collider);
+        Collider other = collision.collider;
+        bool podeTocarSom = AudioColisaoFiltro.PodeTocarSomDeColisao(collision);
+        if (podeTocarSom)
+            TentarTocarAudioColisao(other, "OnCollisionEnter", EstaSendoSegurada());
+        else
+            LogAudioFerramenta("OnCollisionEnter", other, "bloqueado pelo filtro", false, false);
+
+        TentarAplicarDano(other, false);
 
         if (impactForce > 0f && rb != null)
             AplicarForcaImpacto(collision);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        if (Quebrada || collision == null || !EstaSendoSegurada())
+            return;
+
+        Collider other = collision.collider;
+        if (other == null)
+        {
+            LogAudioFerramenta("OnCollisionStay", null, "collider nulo", false, false);
+            return;
+        }
+
+        bool jaEstavaEmContato = contatosAudioSeguradoAtivos.Contains(other);
+        if (jaEstavaEmContato)
+        {
+            LogAudioFerramenta("OnCollisionStay", other, "contato ja registrado", true, false);
+            return;
+        }
+
+        if (!AudioColisaoFiltro.PodeTocarSomDeColisao(collision))
+        {
+            LogAudioFerramenta("OnCollisionStay", other, "bloqueado pelo filtro", false, false);
+            return;
+        }
+
+        if (!DeveTocarAudioSegurado())
+        {
+            LogAudioFerramenta("OnCollisionStay", other, "sem movimento minimo ou em cooldown", false, false);
+            return;
+        }
+
+        TentarTocarAudioColisao(other, "OnCollisionStay", true);
+        proximoAudioSeguradoPermitido = Time.time + CooldownMinimoAudioSegurado;
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        Collider other = collision != null ? collision.collider : null;
+        bool estavaEmContato = other != null && contatosAudioSeguradoAtivos.Contains(other);
+        RemoverContatoAudioSegurado(other);
+        LogAudioFerramenta("OnCollisionExit", other, estavaEmContato ? "contato liberado" : "contato nao estava registrado", estavaEmContato, false);
     }
 
     private void OnTriggerEnter(Collider other)
@@ -144,14 +206,7 @@ public class Picareta : MonoBehaviour
         if (Quebrada)
             return;
 
-        TocarSomPorTag(other != null ? other.gameObject : null);
         TentarAplicarDanoPorEntradaTrigger(other);
-    }
-
-    private void OnTriggerStay(Collider other)
-    {
-        // Nao aplica dano continuo.
-        // Novo dano so depois de sair e entrar novamente no trigger.
     }
 
     private void OnTriggerExit(Collider other)
@@ -180,11 +235,13 @@ public class Picareta : MonoBehaviour
     {
         Transform interactorTransform = ObterTransformInteractor(args.interactorObject);
         donoAtualPlayer = EncontrarPlayerDonoAPartirDoTransform(interactorTransform);
+        ResetarAmostraAudioSegurado();
     }
 
     private void OnSelectExited(SelectExitEventArgs args)
     {
         AtualizarDonoPelaSelecaoAtual();
+        ResetarAmostraAudioSegurado();
     }
 
     private void TentarAplicarDanoPorEntradaTrigger(Collider other)
@@ -205,10 +262,73 @@ public class Picareta : MonoBehaviour
         if (!recursosDentroDoTrigger.Add(recurso))
             return;
 
-        AplicarDanoEmRecurso(recurso);
+        AplicarDanoEmRecurso(recurso, false);
     }
 
-    private void TentarAplicarDano(Collider other)
+    private void TocarSomContatoSeguradoUmaVez(Collider other)
+    {
+        TentarTocarAudioColisao(other, "OnCollisionStay", true);
+    }
+
+    private void TentarTocarAudioColisao(Collider other, string origem, bool controlarContatoAtivo)
+    {
+        if (other == null)
+        {
+            LogAudioFerramenta(origem, null, "collider nulo", false, false);
+            return;
+        }
+
+        bool jaEstavaEmContato = contatosAudioSeguradoAtivos.Contains(other);
+        if (controlarContatoAtivo && jaEstavaEmContato)
+        {
+            LogAudioFerramenta(origem, other, "contato ja registrado", true, false);
+            return;
+        }
+
+        if (PertenceAoDonoAtual(other.gameObject))
+        {
+            LogAudioFerramenta(origem, other, "objeto do player ignorado", jaEstavaEmContato, false);
+            return;
+        }
+
+        EscolherAudioColisao(other.gameObject, out AudioClip clip, out float volume, out string audioEscolhido);
+        bool tocou = TocarSomColisao(clip, volume);
+
+        if (controlarContatoAtivo)
+            RegistrarContatoAudioSegurado(other);
+
+        LogAudioFerramenta(origem, other, audioEscolhido, jaEstavaEmContato, tocou);
+    }
+
+    private void EscolherAudioColisao(GameObject objetoColidido, out AudioClip clip, out float volume, out string audioEscolhido)
+    {
+        string tagObjeto = objetoColidido != null ? objetoColidido.tag : string.Empty;
+        if (string.Equals(tagObjeto, "Rock", StringComparison.Ordinal))
+        {
+            clip = somPedra;
+            volume = volumePedra;
+            audioEscolhido = "Rock";
+            return;
+        }
+
+        clip = somOutros;
+        volume = volumeOutros;
+        audioEscolhido = "Outros";
+    }
+
+    private void RegistrarContatoAudioSegurado(Collider other)
+    {
+        if (other != null)
+            contatosAudioSeguradoAtivos.Add(other);
+    }
+
+    private void RemoverContatoAudioSegurado(Collider other)
+    {
+        if (other != null)
+            contatosAudioSeguradoAtivos.Remove(other);
+    }
+
+    private void TentarAplicarDano(Collider other, bool podeTocarSom = true)
     {
         if (other == null || PertenceAoDonoAtual(other.gameObject))
             return;
@@ -218,15 +338,15 @@ public class Picareta : MonoBehaviour
         if (recurso == null)
             return;
 
-        AplicarDanoEmRecurso(recurso);
+        AplicarDanoEmRecurso(recurso, podeTocarSom);
     }
 
-    private bool AplicarDanoEmRecurso(VidaRecursoMineral recurso)
+    private bool AplicarDanoEmRecurso(VidaRecursoMineral recurso, bool podeTocarSom = true)
     {
         if (recurso == null || Quebrada)
             return false;
 
-        if (!TentarAplicarDanoFlexivel(recurso))
+        if (!TentarAplicarDanoFlexivel(recurso, podeTocarSom))
             return false;
 
         ReduzirVidaDaPicareta();
@@ -295,15 +415,15 @@ public class Picareta : MonoBehaviour
         return null;
     }
 
-    private bool TentarAplicarDanoFlexivel(VidaRecursoMineral recurso)
+    private bool TentarAplicarDanoFlexivel(VidaRecursoMineral recurso, bool podeTocarSom)
     {
         if (recurso == null)
             return false;
 
-        return TentarChamarMetodoDano(recurso);
+        return TentarChamarMetodoDano(recurso, podeTocarSom);
     }
 
-    private bool TentarChamarMetodoDano(VidaRecursoMineral recurso)
+    private bool TentarChamarMetodoDano(VidaRecursoMineral recurso, bool podeTocarSom)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public;
         string[] nomesMetodos =
@@ -321,9 +441,19 @@ public class Picareta : MonoBehaviour
                 recurso,
                 nomesMetodos[i],
                 flags,
+                new[] { typeof(int), typeof(GameObject), typeof(bool) },
+                new object[] { danoPicareta, gameObject, podeTocarSom },
+                out bool danoAplicado);
+            if (metodoEncontrado)
+                return danoAplicado;
+
+            metodoEncontrado = TentarChamarMetodoDano(
+                recurso,
+                nomesMetodos[i],
+                flags,
                 new[] { typeof(int), typeof(GameObject) },
                 new object[] { danoPicareta, gameObject },
-                out bool danoAplicado);
+                out danoAplicado);
             if (metodoEncontrado)
                 return danoAplicado;
 
@@ -656,6 +786,60 @@ public class Picareta : MonoBehaviour
         }
     }
 
+    private void AtualizarMovimentoAudioSegurado()
+    {
+        if (!EstaSendoSegurada())
+        {
+            ResetarAmostraAudioSegurado();
+            return;
+        }
+
+        if (!temAmostraAudioSegurado || Time.deltaTime <= 0f)
+        {
+            ultimaPosicaoAudioSegurado = transform.position;
+            ultimaRotacaoAudioSegurado = transform.rotation;
+            velocidadeLinearAudioSegurado = 0f;
+            velocidadeAngularAudioSegurado = 0f;
+            temAmostraAudioSegurado = true;
+            return;
+        }
+
+        velocidadeLinearAudioSegurado = (transform.position - ultimaPosicaoAudioSegurado).magnitude / Time.deltaTime;
+        velocidadeAngularAudioSegurado = Quaternion.Angle(ultimaRotacaoAudioSegurado, transform.rotation) / Time.deltaTime;
+        ultimaPosicaoAudioSegurado = transform.position;
+        ultimaRotacaoAudioSegurado = transform.rotation;
+    }
+
+    private bool DeveTocarAudioSegurado()
+    {
+        return EstaSendoSegurada() &&
+               Time.time >= proximoAudioSeguradoPermitido &&
+               (velocidadeLinearAudioSegurado >= VelocidadeMinimaAudioSegurado ||
+                velocidadeAngularAudioSegurado >= VelocidadeAngularMinimaAudioSegurado);
+    }
+
+    private bool EstaSendoSegurada()
+    {
+        if (grabInteractable == null)
+            grabInteractable = GetComponent<XRGrabInteractable>();
+
+        if (grabInteractable != null && grabInteractable.interactorsSelecting.Count > 0)
+            return true;
+
+        if (donoAtualPlayer == null)
+            AtualizarDonoPelaSelecaoAtual();
+
+        return donoAtualPlayer != null;
+    }
+
+    private void ResetarAmostraAudioSegurado()
+    {
+        temAmostraAudioSegurado = false;
+        velocidadeLinearAudioSegurado = 0f;
+        velocidadeAngularAudioSegurado = 0f;
+        proximoAudioSeguradoPermitido = 0f;
+    }
+
     private Transform EncontrarPlayerDonoAPartirDoTransform(Transform origem)
     {
         Transform atual = origem;
@@ -725,45 +909,36 @@ public class Picareta : MonoBehaviour
         if (objetoColidido == null || PertenceAoDonoAtual(objetoColidido))
             return;
 
+        EscolherAudioColisao(objetoColidido, out AudioClip clip, out float volume, out _);
+        TocarSomColisao(clip, volume);
+    }
+
+    private bool TocarSomColisao(AudioClip clip, float volume)
+    {
         if (Time.time < proximoSomColisaoPermitido)
-            return;
+            return false;
 
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
-        if (audioSource == null)
-            return;
-
-        AudioClip clip;
-        float volume;
-        string tagObjeto = objetoColidido.tag;
-
-        if (string.Equals(tagObjeto, "Rock", StringComparison.Ordinal))
-        {
-            clip = somPedra;
-            volume = volumePedra;
-        }
-        else if (string.Equals(tagObjeto, "Metal", StringComparison.Ordinal))
-        {
-            clip = somMetal;
-            volume = volumeMetal;
-        }
-        else
-        {
-            clip = somOutros;
-            volume = volumeOutros;
-        }
-
-        if (clip == null)
-            return;
+        if (audioSource == null || clip == null)
+            return false;
 
         proximoSomColisaoPermitido = Time.time + cooldownSomColisao;
         audioSource.PlayOneShot(clip, volume);
+        return true;
     }
 
     private void TocarSomQuebra()
     {
         if (somQuebra != null)
             AudioSource.PlayClipAtPoint(somQuebra, transform.position, volumeQuebra);
+    }
+
+    private void LogAudioFerramenta(string origem, Collider other, string audioEscolhido, bool jaEstavaEmContato, bool tocou)
+    {
+        string nomeCollider = other != null ? other.name : "(null)";
+        string tagCollider = other != null ? other.tag : "(sem tag)";
+        Debug.Log($"{PrefixoDebugAudio} Picareta | {origem} | collider={nomeCollider} | tag={tagCollider} | audio={audioEscolhido} | jaEstavaEmContato={jaEstavaEmContato} | tocou={tocou}", this);
     }
 }

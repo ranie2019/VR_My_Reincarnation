@@ -2,28 +2,24 @@ using UnityEngine;
 
 public class PlaySoundOnCollision : MonoBehaviour
 {
-    public AudioClip collisionSound; // O áudio a ser reproduzido
+    public AudioClip collisionSound; // O audio a ser reproduzido
     private AudioSource audioSource;
 
-    void Start()
+    private void Start()
     {
         audioSource = GetComponent<AudioSource>();
 
-        if (collisionSound != null)
-        {
+        if (audioSource != null && collisionSound != null)
             audioSource.clip = collisionSound;
-        }
     }
 
-    void OnCollisionEnter(Collision collision)
+    private void OnCollisionEnter(Collision collision)
     {
-        // Verifica se a colisão é com a bola
-        if (collision.gameObject.CompareTag("Ball"))
-        {
-            if (audioSource != null && collisionSound != null)
-            {
-                audioSource.Play();
-            }
-        }
+        if (!AudioColisaoFiltro.PodeTocarSomDeColisao(collision))
+            return;
+
+        // Verifica se a colisao e com a bola
+        if (collision.gameObject.CompareTag("Ball") && audioSource != null && collisionSound != null)
+            audioSource.Play();
     }
 }

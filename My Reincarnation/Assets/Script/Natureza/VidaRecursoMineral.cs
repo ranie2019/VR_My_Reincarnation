@@ -20,17 +20,8 @@ public class VidaRecursoMineral : MonoBehaviour
     [SerializeField] private GameObject prefabAoDestruir;
     [SerializeField] private Vector3 offsetSpawn = Vector3.zero;
 
-    [Header("Áudio")]
-    [SerializeField] private AudioSource audioSource;
-    [SerializeField] private AudioClip somHit;
-    [SerializeField] private float volumeSom = 1f;
-    [SerializeField] private AudioClip somMorte;
-    [SerializeField] private float volumeSomMorte = 1f;
-
-
     private bool emCooldown;
     private bool morreu;
-    private int ultimoFrameSomHit = -1;
 
     private class RepassadorFisicaMineral : MonoBehaviour
     {
@@ -69,16 +60,10 @@ public class VidaRecursoMineral : MonoBehaviour
         danoPorHit = 1;
         cooldownHit = 0.25f;
         aplicarDanoPorTriggerDireto = true;
-        volumeSom = 1f;
-        volumeSomMorte = 1f;
-        audioSource = GetComponent<AudioSource>();
     }
 
     private void Awake()
     {
-        if (audioSource == null)
-            audioSource = GetComponent<AudioSource>();
-
         vidaAtual = Mathf.Clamp(vidaAtual, 1, Mathf.Max(1, vidaMax));
 
         InstalarRepassadoresNosFilhos();
@@ -90,8 +75,6 @@ public class VidaRecursoMineral : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 1, vidaMax);
         danoPorHit = Mathf.Max(1, danoPorHit);
         cooldownHit = Mathf.Max(0f, cooldownHit);
-        volumeSom = Mathf.Clamp01(volumeSom);
-        volumeSomMorte = Mathf.Clamp01(volumeSomMorte);
     }
 
     private void InstalarRepassadoresNosFilhos()
@@ -118,8 +101,6 @@ public class VidaRecursoMineral : MonoBehaviour
         {
             return;
         }
-
-        TocarSomHit();
 
         bool colliderEhPicareta = ColliderEhPicareta(collision.collider);
         bool transformEhPicareta = TransformEhPicareta(collision.transform);
@@ -148,8 +129,6 @@ public class VidaRecursoMineral : MonoBehaviour
         {
             return;
         }
-
-        TocarSomHit();
 
         bool colliderEhPicareta = ColliderEhPicareta(other);
 
@@ -263,8 +242,6 @@ public class VidaRecursoMineral : MonoBehaviour
 
         vidaAtual -= dano;
 
-        TocarSomHit();
-
         if (vidaAtual <= 0)
         {
             Morrer();
@@ -287,32 +264,10 @@ public class VidaRecursoMineral : MonoBehaviour
             return;
 
         morreu = true;
-        TocarSomMorte();
 
         if (prefabAoDestruir != null)
             Instantiate(prefabAoDestruir, transform.position + offsetSpawn, transform.rotation);
 
         Destroy(gameObject);
-    }
-
-    private void TocarSom(AudioClip clip)
-    {
-        if (audioSource != null && clip != null)
-            audioSource.PlayOneShot(clip, volumeSom);
-    }
-
-    private void TocarSomHit()
-    {
-        if (Time.frameCount == ultimoFrameSomHit)
-            return;
-
-        ultimoFrameSomHit = Time.frameCount;
-        TocarSom(somHit);
-    }
-
-    private void TocarSomMorte()
-    {
-        if (somMorte != null)
-            AudioSource.PlayClipAtPoint(somMorte, transform.position, volumeSomMorte);
     }
 }

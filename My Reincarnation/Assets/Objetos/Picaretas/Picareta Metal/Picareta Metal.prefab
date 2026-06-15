@@ -599,15 +599,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 4.86
+      value: 521.07434
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.29
+      value: 0.79
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 13.9
+      value: -401.24554
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
       propertyPath: m_LocalRotation.w
@@ -760,6 +760,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8311855675034713542}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3768704022325723461}
     - targetCorrespondingSourceObject: {fileID: 6027952125719520309, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 630789709215892685}
@@ -1104,6 +1107,29 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &3768704022325723461
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799679431825974351}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  itemId: Picareta Metal
+  nomeItem: Picareta Metal
+  prefabReferencia: {fileID: 919132149155446097, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}
+  salvarNoInventario: 1
+  usarNomeDoObjetoSeIdVazio: 1
+  destruirOriginalAoCarregarSeEstiverNoInventario: 1
+  estaNoInventario: 0
+  salvarQuandoSoltoNaCena: 1
+  instanciaId: 
+  durabilidadeAtual: -1
+  dadosExtrasJson: 
 --- !u!1 &5753668158389742265 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -4034869773821365337, guid: 50617100f4442e843b8ff4d7349fb4e8, type: 3}

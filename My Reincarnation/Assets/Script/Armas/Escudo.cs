@@ -120,7 +120,7 @@ public class Escudo : MonoBehaviour
         if (collision == null || collision.collider == null)
             return;
 
-        ProcessarBloqueio(collision.collider.gameObject);
+        ProcessarBloqueio(collision.collider.gameObject, AudioColisaoFiltro.PodeTocarSomDeColisao(collision));
     }
 
     private void OnTriggerEnter(Collider other)
@@ -128,7 +128,7 @@ public class Escudo : MonoBehaviour
         if (other == null)
             return;
 
-        ProcessarBloqueio(other.gameObject);
+        ProcessarBloqueio(other.gameObject, false);
     }
 
     private void OnSelectEntered(SelectEnterEventArgs args)
@@ -188,6 +188,11 @@ public class Escudo : MonoBehaviour
 
     public bool RegistrarBloqueio(GameObject origemDano)
     {
+        return RegistrarBloqueio(origemDano, true);
+    }
+
+    public bool RegistrarBloqueio(GameObject origemDano, bool tocarSom)
+    {
         if (Quebrado || origemDano == null)
             return false;
 
@@ -206,14 +211,15 @@ public class Escudo : MonoBehaviour
         if (!PodeBloquearAgora(origemResolvida))
             return false;
 
-        TocarSomBloqueio();
+        if (tocarSom)
+            TocarSomBloqueio();
         ReduzirVidaDoEscudo();
         return true;
     }
 
-    private void ProcessarBloqueio(GameObject objetoColidido)
+    private void ProcessarBloqueio(GameObject objetoColidido, bool tocarSom)
     {
-        RegistrarBloqueio(objetoColidido);
+        RegistrarBloqueio(objetoColidido, tocarSom);
     }
 
     private void NormalizarVida()

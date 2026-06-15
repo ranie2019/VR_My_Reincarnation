@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 1833960573875836410}
   - component: {fileID: 5456440013711417979}
   - component: {fileID: 4828991945644028985}
+  - component: {fileID: 7372217267715212598}
   m_Layer: 0
   m_Name: Stone
   m_TagString: Stone
@@ -306,6 +307,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioDados
   nomeItem: Stone
   prefabParaStack: {fileID: 165230}
+--- !u!114 &7372217267715212598
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 165230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  itemId: Stone
+  nomeItem: Stone
+  prefabReferencia: {fileID: 165230}
+  salvarNoInventario: 1
+  usarNomeDoObjetoSeIdVazio: 1
+  destruirOriginalAoCarregarSeEstiverNoInventario: 1
+  estaNoInventario: 0
+  salvarQuandoSoltoNaCena: 1
+  instanciaId: Stone
+  durabilidadeAtual: -1
+  dadosExtrasJson: 
 --- !u!1 &3469338933817914625
 GameObject:
   m_ObjectHideFlags: 0
