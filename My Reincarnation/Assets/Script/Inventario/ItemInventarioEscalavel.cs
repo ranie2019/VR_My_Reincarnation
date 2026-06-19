@@ -103,6 +103,46 @@ public class ItemInventarioEscalavel : MonoBehaviour
         return coube;
     }
 
+    public bool AjustarRenderersParaSlotVisual(Transform slotTransform, Bounds boundsPermitido)
+    {
+        if (slotTransform == null || !TamanhoValido(boundsPermitido.size))
+            return false;
+
+        bool coube = false;
+
+        for (int i = 0; i < 10; i++)
+        {
+            if (!TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsRenderers))
+                return false;
+
+            CentralizarNoSlot(slotTransform, boundsRenderers, boundsPermitido);
+            Physics.SyncTransforms();
+
+            if (!TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsRenderers))
+                return false;
+
+            coube = BoundsDentroDoPermitido(boundsRenderers, boundsPermitido);
+            if (coube)
+                break;
+
+            float ajuste = Mathf.Min(1f, MenorFator(boundsPermitido.size, boundsRenderers.size));
+            if (ajuste >= 1f)
+                break;
+
+            AplicarEscalaLocal(transform.localScale * ajuste);
+        }
+
+        if (!coube && TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsFinais))
+        {
+            CentralizarNoSlot(slotTransform, boundsFinais, boundsPermitido);
+            Physics.SyncTransforms();
+            coube = TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsFinais) &&
+                    BoundsDentroDoPermitido(boundsFinais, boundsPermitido);
+        }
+
+        return coube;
+    }
+
     private void GarantirEscalaOriginal()
     {
         var escalaComp = GetComponent<EscalaOriginalItem>();
@@ -172,6 +212,22 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
             EncapsularBoundsNoSlot(slotTransform, col.bounds, ref boundsLocal, ref achou);
         }
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer r in renderers)
+        {
+            if (r == null || !r.transform.IsChildOf(transform)) continue;
+
+            EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
+        }
+
+        return achou;
+    }
+
+    private bool TentarObterRendererBoundsNoEspacoDoSlot(Transform slotTransform, Vector3 centroInicial, out Bounds boundsLocal)
+    {
+        boundsLocal = new Bounds(centroInicial, Vector3.zero);
+        bool achou = false;
 
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
         foreach (Renderer r in renderers)

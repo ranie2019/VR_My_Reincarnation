@@ -63,7 +63,6 @@ public class Machado : MonoBehaviour
     private readonly Dictionary<VidaArvore, int> contatosPorArvore = new();
     private readonly HashSet<Collider> contatosAudioSeguradoAtivos = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
-    private const string PrefixoDebugAudio = "[AUDIO FERRAMENTA DEBUG]";
     private const float VelocidadeMinimaAudioSegurado = 0.25f;
     private const float VelocidadeAngularMinimaAudioSegurado = 45f;
     private const float CooldownMinimoAudioSegurado = 0.2f;
@@ -862,8 +861,5 @@ public class Machado : MonoBehaviour
 
     private void LogAudioFerramenta(string origem, Collider other, string audioEscolhido, bool jaEstavaEmContato, bool tocou)
     {
-        string nomeCollider = other != null ? other.name : "(null)";
-        string tagCollider = other != null ? other.tag : "(sem tag)";
-        Debug.Log($"{PrefixoDebugAudio} Machado | {origem} | collider={nomeCollider} | tag={tagCollider} | audio={audioEscolhido} | jaEstavaEmContato={jaEstavaEmContato} | tocou={tocou}", this);
     }
 }

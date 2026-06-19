@@ -119,7 +119,6 @@ public class ObjetoPersistente : MonoBehaviour, ISalvavel
     public void GerarNovoId()
     {
         objectId = Guid.NewGuid().ToString("N");
-        Debug.Log($"[ObjetoPersistente] Novo ID gerado para '{name}': {objectId}", this);
     }
 
     [ContextMenu("Copiar ID no Console")]
@@ -127,7 +126,6 @@ public class ObjetoPersistente : MonoBehaviour, ISalvavel
     {
         GarantirId();
         GUIUtility.systemCopyBuffer = objectId;
-        Debug.Log($"[ObjetoPersistente] ID copiado: {objectId}", this);
     }
 
     private void GarantirId()

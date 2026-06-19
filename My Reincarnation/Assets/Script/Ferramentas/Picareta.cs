@@ -65,7 +65,6 @@ public class Picareta : MonoBehaviour
     private readonly Dictionary<VidaRecursoMineral, int> contatosPorRecurso = new();
     private readonly HashSet<Collider> contatosAudioSeguradoAtivos = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
-    private const string PrefixoDebugAudio = "[AUDIO FERRAMENTA DEBUG]";
     private const float VelocidadeMinimaAudioSegurado = 0.25f;
     private const float VelocidadeAngularMinimaAudioSegurado = 45f;
     private const float CooldownMinimoAudioSegurado = 0.2f;
@@ -937,8 +936,5 @@ public class Picareta : MonoBehaviour
 
     private void LogAudioFerramenta(string origem, Collider other, string audioEscolhido, bool jaEstavaEmContato, bool tocou)
     {
-        string nomeCollider = other != null ? other.name : "(null)";
-        string tagCollider = other != null ? other.tag : "(sem tag)";
-        Debug.Log($"{PrefixoDebugAudio} Picareta | {origem} | collider={nomeCollider} | tag={tagCollider} | audio={audioEscolhido} | jaEstavaEmContato={jaEstavaEmContato} | tocou={tocou}", this);
     }
 }

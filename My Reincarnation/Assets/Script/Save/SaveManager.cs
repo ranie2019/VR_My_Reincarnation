@@ -153,7 +153,6 @@ public class SaveManager : MonoBehaviour
     [ContextMenu("Mostrar Caminho Do Save")]
     public void MostrarCaminhoDoSave()
     {
-        Debug.Log($"[SaveManager] Caminho do save: {CaminhoSave}", this);
     }
 
     public bool ExisteSave()
@@ -1003,7 +1002,5 @@ public class SaveManager : MonoBehaviour
 
     private void Log(string mensagem)
     {
-        if (debugSave)
-            Debug.Log($"[SaveManager] {mensagem}", this);
     }
 }

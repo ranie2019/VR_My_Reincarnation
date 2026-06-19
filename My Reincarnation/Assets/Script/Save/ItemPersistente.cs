@@ -276,13 +276,11 @@ public class ItemPersistente : MonoBehaviour
     [ContextMenu("Mostrar ID No Console")]
     private void MostrarIdNoConsole()
     {
-        Debug.Log($"[ItemPersistente] Item ID atual: {ObterItemId()}", this);
     }
 
     [ContextMenu("Mostrar ID Da Instancia No Console")]
     private void MostrarInstanciaIdNoConsole()
     {
-        Debug.Log($"[ItemPersistente] Instancia ID atual: {ObterInstanciaId()}", this);
     }
 
     private void GarantirInstanciaIdRuntime()

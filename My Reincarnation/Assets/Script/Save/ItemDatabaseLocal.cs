@@ -133,7 +133,6 @@ public class ItemDatabaseLocal : MonoBehaviour
             EditorUtility.SetDirty(this);
 #endif
 
-        Debug.Log($"[ItemDatabaseLocal] IDs preenchidos pelo nome do prefab: {alterados}", this);
         ValidarDatabase();
     }
 

@@ -186,7 +186,20 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             }
         }
 
+        FinalizarRestauracaoDosSlots();
         Log($"Itens carregados no inventario: {itensCarregados}");
+    }
+
+    private void FinalizarRestauracaoDosSlots()
+    {
+        if (slots == null)
+            return;
+
+        for (int i = 0; i < slots.Length; i++)
+        {
+            if (slots[i] != null)
+                slots[i].FinalizarRestauracaoDoSave();
+        }
     }
 
     private bool RestaurarItemExistente(InventorySaveData data, ItemPersistente persistente, SlotInventario slot, bool esconderNaPilha)
@@ -596,7 +609,5 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
     private void Log(string mensagem)
     {
-        if (debugInventarioSave)
-            Debug.Log($"[InventarioSaveAdapter] {mensagem}", this);
     }
 }
