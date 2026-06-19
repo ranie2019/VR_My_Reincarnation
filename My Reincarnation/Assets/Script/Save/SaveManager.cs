@@ -99,7 +99,6 @@ public class SaveManager : MonoBehaviour
             Directory.CreateDirectory(diretorio);
 
         File.WriteAllText(CaminhoSave, conteudo, Encoding.UTF8);
-        Log($"Jogo salvo em: {CaminhoSave}");
     }
 
     [ContextMenu("Carregar Jogo")]
@@ -107,7 +106,6 @@ public class SaveManager : MonoBehaviour
     {
         if (!ExisteSave())
         {
-            Log("Nenhum save encontrado para carregar.");
             return;
         }
 
@@ -133,8 +131,6 @@ public class SaveManager : MonoBehaviour
             RestaurarInventario(data.inventario);
 
         RestaurarObjetosCena(data.objetosCena, instanciaIdsInventario);
-
-        Log($"Jogo carregado de: {CaminhoSave}");
     }
 
     [ContextMenu("Apagar Save")]
@@ -142,12 +138,10 @@ public class SaveManager : MonoBehaviour
     {
         if (!ExisteSave())
         {
-            Log("Nao existe save para apagar.");
             return;
         }
 
         File.Delete(CaminhoSave);
-        Log($"Save apagado: {CaminhoSave}");
     }
 
     [ContextMenu("Mostrar Caminho Do Save")]
@@ -293,8 +287,6 @@ public class SaveManager : MonoBehaviour
             FindObjectsInactive.Include,
             FindObjectsSortMode.None);
 
-        int totalSalvo = 0;
-
         for (int i = 0; i < itens.Length; i++)
         {
             ItemPersistente item = itens[i];
@@ -319,12 +311,7 @@ public class SaveManager : MonoBehaviour
 
             SceneObjectSaveData data = CriarSceneObjectDataDoItem(item, estadoItem, objectId);
             dados.Add(data);
-            totalSalvo++;
-
-            Log($"Item solto salvo: {estadoItem.itemId} | instancia {estadoItem.instanciaId} | inventario? false | pos {item.transform.position}");
         }
-
-        Log($"Itens soltos salvos na cena: {totalSalvo}");
     }
 
     private SceneObjectSaveData CriarSceneObjectDataDoItem(
@@ -364,10 +351,7 @@ public class SaveManager : MonoBehaviour
 
         List<SceneObjectSaveData> itensSalvos = FiltrarDadosItensPersistentes(objetosCena);
         if (itensSalvos.Count == 0)
-        {
-            Log("Save nao possui itens soltos da cena para restaurar.");
             return;
-        }
 
         ItemDatabaseLocal database = ItemDatabaseLocal.Instancia != null
             ? ItemDatabaseLocal.Instancia
@@ -377,8 +361,6 @@ public class SaveManager : MonoBehaviour
         HashSet<ItemPersistente> itensUsados = new HashSet<ItemPersistente>();
         HashSet<string> instanciaIdsSalvos = new HashSet<string>();
         HashSet<string> instanciaIdsCarregados = new HashSet<string>();
-
-        int itensCarregados = 0;
 
         for (int i = 0; i < itensSalvos.Count; i++)
         {
@@ -399,10 +381,7 @@ public class SaveManager : MonoBehaviour
 
             estadoItem.instanciaId = instanciaId;
             if (instanciaIdsInventario != null && instanciaIdsInventario.Contains(instanciaId))
-            {
-                Log($"Item de cena ignorado porque pertence ao inventario salvo: {estadoItem.itemId} | instancia {instanciaId}");
                 continue;
-            }
 
             if (!instanciaIdsCarregados.Add(instanciaId))
             {
@@ -475,13 +454,9 @@ public class SaveManager : MonoBehaviour
 
             RestaurarItemSoltoCena(item, data, estadoItem);
             itensUsados.Add(item);
-            itensCarregados++;
-
-            Log($"Item solto carregado/restaurado na cena: {estadoItem.itemId} | instancia {estadoItem.instanciaId} | inventario? false | pos {item.transform.position}");
         }
 
         RemoverDuplicatasItensSoltos(existentesAntes, itensUsados, instanciaIdsSalvos);
-        Log($"Itens soltos carregados da cena: {itensCarregados}");
     }
 
     private HashSet<string> ExtrairInstanciaIdsInventario(List<InventorySaveData> itens)
@@ -709,8 +684,6 @@ public class SaveManager : MonoBehaviour
         HashSet<ItemPersistente> itensUsados,
         HashSet<string> instanciaIdsSalvos)
     {
-        int removidos = 0;
-
         for (int i = 0; i < existentesAntes.Count; i++)
         {
             ItemPersistente item = existentesAntes[i];
@@ -725,11 +698,7 @@ public class SaveManager : MonoBehaviour
                 continue;
 
             Destroy(item.gameObject);
-            removidos++;
         }
-
-        if (removidos > 0)
-            Log($"Itens soltos duplicados removidos da cena: {removidos}");
     }
 
     private bool ItemDeveSerSalvoComoCena(ItemPersistente item)
@@ -802,17 +771,7 @@ public class SaveManager : MonoBehaviour
             return new List<InventorySaveData>();
         }
 
-        List<InventorySaveData> itens = inventarioSalvavel.SalvarInventario() ?? new List<InventorySaveData>();
-        Log($"Itens salvos no inventario: {itens.Count}");
-
-        for (int i = 0; i < itens.Count; i++)
-        {
-            InventorySaveData item = itens[i];
-            if (item != null)
-                Log($"Inventario salvo: {item.itemId} | instancia {item.instanciaId} | inventario? true | slot {item.slot} | quantidade {item.quantidade}");
-        }
-
-        return itens;
+        return inventarioSalvavel.SalvarInventario() ?? new List<InventorySaveData>();
     }
 
     private void RestaurarInventario(List<InventorySaveData> itens)
@@ -829,7 +788,6 @@ public class SaveManager : MonoBehaviour
             return;
         }
 
-        Log($"Restaurando inventario com {itens.Count} entradas.");
         inventarioSalvavel.CarregarInventario(itens);
     }
 
@@ -1000,7 +958,4 @@ public class SaveManager : MonoBehaviour
         return componente.GetComponent<ItemPersistente>() != null;
     }
 
-    private void Log(string mensagem)
-    {
-    }
 }

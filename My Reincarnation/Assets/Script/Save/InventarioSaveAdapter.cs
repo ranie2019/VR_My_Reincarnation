@@ -13,7 +13,6 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
     [Header("Carregamento")]
     [SerializeField] private bool limparInventarioAntesCarregar = true;
     [SerializeField] private bool destruirOriginaisSalvosNoInventario = true;
-    [SerializeField] private bool debugInventarioSave = true;
 
     private void Awake()
     {
@@ -71,9 +70,6 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                     continue;
                 }
 
-                string instanciaLog = string.IsNullOrWhiteSpace(data.instanciaId) ? "(sem instanciaId)" : data.instanciaId;
-                Log($"Item detectado no inventario para save: {data.itemId} | instancia {instanciaLog} | inventario? true | pos atual {item.transform.position}");
-
                 string chave = CriarChaveAgrupamento(data);
                 if (agrupados.TryGetValue(chave, out InventorySaveData existente))
                 {
@@ -89,11 +85,8 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         foreach (InventorySaveData data in agrupados.Values)
         {
             resultado.Add(data);
-            string instanciaPrincipal = string.IsNullOrWhiteSpace(data.instanciaId) ? "(sem instanciaId)" : data.instanciaId;
-            Log($"Item salvo no inventario: {data.itemId} | instancia {instanciaPrincipal} | inventario? true | slot {data.slot} | qtd {data.quantidade}");
         }
 
-        Log($"Total de itens salvos no inventario: {resultado.Count}");
         return resultado;
     }
 
@@ -102,10 +95,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         AtualizarReferencias();
 
         if (itens == null)
-        {
-            Log("Lista de inventario vazia no save.");
             return;
-        }
 
         if (limparInventarioAntesCarregar)
             LimparSlots();
@@ -113,7 +103,6 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         List<ItemPersistente> originaisCena = ObterItensPersistentesSoltosCena();
         HashSet<ItemPersistente> originaisUsados = new HashSet<ItemPersistente>();
 
-        int itensCarregados = 0;
         HashSet<string> instanciaIdsCarregados = new HashSet<string>();
 
         for (int i = 0; i < itens.Count; i++)
@@ -164,9 +153,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 if (originalCena != null)
                 {
                     originaisUsados.Add(originalCena);
-                    if (RestaurarItemExistente(dataInstancia, originalCena, slots[data.slot], esconderNaPilha))
-                        itensCarregados++;
-
+                    RestaurarItemExistente(dataInstancia, originalCena, slots[data.slot], esconderNaPilha);
                     continue;
                 }
 
@@ -187,7 +174,6 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         }
 
         FinalizarRestauracaoDosSlots();
-        Log($"Itens carregados no inventario: {itensCarregados}");
     }
 
     private void FinalizarRestauracaoDosSlots()
@@ -231,7 +217,6 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         }
 
         persistente.MarcarComoNoInventario();
-        Log($"Item original da cena restaurado no inventario: {data.itemId} | instancia {data.instanciaId} | inventario? true | slot {data.slot}");
         return true;
     }
 
@@ -344,10 +329,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
     {
         HashSet<string> instanciaIdsSalvos = ExtrairInstanciaIdsSalvos(itens);
         if (instanciaIdsSalvos.Count == 0)
-        {
-            Log("Nenhum instanciaId confiavel no inventario salvo. Originais soltos nao serao destruidos por seguranca.");
             return;
-        }
 
         ItemPersistente[] itensCena = FindObjectsByType<ItemPersistente>(
             FindObjectsInactive.Include,
@@ -370,7 +352,6 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
             instanciaIdsEncontrados.Add(instanciaId.Trim());
             removidos.Add(item);
-            Log($"Removendo original da cena para item salvo no inventario: {item.ObterItemId()} | instancia {instanciaId}");
             Destroy(item.gameObject);
         }
 
@@ -607,7 +588,4 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             slots = FindObjectsByType<SlotInventario>(FindObjectsInactive.Include, FindObjectsSortMode.None);
     }
 
-    private void Log(string mensagem)
-    {
-    }
 }

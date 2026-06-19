@@ -11,8 +11,6 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 [DisallowMultipleComponent]
 public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 {
-    private const string PrefixoDebugEscala = "[DEBUG_ESCALA]";
-
     [Header("Filho visual do slot")]
     [SerializeField] private GameObject visualSlot;
 
@@ -545,8 +543,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         SalvarEstadoOriginalSeNecessario(item);
         EstadoOriginalItem estado = estadosOriginais[item];
         bool fluxoRestore = reaplicarEscalaRestauradaDoSave || itensRestauradosDoSave.Contains(item);
-        if (fluxoRestore)
-            LogDebugEscala("ANTES_PARENT", item);
 
         itemGuardado = item;
         MarcarItemComoTopo(item);
@@ -555,8 +551,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         ParentarItemNoSlot(item);
 
         RestaurarEscalaOriginalDoEstado(item, estado, false);
-        if (fluxoRestore)
-            LogDebugEscala("DEPOIS_PARENT", item);
 
         item.enabled = estado.GrabEnabled;
 
@@ -599,11 +593,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         RegistrarEscalaVisualInventario(item);
         AplicarFatorReducaoVisualInventario(item.transform);
         Physics.SyncTransforms();
-
-        if (fluxoRestore)
-            LogDebugEscala("FINAL_RESTORE", item);
-        else
-            LogDebugEscala("ITEM_MANUAL_SLOT", item);
     }
 
     private void RestaurarItemParaMundo(XRGrabInteractable item)
@@ -919,7 +908,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         SalvarEstadoOriginalSeNecessario(item);
         itensRestauradosDoSave.Add(item);
         escalasVisuaisInventario.Remove(item);
-        LogDebugEscalaInicioRestore(item);
 
         MarcarItemAceitoPeloSlot(item, esconderNaPilha, "restauracao save");
         pilhaItens.Add(item);
@@ -1179,9 +1167,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         GarantirEscalaOriginal(item.transform);
         PosicionarItemNoPontoDoSlot(item.transform);
         PrepararEscalaParaSlot(item.transform, estado);
-        LogDebugEscala("APOS_PREPARAR_SLOT", item);
         AjustarEscalaAdaptativa(item.transform);
-        LogDebugEscala("APOS_AJUSTAR_ESCALA", item);
         RegistrarEscalaVisualInventario(item);
     }
 
@@ -1454,82 +1440,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         return Mathf.Abs(escala.x) > minimo &&
                Mathf.Abs(escala.y) > minimo &&
                Mathf.Abs(escala.z) > minimo;
-    }
-
-    private void LogDebugEscalaInicioRestore(XRGrabInteractable item)
-    {
-        Debug.Log($"{PrefixoDebugEscala} INICIO_RESTORE | item={ObterNomeItemDebug(item)} | instanciaId={ObterInstanciaIdDebug(item)}", item);
-    }
-
-    private void LogDebugEscala(string evento, XRGrabInteractable item)
-    {
-        Transform itemTransform = item != null ? item.transform : null;
-        Vector3 localScale = itemTransform != null ? itemTransform.localScale : Vector3.zero;
-        Vector3 lossyScale = itemTransform != null ? itemTransform.lossyScale : Vector3.zero;
-        Vector3 rendererBoundsSize = ObterRendererBoundsSize(itemTransform);
-
-        Debug.Log(
-            $"{PrefixoDebugEscala} {evento} | item={ObterNomeItemDebug(item)} | instanciaId={ObterInstanciaIdDebug(item)} | parent={NomeTransform(itemTransform != null ? itemTransform.parent : null)} | localScale={localScale} | lossyScale={lossyScale} | Renderer.bounds.size={rendererBoundsSize}",
-            item);
-    }
-
-    private Vector3 ObterRendererBoundsSize(Transform item)
-    {
-        if (item == null)
-            return Vector3.zero;
-
-        Renderer[] renderers = item.GetComponentsInChildren<Renderer>(true);
-        bool achou = false;
-        Bounds bounds = default;
-
-        foreach (Renderer rendererItem in renderers)
-        {
-            if (rendererItem == null || !rendererItem.transform.IsChildOf(item))
-                continue;
-
-            if (!achou)
-            {
-                bounds = rendererItem.bounds;
-                achou = true;
-            }
-            else
-            {
-                bounds.Encapsulate(rendererItem.bounds);
-            }
-        }
-
-        return achou ? bounds.size : Vector3.zero;
-    }
-
-    private string ObterNomeItemDebug(XRGrabInteractable item)
-    {
-        if (item == null)
-            return "(sem item)";
-
-        ItemPersistente persistente = item.GetComponent<ItemPersistente>();
-        if (persistente != null)
-        {
-            string itemId = persistente.ObterItemId();
-            if (!string.IsNullOrWhiteSpace(itemId))
-                return itemId;
-        }
-
-        return item.name;
-    }
-
-    private string ObterInstanciaIdDebug(XRGrabInteractable item)
-    {
-        ItemPersistente persistente = item != null ? item.GetComponent<ItemPersistente>() : null;
-        if (persistente == null)
-            return "(sem instanciaId)";
-
-        string instanciaId = persistente.ObterInstanciaIdSemGerar();
-        return string.IsNullOrWhiteSpace(instanciaId) ? "(sem instanciaId)" : instanciaId;
-    }
-
-    private string NomeTransform(Transform alvo)
-    {
-        return alvo != null ? alvo.name : "(sem parent)";
     }
 
     private void SetUiDoItemVisivel(EstadoOriginalItem estado, bool visivel)
