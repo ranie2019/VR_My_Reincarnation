@@ -87,7 +87,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples.InteractionSimulator.Editor
             var packageSamples = Sample.FindByPackage(packageName, packageVersion);
             if (packageSamples == null)
             {
-                Debug.LogError($"Couldn't find samples of the {ToString(packageName, packageVersion)} package; aborting project validation rule.");
+                { }
                 return false;
             }
 
@@ -100,7 +100,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples.InteractionSimulator.Editor
                 }
             }
 
-            Debug.LogError($"Couldn't find {sampleDisplayName} sample in the {ToString(packageName, packageVersion)} package; aborting project validation rule.");
+            { }
             return false;
         }
 

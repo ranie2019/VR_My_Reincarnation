@@ -15,7 +15,7 @@ public class LoadScene : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"Scene '{sceneName}' does not exist in the Build Settings.");
+            { }
         }
     }
 
@@ -29,7 +29,7 @@ public class LoadScene : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Current scene name is null or empty!");
+            { }
         }
     }
 

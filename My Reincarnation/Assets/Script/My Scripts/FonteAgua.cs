@@ -81,6 +81,8 @@ public class FonteAgua : MonoBehaviour
 
     private void Start()
     {
+        NormalizarConfiguracoes();
+
         if (criarAutomaticamente)
             CriarOuAtualizarSistema();
         else
@@ -106,32 +108,37 @@ public class FonteAgua : MonoBehaviour
 
     private void OnValidate()
     {
-        alturaAguaPrato = Mathf.Max(0f, alturaAguaPrato);
-        escalaAguaPratoSuperior = Mathf.Max(0.01f, escalaAguaPratoSuperior);
-        escalaAguaPratoMeio = Mathf.Max(0.01f, escalaAguaPratoMeio);
-        escalaAguaPratoInferior = Mathf.Max(0.01f, escalaAguaPratoInferior);
-        alturaJatoInicial = Mathf.Max(0f, alturaJatoInicial);
-        quantidadeParticulasJatoInicial = Mathf.Max(1f, quantidadeParticulasJatoInicial);
-        tamanhoParticulaJatoInicial = Mathf.Max(0.001f, tamanhoParticulaJatoInicial);
-        velocidadeJatoInicial = Mathf.Max(0.01f, velocidadeJatoInicial);
-        larguraJatoInicial = Mathf.Max(0.001f, larguraJatoInicial);
-        gravidadeJatoInicial = Mathf.Max(0f, gravidadeJatoInicial);
-        vidaParticulaJatoInicial = Mathf.Max(0.08f, vidaParticulaJatoInicial);
-        inclinacaoJatoInicial = Mathf.Clamp(inclinacaoJatoInicial, -75f, 75f);
-        quantidadeParticulasQueda = Mathf.Max(1f, quantidadeParticulasQueda);
-        tamanhoParticulaQueda = Mathf.Max(0.001f, tamanhoParticulaQueda);
-        velocidadeQueda = Mathf.Max(0.01f, velocidadeQueda);
-        larguraQueda = Mathf.Max(0.001f, larguraQueda);
-        gravidadeQueda = Mathf.Max(0f, gravidadeQueda);
-        vidaParticulaQueda = Mathf.Max(0.08f, vidaParticulaQueda);
-        alturaInicioQueda = Mathf.Max(0f, alturaInicioQueda);
-        raioAreaQueda = Mathf.Max(0.001f, raioAreaQueda);
-        velocidadeAnimacaoUV = Mathf.Max(0f, velocidadeAnimacaoUV);
-        intensidadeOndulacao = Mathf.Max(0f, intensidadeOndulacao);
-        velocidadeOndulacao = Mathf.Max(0f, velocidadeOndulacao);
+        NormalizarConfiguracoes();
 
         if (Application.isPlaying)
             AtualizarCorDosMateriais();
+    }
+
+    private void NormalizarConfiguracoes()
+    {
+        alturaAguaPrato = MinimoFinito(alturaAguaPrato, 0f);
+        escalaAguaPratoSuperior = MinimoFinito(escalaAguaPratoSuperior, 0.01f);
+        escalaAguaPratoMeio = MinimoFinito(escalaAguaPratoMeio, 0.01f);
+        escalaAguaPratoInferior = MinimoFinito(escalaAguaPratoInferior, 0.01f);
+        alturaJatoInicial = MinimoFinito(alturaJatoInicial, 0f);
+        quantidadeParticulasJatoInicial = MinimoFinito(quantidadeParticulasJatoInicial, 1f);
+        tamanhoParticulaJatoInicial = MinimoFinito(tamanhoParticulaJatoInicial, 0.001f);
+        velocidadeJatoInicial = MinimoFinito(velocidadeJatoInicial, 0.01f);
+        larguraJatoInicial = MinimoFinito(larguraJatoInicial, 0.001f);
+        gravidadeJatoInicial = MinimoFinito(gravidadeJatoInicial, 0f);
+        vidaParticulaJatoInicial = MinimoFinito(vidaParticulaJatoInicial, 0.08f);
+        inclinacaoJatoInicial = ValorFinito(inclinacaoJatoInicial) ? Mathf.Clamp(inclinacaoJatoInicial, -75f, 75f) : 0f;
+        quantidadeParticulasQueda = MinimoFinito(quantidadeParticulasQueda, 1f);
+        tamanhoParticulaQueda = MinimoFinito(tamanhoParticulaQueda, 0.001f);
+        velocidadeQueda = MinimoFinito(velocidadeQueda, 0.01f);
+        larguraQueda = MinimoFinito(larguraQueda, 0.001f);
+        gravidadeQueda = MinimoFinito(gravidadeQueda, 0f);
+        vidaParticulaQueda = MinimoFinito(vidaParticulaQueda, 0.08f);
+        alturaInicioQueda = MinimoFinito(alturaInicioQueda, 0f);
+        raioAreaQueda = MinimoFinito(raioAreaQueda, 0.001f);
+        velocidadeAnimacaoUV = MinimoFinito(velocidadeAnimacaoUV, 0f);
+        intensidadeOndulacao = MinimoFinito(intensidadeOndulacao, 0f);
+        velocidadeOndulacao = MinimoFinito(velocidadeOndulacao, 0f);
     }
 
     public void IniciarAgua()
@@ -183,6 +190,7 @@ public class FonteAgua : MonoBehaviour
 
     private void CriarOuAtualizarSistema()
     {
+        NormalizarConfiguracoes();
         PrepararMateriais();
 
         // Reutiliza filhos existentes para evitar duplicatas no prefab/cena.
@@ -198,7 +206,7 @@ public class FonteAgua : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[FonteAgua] OrigemJato nao foi atribuido. O jato e a queda de agua nao serao criados.", this);
+            { }
         }
 
         if (alvoJato != null)
@@ -209,7 +217,7 @@ public class FonteAgua : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[FonteAgua] AlvoJato nao foi atribuido. O respingo sera ignorado.", this);
+            { }
         }
 
         aguaSuperior = CriarOuAtualizarDiscoAgua(
@@ -316,7 +324,7 @@ public class FonteAgua : MonoBehaviour
     {
         if (prato == null)
         {
-            Debug.LogWarning($"[FonteAgua] {nome}: transform do prato nao foi atribuido.", this);
+            { }
             return ObterTransformExistente(nome);
         }
 
@@ -410,7 +418,7 @@ public class FonteAgua : MonoBehaviour
 
         if (origemJato == null)
         {
-            Debug.LogWarning("[FonteAgua] OrigemJato nao foi atribuido. FX_JatoAgua nao sera posicionado.", this);
+            { }
             return;
         }
 
@@ -476,7 +484,7 @@ public class FonteAgua : MonoBehaviour
 
         if (origemJato == null)
         {
-            Debug.LogWarning("[FonteAgua] OrigemJato nao foi atribuido. FX_QuedaAgua nao sera posicionado.", this);
+            { }
             return;
         }
 
@@ -649,6 +657,9 @@ public class FonteAgua : MonoBehaviour
 
     private Quaternion RotacaoParaDirecao(Vector3 direcao)
     {
+        if (!VetorFinito(direcao))
+            direcao = Vector3.up;
+
         if (direcao.sqrMagnitude < 0.001f)
             direcao = Vector3.up;
 
@@ -663,6 +674,8 @@ public class FonteAgua : MonoBehaviour
 
     private void AtualizarPosicoesFX()
     {
+        NormalizarConfiguracoes();
+
         if (particleJato != null && origemJato != null)
         {
             Vector3 direcaoJato = CalcularDirecaoJatoInicial();
@@ -968,5 +981,20 @@ public class FonteAgua : MonoBehaviour
     {
         cor.a = Mathf.Clamp01(alpha);
         return cor;
+    }
+
+    private static float MinimoFinito(float valor, float minimo)
+    {
+        return ValorFinito(valor) ? Mathf.Max(minimo, valor) : minimo;
+    }
+
+    private static bool VetorFinito(Vector3 valor)
+    {
+        return ValorFinito(valor.x) && ValorFinito(valor.y) && ValorFinito(valor.z);
+    }
+
+    private static bool ValorFinito(float valor)
+    {
+        return !float.IsNaN(valor) && !float.IsInfinity(valor);
     }
 }

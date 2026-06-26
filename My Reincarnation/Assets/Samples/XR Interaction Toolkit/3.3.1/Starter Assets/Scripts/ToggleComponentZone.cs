@@ -82,7 +82,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             if (!m_TriggerVolume.isTrigger)
             {
                 m_TriggerVolume.isTrigger = true;
-                Debug.LogWarning($"Trigger Volume \"{m_TriggerVolume}\" was not set as trigger, which the Toggle Component Zone expects. It has been forced to be a trigger.", this);
+                { }
             }
         }
 
@@ -145,8 +145,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
                 }
                 else
                 {
-                    Debug.LogWarning("List of Components to Toggle changed in count between entering and exiting the Trigger Volume," +
-                        " which is not supported by this component. Cannot restore original enabled state.", this);
+                    { }
                 }
             }
 
@@ -164,8 +163,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
                 }
                 else
                 {
-                    Debug.LogWarning("List of GameObjects to Toggle changed in count between entering and exiting the Trigger Volume," +
-                        " which is not supported by this component. Cannot restore original active state.", this);
+                    { }
                 }
             }
         }

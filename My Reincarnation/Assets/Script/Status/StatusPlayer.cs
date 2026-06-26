@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Globalization;
 using System.Text;
 using UnityEngine;
@@ -35,6 +36,20 @@ public class StatusPlayer : MonoBehaviour
     [SerializeField] private int vidaMaxima = 100;
     [SerializeField] private int manaAtual = 50;
     [SerializeField] private int manaMaxima = 50;
+
+    [Header("Dano Recebido")]
+    [SerializeField] private string[] tagsQueCausamDanoNoPlayer;
+    [SerializeField] private float danoFallback = 1f;
+    [SerializeField] private float intervaloEntreDanos = 0.25f;
+    [SerializeField] private bool debugDanoRecebido = true;
+
+    [Header("Morte e Respawn")]
+    [SerializeField] private Transform playerRoot;
+    [SerializeField] private Vector3 posicaoRespawn = new Vector3(601.119995f, 0.5f, -430.820007f);
+    [SerializeField] private Vector3 rotacaoRespawnEuler = Vector3.zero;
+    [SerializeField] private GameObject efeitoMortePrefab;
+    [SerializeField] private float tempoAntesRespawn = 2f;
+    [SerializeField] private bool debugMortePlayer = true;
 
     [Header("Atributos Base")]
     [SerializeField] private int forca = ValorInicialAtributo;
@@ -74,17 +89,29 @@ public class StatusPlayer : MonoBehaviour
     [SerializeField] private int bonusCritico;
     [SerializeField] private int bonusDefesa;
 
+    private float proximoTempoPodeReceberDano;
+    private float vidaAtualReal;
+    private bool vidaAtualRealInicializada;
+    private bool playerMorto;
+
     private void Awake()
     {
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
+        if (playerRoot == null)
+            playerRoot = transform.root;
+
         GarantirAtributosIniciais();
+    }
+
+    private void Start()
+    {
+        SincronizarVidaAtualReal();
     }
 
     private void OnValidate()
     {
-        nivel = Mathf.Max(0, nivel);
         experienciaAtual = Mathf.Max(0, experienciaAtual);
         experienciaParaProximoNivel = Mathf.Max(1, experienciaParaProximoNivel);
         multiplicadorExperienciaPorNivel = Mathf.Max(1.01f, multiplicadorExperienciaPorNivel);
@@ -94,7 +121,334 @@ public class StatusPlayer : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         manaMaxima = Mathf.Max(1, manaMaxima);
         manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+        danoFallback = Mathf.Max(0f, danoFallback);
+        intervaloEntreDanos = Mathf.Max(0f, intervaloEntreDanos);
+        tempoAntesRespawn = Mathf.Max(0f, tempoAntesRespawn);
         GarantirAtributosIniciais();
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (collision == null)
+        {
+            LogDano("OnCollisionEnter ignorado: collision nula.");
+            return;
+        }
+
+        ProcessarContatoDeDano(collision.collider, "OnCollisionEnter");
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        ProcessarContatoDeDano(other, "OnTriggerEnter");
+    }
+
+    public void ReceberDano(float ataqueBruto, GameObject origemDoDano)
+    {
+        if (playerMorto)
+            return;
+
+        SincronizarVidaAtualRealSeNecessario();
+
+        IDano fonteDano = EncontrarFonteDano(origemDoDano);
+        string nomeOrigem = origemDoDano != null ? origemDoDano.name : "<sem origem>";
+
+        if (ataqueBruto <= 0f)
+        {
+            LogDano($"Dano de '{nomeOrigem}' ignorado: ataque bruto {ataqueBruto:F3}.");
+            return;
+        }
+
+        if (OrigemPertenceAoPlayer(origemDoDano, fonteDano))
+        {
+            LogDano($"Dano de '{nomeOrigem}' ignorado: origem pertence ao proprio Player.");
+            return;
+        }
+
+        if (Time.time < proximoTempoPodeReceberDano)
+        {
+            LogDano($"Dano de '{nomeOrigem}' ignorado: cooldown ate {proximoTempoPodeReceberDano:F3}.");
+            return;
+        }
+
+        float defesaCalculada = Mathf.Max(0f, constituicao + resistencia);
+        float danoFinal = ataqueBruto * (ataqueBruto / (ataqueBruto + defesaCalculada));
+
+        if (danoFinal < 0.1f)
+        {
+            LogDano(
+                $"Dano de '{nomeOrigem}' zerado: IDano={(fonteDano != null ? "sim" : "nao")}, " +
+                $"bruto={ataqueBruto:F3}, defesa={defesaCalculada:F3}, final={danoFinal:F3}.");
+            return;
+        }
+
+        float vidaAntes = vidaAtualReal;
+        vidaAtualReal = Mathf.Max(0f, vidaAtualReal - danoFinal);
+        vidaAtual = Mathf.Clamp(Mathf.CeilToInt(vidaAtualReal), 0, vidaMaxima);
+        proximoTempoPodeReceberDano = Time.time + intervaloEntreDanos;
+
+        if (vidaAtualReal <= 0f)
+        {
+            vidaAtualReal = 0f;
+            vidaAtual = 0;
+        }
+
+        NotificarStatusAlterado();
+
+        string tagOrigem = origemDoDano != null ? origemDoDano.tag : "<sem tag>";
+        LogDano(
+            $"origem={nomeOrigem}, tag={tagOrigem}, IDano={(fonteDano != null ? "sim" : "nao")}, " +
+            $"ataqueBruto={ataqueBruto:0.###}, defesa={defesaCalculada:0.###}, " +
+            $"danoFinal={danoFinal:0.###}, vidaAntes={vidaAntes:0.###}, " +
+            $"vidaDepois={vidaAtualReal:0.###} (compatibilidade={vidaAtual}/{vidaMaxima}).");
+
+        if (vidaAtualReal <= 0f)
+            Morrer();
+    }
+
+    // Mantem compatibilidade com inimigos atuais que procuram ReceberDano(int).
+    public void ReceberDano(int ataqueBruto)
+    {
+        ReceberDano((float)ataqueBruto, null);
+    }
+
+    private void ProcessarContatoDeDano(Collider outro, string evento)
+    {
+        if (outro == null)
+        {
+            LogDano($"{evento} ignorado: collider nulo.");
+            return;
+        }
+
+        if (outro.transform == transform || outro.transform.IsChildOf(transform))
+        {
+            LogDano($"{evento} de '{outro.name}' ignorado: collider pertence ao proprio Player.");
+            return;
+        }
+
+        IDano fonteDano = EncontrarFonteDano(outro, out GameObject objetoFonteDano);
+        string tagCollider = outro.gameObject.tag;
+        LogDano(
+            $"{evento}: objeto='{outro.name}', tag='{tagCollider}', " +
+            $"IDano={(fonteDano != null ? "encontrado" : "nao encontrado")}.");
+
+        if (!TagPodeCausarDano(outro.transform, fonteDano))
+        {
+            LogDano($"{evento} de '{outro.name}' ignorado: nenhuma tag autorizada no objeto, pai, root ou IDano.");
+            return;
+        }
+
+        float dano = fonteDano != null
+            ? Mathf.Max(0f, fonteDano.ObterDano())
+            : Mathf.Max(0f, danoFallback);
+        GameObject origem = objetoFonteDano != null ? objetoFonteDano : outro.gameObject;
+
+        LogDano(
+            $"{evento} autorizado: origem='{origem.name}', tag='{origem.tag}', " +
+            $"IDano={(fonteDano != null ? "sim" : "nao, usando fallback")}, dano bruto={dano:F3}.");
+        ReceberDano(dano, origem);
+    }
+
+    private bool TagPodeCausarDano(Transform origem, IDano fonteDano)
+    {
+        if (origem == null || tagsQueCausamDanoNoPlayer == null || tagsQueCausamDanoNoPlayer.Length == 0)
+            return false;
+
+        if (TransformTemTagAutorizada(origem))
+            return true;
+
+        if (origem.parent != null && TransformTemTagAutorizada(origem.parent))
+            return true;
+
+        if (origem.root != null && TransformTemTagAutorizada(origem.root))
+            return true;
+
+        if (fonteDano is Component componenteFonte &&
+            TransformTemTagAutorizada(componenteFonte.transform))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TransformTemTagAutorizada(Transform origem)
+    {
+        if (origem == null)
+            return false;
+
+        for (Transform atual = origem; atual != null; atual = atual.parent)
+        {
+            string tagAtual = atual.gameObject.tag;
+            for (int i = 0; i < tagsQueCausamDanoNoPlayer.Length; i++)
+            {
+                string tagAutorizada = tagsQueCausamDanoNoPlayer[i];
+                if (!string.IsNullOrWhiteSpace(tagAutorizada) &&
+                    string.Equals(tagAtual, tagAutorizada.Trim(), StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static IDano EncontrarFonteDano(GameObject origemDoDano)
+    {
+        if (origemDoDano == null)
+            return null;
+
+        IDano fonteDano = origemDoDano.GetComponent<IDano>();
+        if (fonteDano != null)
+            return fonteDano;
+
+        fonteDano = origemDoDano.GetComponentInParent<IDano>();
+        if (fonteDano != null)
+            return fonteDano;
+
+        Transform raiz = origemDoDano.transform.root;
+        return raiz != null ? raiz.GetComponentInChildren<IDano>(true) : null;
+    }
+
+    private static IDano EncontrarFonteDano(Collider collider, out GameObject objetoFonteDano)
+    {
+        objetoFonteDano = null;
+        if (collider == null)
+            return null;
+
+        IDano fonteDano = collider.GetComponent<IDano>();
+        if (fonteDano == null)
+            fonteDano = collider.GetComponentInParent<IDano>();
+
+        Rigidbody rigidbody = collider.attachedRigidbody;
+        if (fonteDano == null && rigidbody != null)
+            fonteDano = rigidbody.GetComponent<IDano>();
+        if (fonteDano == null && rigidbody != null)
+            fonteDano = rigidbody.GetComponentInParent<IDano>();
+
+        Transform raiz = collider.transform.root;
+        if (fonteDano == null && raiz != null)
+            fonteDano = raiz.GetComponentInChildren<IDano>(true);
+
+        if (fonteDano is Component componenteFonte)
+            objetoFonteDano = componenteFonte.gameObject;
+
+        return fonteDano;
+    }
+
+    private bool OrigemPertenceAoPlayer(GameObject origemDoDano, IDano fonteDano)
+    {
+        if (origemDoDano == null)
+            return false;
+
+        Transform origem = origemDoDano.transform;
+        if (origemDoDano == gameObject || origem.IsChildOf(transform))
+            return true;
+
+        if (fonteDano == null)
+            return false;
+
+        GameObject dono = fonteDano.ObterDono();
+        if (dono == gameObject)
+            return true;
+
+        Transform raizPlayer = transform.root;
+        return raizPlayer != null && dono == raizPlayer.gameObject;
+    }
+
+    private void SincronizarVidaAtualReal()
+    {
+        vidaAtualReal = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
+        vidaAtualRealInicializada = true;
+    }
+
+    private void SincronizarVidaAtualRealSeNecessario()
+    {
+        if (!vidaAtualRealInicializada || Mathf.CeilToInt(vidaAtualReal) != vidaAtual)
+            SincronizarVidaAtualReal();
+    }
+
+    private void LogDano(string mensagem)
+    {
+        if (debugDanoRecebido)
+            { }
+    }
+
+    public float GetVidaAtualReal()
+    {
+        SincronizarVidaAtualRealSeNecessario();
+        return vidaAtualReal;
+    }
+
+    private void Morrer()
+    {
+        if (playerMorto)
+            return;
+
+        playerMorto = true;
+
+        if (playerRoot == null)
+            playerRoot = transform.root;
+
+        if (debugMortePlayer)
+            { }
+        if (efeitoMortePrefab != null)
+            Instantiate(efeitoMortePrefab, playerRoot.position, Quaternion.identity);
+
+        AplicarPenalidadeMorte();
+        StartCoroutine(RespawnPlayer());
+    }
+
+    private void AplicarPenalidadeMorte()
+    {
+        nivel -= 1;
+        experienciaAtual = 0;
+        NotificarStatusAlterado();
+
+        if (debugMortePlayer)
+        {
+            { }
+        }
+    }
+
+    private IEnumerator RespawnPlayer()
+    {
+        yield return new WaitForSeconds(tempoAntesRespawn);
+
+        if (playerRoot == null)
+            playerRoot = transform.root;
+
+        CharacterController cc = playerRoot.GetComponent<CharacterController>();
+        if (cc != null)
+            cc.enabled = false;
+
+        Rigidbody rb = playerRoot.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        playerRoot.position = posicaoRespawn;
+        playerRoot.rotation = Quaternion.Euler(rotacaoRespawnEuler);
+
+        if (cc != null)
+            cc.enabled = true;
+
+        RestaurarVidaAposRespawn();
+        playerMorto = false;
+        NotificarStatusAlterado();
+
+        if (debugMortePlayer)
+            { }
+    }
+
+    private void RestaurarVidaAposRespawn()
+    {
+        vidaAtualReal = vidaMaxima;
+        vidaAtual = Mathf.CeilToInt(vidaAtualReal);
+        vidaAtualRealInicializada = true;
     }
 
     public void ReceberExperiencia(int quantidade)

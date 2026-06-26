@@ -10,7 +10,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 [DisallowMultipleComponent]
-public class Picareta : MonoBehaviour
+public class Picareta : MonoBehaviour, IDano
 {
     [Header("Dano da picareta")]
     [SerializeField] private int danoPicareta = 1;
@@ -241,6 +241,17 @@ public class Picareta : MonoBehaviour
     {
         AtualizarDonoPelaSelecaoAtual();
         ResetarAmostraAudioSegurado();
+    }
+
+    public float ObterDano()
+    {
+        return Mathf.Max(0, danoPicareta);
+    }
+
+    public GameObject ObterDono()
+    {
+        AtualizarDonoPelaSelecaoAtual();
+        return donoAtualPlayer != null ? donoAtualPlayer.gameObject : null;
     }
 
     private void TentarAplicarDanoPorEntradaTrigger(Collider other)

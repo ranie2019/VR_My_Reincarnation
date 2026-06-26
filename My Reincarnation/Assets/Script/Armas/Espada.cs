@@ -10,7 +10,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 [DisallowMultipleComponent]
-public class Espada : MonoBehaviour
+public class Espada : MonoBehaviour, IDano
 {
     [Header("Dano")]
     [SerializeField] private int danoEspada = 1;
@@ -166,6 +166,16 @@ public class Espada : MonoBehaviour
             AtualizarDonoPelaSelecaoAtual();
 
         return donoAtualPlayer != null ? donoAtualPlayer.gameObject : null;
+    }
+
+    public float ObterDano()
+    {
+        return Mathf.Max(0, danoEspada);
+    }
+
+    public GameObject ObterDono()
+    {
+        return GetDonoAtual();
     }
 
     public StatusPlayer GetStatusPlayerDonoAtual()
@@ -666,7 +676,7 @@ public class Espada : MonoBehaviour
 
         if (EhPlayer(alvo))
         {
-            Debug.LogWarning($"[Espada] Alvo Player '{alvo.name}' foi atingido, mas nao possui metodo publico ReceberDano(int).");
+            { }
             return false;
         }
 
@@ -698,7 +708,7 @@ public class Espada : MonoBehaviour
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning($"[Espada] Falha ao aplicar dano em '{componente.name}' via ReceberDano(int, GameObject): {e.Message}");
+                    { }
                     return false;
                 }
             }
@@ -720,7 +730,7 @@ public class Espada : MonoBehaviour
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[Espada] Falha ao aplicar dano em '{componente.name}' via ReceberDano(int): {e.Message}");
+                { }
                 return false;
             }
         }

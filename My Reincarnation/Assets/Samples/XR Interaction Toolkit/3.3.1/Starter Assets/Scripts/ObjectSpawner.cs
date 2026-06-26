@@ -188,7 +188,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             if (index < m_ObjectPrefabs.Count)
                 m_SpawnOptionIndex = index;
             else
-                Debug.LogWarning("Object index specified larger than number of Object Prefabs.", this);
+                { }
         }
 
         /// <summary>
@@ -215,7 +215,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
                 if (pointInViewportSpace.z < 0f || pointInViewportSpace.x > inViewMax || pointInViewportSpace.x < inViewMin ||
                     pointInViewportSpace.y > inViewMax || pointInViewportSpace.y < inViewMin)
                 {
-                    Debug.LogWarning("Object spawn point out of view and OnlySpawnInView is set to true.", this);
+                    { }
                     return false;
                 }
             }
@@ -265,7 +265,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
         public void SpawnObject(Vector3 spawnPoint, Vector3 spawnNormal)
         {
             if (!TrySpawnObject(spawnPoint, spawnNormal))
-                Debug.LogWarning("Could not spawn object.", this);
+                { }
         }
     }
 }

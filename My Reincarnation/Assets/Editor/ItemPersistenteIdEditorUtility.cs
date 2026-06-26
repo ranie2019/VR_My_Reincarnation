@@ -22,7 +22,7 @@ public static class ItemPersistenteIdEditorUtility
         Scene cena = SceneManager.GetActiveScene();
         if (!cena.IsValid() || !cena.isLoaded)
         {
-            Debug.LogWarning("[ItemPersistenteIdEditorUtility] Nenhuma cena ativa carregada para gerar IDs.");
+            { }
             return;
         }
 
@@ -54,8 +54,7 @@ public static class ItemPersistenteIdEditorUtility
         if (idsGerados > 0)
             EditorSceneManager.MarkSceneDirty(cena);
 
-        Debug.Log(
-            $"[ItemPersistenteIdEditorUtility] IDs gerados/corrigidos na cena ativa: {idsGerados}. Duplicados corrigidos: {duplicadosCorrigidos}.");
+        { }
     }
 
     [MenuItem("Tools/Save/Limpar IDs dos Prefabs ItemPersistente")]
@@ -113,8 +112,7 @@ public static class ItemPersistenteIdEditorUtility
         if (prefabsAlterados > 0)
             AssetDatabase.SaveAssets();
 
-        Debug.Log(
-            $"[ItemPersistenteIdEditorUtility] Prefabs alterados: {prefabsAlterados}. instanciaIds removidos de prefab assets: {idsLimpados}.");
+        { }
     }
 
     [MenuItem("Tools/Save/Validar IDs Persistentes")]
@@ -138,27 +136,25 @@ public static class ItemPersistenteIdEditorUtility
             if (string.IsNullOrWhiteSpace(itemId))
             {
                 avisos++;
-                Debug.LogWarning($"[ItemPersistenteIdEditorUtility] itemId vazio em: {ObterCaminhoHierarquia(item.transform)}", item);
+                { }
             }
             else if (idsDatabase.Count > 0 && !idsDatabase.Contains(itemId))
             {
                 avisos++;
-                Debug.LogWarning($"[ItemPersistenteIdEditorUtility] itemId nao existe no ItemDatabaseLocal: {itemId} em {ObterCaminhoHierarquia(item.transform)}", item);
+                { }
             }
 
             if (string.IsNullOrWhiteSpace(instanciaId))
             {
                 avisos++;
-                Debug.LogWarning($"[ItemPersistenteIdEditorUtility] instanciaId vazio em: {ObterCaminhoHierarquia(item.transform)}", item);
+                { }
                 continue;
             }
 
             if (primeiroPorInstanciaId.TryGetValue(instanciaId, out ItemPersistente primeiro))
             {
                 avisos++;
-                Debug.LogWarning(
-                    $"[ItemPersistenteIdEditorUtility] instanciaId duplicado: {instanciaId}. Primeiro: {ObterCaminhoHierarquia(primeiro.transform)} | Duplicado: {ObterCaminhoHierarquia(item.transform)}",
-                    item);
+                { }
             }
             else
             {
@@ -167,7 +163,7 @@ public static class ItemPersistenteIdEditorUtility
         }
 
         avisos += ValidarDatabaseAtivo();
-        Debug.Log($"[ItemPersistenteIdEditorUtility] Validacao finalizada. Avisos encontrados: {avisos}.");
+        { }
     }
 
     private static List<ItemPersistente> ObterItensPersistentesDaCenaAtiva()
@@ -200,8 +196,7 @@ public static class ItemPersistenteIdEditorUtility
         var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
         if (prefabStage != null && SceneManager.GetActiveScene() == prefabStage.scene)
         {
-            Debug.LogWarning(
-                $"[ItemPersistenteIdEditorUtility] Operacao cancelada: '{nomeOperacao}' deve ser executada em uma cena normal, nao dentro do Prefab Mode. Saia do Prefab Mode para nao salvar IDs fixos em prefab assets.");
+            { }
             return false;
         }
 
@@ -213,8 +208,7 @@ public static class ItemPersistenteIdEditorUtility
         if (!EditorApplication.isPlaying && !EditorApplication.isPlayingOrWillChangePlaymode)
             return true;
 
-        Debug.LogWarning(
-            $"[ItemPersistenteIdEditorUtility] Operacao cancelada: '{nomeOperacao}' nao pode ser executada durante Play Mode. IDs temporarios de runtime nao devem ser salvos como IDs persistentes.");
+        { }
         return false;
     }
 
@@ -246,7 +240,7 @@ public static class ItemPersistenteIdEditorUtility
         ItemDatabaseLocal database = ObterDatabaseAtivo();
         if (database == null)
         {
-            Debug.LogWarning("[ItemPersistenteIdEditorUtility] ItemDatabaseLocal nao encontrado na cena ativa.");
+            { }
             return 1;
         }
 
@@ -255,7 +249,7 @@ public static class ItemPersistenteIdEditorUtility
         SerializedProperty itens = serializedObject.FindProperty(CampoItensDatabase);
         if (itens == null || !itens.isArray)
         {
-            Debug.LogWarning("[ItemPersistenteIdEditorUtility] Lista de itens do ItemDatabaseLocal nao encontrada.");
+            { }
             return 1;
         }
 
@@ -272,14 +266,14 @@ public static class ItemPersistenteIdEditorUtility
             if (itemIdVazio && prefabVazio)
             {
                 avisos++;
-                Debug.LogWarning($"[ItemPersistenteIdEditorUtility] Entrada vazia no ItemDatabaseLocal no indice {i}.", database);
+                { }
                 continue;
             }
 
             if (itemIdVazio)
             {
                 avisos++;
-                Debug.LogWarning($"[ItemPersistenteIdEditorUtility] itemId vazio no ItemDatabaseLocal no indice {i}.", database);
+                { }
                 continue;
             }
 
@@ -287,13 +281,13 @@ public static class ItemPersistenteIdEditorUtility
             if (!ids.Add(id))
             {
                 avisos++;
-                Debug.LogWarning($"[ItemPersistenteIdEditorUtility] itemId duplicado no ItemDatabaseLocal: {id}", database);
+                { }
             }
 
             if (prefabVazio)
             {
                 avisos++;
-                Debug.LogWarning($"[ItemPersistenteIdEditorUtility] prefab vazio no ItemDatabaseLocal para itemId: {id}", database);
+                { }
             }
         }
 

@@ -48,7 +48,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.Hands
             m_Subsystem = s_Subsystems[0];
             m_Subsystem.updatedHands += OnUpdatedHands;
 #else
-            Debug.LogError("Script requires XR Hands (com.unity.xr.hands) package. Install using Window > Package Manager or click Fix on the related issue in Edit > Project Settings > XR Plug-in Management > Project Validation.", this);
+            { }
 #endif
         }
 

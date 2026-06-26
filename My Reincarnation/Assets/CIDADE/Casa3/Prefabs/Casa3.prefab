@@ -388,7 +388,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -1, z: -0, w: 0}
   m_LocalPosition: {x: 0.88, y: -0.009, z: 0.63}
-  m_LocalScale: {x: 5.3501, y: 4.449785, z: 5.3501}
+  m_LocalScale: {x: 5.3501, y: 1.5361995, z: 5.3501}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4531423688896120761}
@@ -3117,7 +3117,8 @@ GameObject:
   - component: {fileID: 9134792487672859918}
   - component: {fileID: 7544545600749168184}
   - component: {fileID: 1736416207436226279}
-  - component: {fileID: 5643666145028549025}
+  - component: {fileID: 2456549084194016129}
+  - component: {fileID: 2594574295982901034}
   - component: {fileID: 4827468584592126727}
   m_Layer: 0
   m_Name: door_01
@@ -3135,8 +3136,8 @@ Transform:
   m_GameObject: {fileID: 5757134043106769789}
   serializedVersion: 2
   m_LocalRotation: {x: -0.004113956, y: 0.99999154, z: -0.000000040467732, w: -0.000016049513}
-  m_LocalPosition: {x: -0.089, y: 0.008, z: -0.834}
-  m_LocalScale: {x: 1, y: 0.9837776, z: 0.9784001}
+  m_LocalPosition: {x: -0.0891, y: 0.0214, z: -0.8103}
+  m_LocalScale: {x: 1, y: 0.9552731, z: 0.95802855}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3093913906113815711}
@@ -3200,8 +3201,35 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &5643666145028549025
-MeshCollider:
+--- !u!54 &2456549084194016129
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5757134043106769789}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 1
+  m_Constraints: 0
+  m_CollisionDetection: 3
+--- !u!65 &2594574295982901034
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -3218,10 +3246,9 @@ MeshCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 1041378017805154568, guid: 2b54b2404821db84688606765e43d143, type: 3}
+  serializedVersion: 3
+  m_Size: {x: 0.19928178, y: 0.62998873, z: 1.4743962}
+  m_Center: {x: 0.004119162, y: 0.43458492, z: -0.8401851}
 --- !u!114 &4827468584592126727
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3236,15 +3263,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Porta
   dobradicaSuperior: {fileID: 3093913906113815711}
   dobradicaInferior: {fileID: 3047996192869636969}
-  anguloMinimo: -95
-  anguloMaximo: 95
+  anguloMinimo: -100
+  anguloMaximo: 100
   inverterDirecao: 0
+  referenciaLadoExterno: {fileID: 0}
   sensibilidadeEmpurrao: 1
   velocidadeAbertura: 120
   amortecimentoMovimento: 8
   tempoParaFechar: 3
   velocidadeRetorno: 90
   anguloAtual: 0
+  debugPorta: 0
 --- !u!1 &5787059789987168791
 GameObject:
   m_ObjectHideFlags: 0

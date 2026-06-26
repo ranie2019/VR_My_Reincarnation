@@ -386,7 +386,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
         {
             if (m_RayInteractor != null && m_NearFarInteractor != null)
             {
-                Debug.LogWarning("Both Ray Interactor and Near-Far Interactor are assigned. Only one should be assigned, not both. Clearing Ray Interactor.", this);
+                { }
                 m_RayInteractor = null;
             }
 

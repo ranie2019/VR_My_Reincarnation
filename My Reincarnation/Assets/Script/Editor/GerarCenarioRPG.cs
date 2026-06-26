@@ -176,7 +176,7 @@ public class GerarCenarioRPG : EditorWindow
         EditorUtility.SetDirty(terrainData);
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
-        Debug.Log($"[GerarCenarioRPG] Relevo e pintura gerados no Terrain '{terrain.name}'. Nenhum prefab foi instanciado.");
+        { }
     }
 
     private Terrain ObterOuCriarTerrain()

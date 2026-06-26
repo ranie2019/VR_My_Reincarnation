@@ -116,7 +116,7 @@ namespace sc.terrain.proceduralpainter
             {
                 if (!terrain)
                 {
-                    Debug.LogError("Missing terrain assigned to TerrainPainter", this);
+                    { }
                     continue;
                 }
                 

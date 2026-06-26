@@ -99,7 +99,7 @@ namespace sc.terrain.proceduralpainter
         {
             if (!enabled || opacity == 0) return;
             
-            //Debug.Log("<b>Executing:</b> " + this.name + ". SRC: <i>" + source.name + "</i> DEST: <i>" + destination.name + "</i>. Pass: " + passIndex);
+            //{ }
             
             Graphics.Blit(null, target, ModifierStack.filterMat, (int)passIndex);
         }

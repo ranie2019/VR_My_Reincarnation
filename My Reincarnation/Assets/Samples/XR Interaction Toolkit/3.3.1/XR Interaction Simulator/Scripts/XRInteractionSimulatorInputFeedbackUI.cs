@@ -242,21 +242,21 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.InteractionSimulator
             }
             else
             {
-                Debug.LogError($"Could not find the XRInteractionSimulator component, disabling simulator UI.", this);
+                { }
                 gameObject.SetActive(false);
                 return;
             }
 
             if (!m_Simulator.gameObject.TryGetComponent(out m_DeviceLifecycleManager))
             {
-                Debug.LogError($"Could not find SimulatedDeviceLifecycleManager component on {m_Simulator.name}, disabling simulator UI.", this);
+                { }
                 gameObject.SetActive(false);
                 return;
             }
 
             if (!m_Simulator.gameObject.TryGetComponent(out m_HandExpressionManager))
             {
-                Debug.LogError($"Could not find SimulatedHandExpressionManager component on {m_Simulator.name}, disabling simulator UI.", this);
+                { }
                 gameObject.SetActive(false);
                 return;
             }
@@ -697,7 +697,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.InteractionSimulator
                 if (!m_ControllerInputPanels.ContainsKey(m_Simulator.quickActionControllerInputModes[i]))
                 {
                     string inputModeName = m_Simulator.quickActionControllerInputModes[i].ToString();
-                    Debug.LogError($"Panel for the {inputModeName} controller input mode does not exist.", this);
+                    { }
                 }
 
                 var panel = m_ControllerInputPanels[m_Simulator.quickActionControllerInputModes[i]];
@@ -716,7 +716,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.InteractionSimulator
 
                     if (!m_HandExpressionPanels.ContainsKey(handExpressionName))
                     {
-                        Debug.LogError($"Panel for the {handExpressionName} hand expression does not exist.", this);
+                        { }
                     }
 
                     var panel = m_HandExpressionPanels[handExpressionName];
@@ -821,7 +821,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.InteractionSimulator
             if (!m_ControllerInputBgs.ContainsKey(m_Simulator.controllerInputMode))
             {
                 string inputModeName = m_Simulator.controllerInputMode.ToString();
-                Debug.LogError($"Background for the {inputModeName} controller input mode panel does not exist.", this);
+                { }
             }
 
             m_ControllerInputBgs[m_Simulator.controllerInputMode].color = highlightColor;
@@ -838,7 +838,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.InteractionSimulator
 
             if (!m_HandExpressionBgs.ContainsKey(handExpressionName))
             {
-                Debug.LogError($"Background for the {handExpressionName} hand expression panel does not exist.", this);
+                { }
             }
 
             m_HandExpressionBgs[handExpressionName].color = highlightColor;

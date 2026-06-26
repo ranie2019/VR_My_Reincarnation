@@ -66,7 +66,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
                 if (data == null || string.IsNullOrWhiteSpace(data.itemId))
                 {
-                    Debug.LogWarning($"[InventarioSaveAdapter] Item sem itemId valido nao foi salvo: {item.gameObject.name}", this);
+                    { }
                     continue;
                 }
 
@@ -113,7 +113,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
             if (data.slot < 0 || slots == null || data.slot >= slots.Length || slots[data.slot] == null)
             {
-                Debug.LogWarning($"[InventarioSaveAdapter] Slot invalido para item '{data.itemId}': {data.slot}", this);
+                { }
                 continue;
             }
 
@@ -121,14 +121,14 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             List<string> instanciaIds = ObterInstanciaIdsParaRestaurar(data);
             if (instanciaIds.Count == 0)
             {
-                Debug.LogWarning($"[InventarioSaveAdapter] Item de inventario ignorado por falta de instanciaId confiavel. itemId: {data.itemId}. Save antigo/contaminado pode causar duplicacao; crie um save novo depois de validar os IDs.", this);
+                { }
                 continue;
             }
 
             int quantidadeParaRestaurar = Mathf.Min(quantidade, instanciaIds.Count);
             if (quantidadeParaRestaurar < quantidade)
             {
-                Debug.LogWarning($"[InventarioSaveAdapter] Quantidade salva maior que a quantidade de instanciaIds confiaveis para itemId: {data.itemId}. Restaurando {quantidadeParaRestaurar} de {quantidade}.", this);
+                { }
             }
 
             for (int quantidadeIndex = 0; quantidadeIndex < quantidadeParaRestaurar; quantidadeIndex++)
@@ -136,7 +136,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 string instanciaId = instanciaIds[quantidadeIndex];
                 if (!instanciaIdsCarregados.Add(instanciaId))
                 {
-                    Debug.LogWarning($"[InventarioSaveAdapter] instanciaId duplicado no inventario salvo ignorado: {instanciaId} | itemId: {data.itemId}", this);
+                    { }
                     continue;
                 }
 
@@ -159,17 +159,17 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
                 if (candidatosRuntime > 1)
                 {
-                    Debug.LogWarning($"[InventarioSaveAdapter] Item de inventario nao restaurado porque existem {candidatosRuntime} originais com ID temporario e mesmo itemId na cena. itemId: {dataInstancia.itemId} | instanciaId salvo: {dataInstancia.instanciaId}. Gere IDs persistentes na cena e crie um save novo.", this);
+                    { }
                     continue;
                 }
 
                 if (ExisteOriginalMesmoTipoNaoUsado(originaisCena, dataInstancia.itemId, originaisUsados))
                 {
-                    Debug.LogWarning($"[InventarioSaveAdapter] Item de inventario nao restaurado para evitar duplicacao. Existe original de cena do mesmo itemId, mas o instanciaId nao confere. itemId: {dataInstancia.itemId} | instanciaId salvo: {dataInstancia.instanciaId}. Save antigo/contaminado; gere IDs e crie um save novo.", this);
+                    { }
                     continue;
                 }
 
-                Debug.LogWarning($"[InventarioSaveAdapter] Item de inventario nao restaurado porque a instancia original nao foi encontrada. itemId: {dataInstancia.itemId} | instanciaId salvo: {dataInstancia.instanciaId}. Nao sera instanciado prefab novo por seguranca.", this);
+                { }
             }
         }
 
@@ -202,7 +202,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         XRGrabInteractable grab = instancia.GetComponent<XRGrabInteractable>();
         if (grab == null)
         {
-            Debug.LogWarning($"[InventarioSaveAdapter] Item existente '{data.itemId}' nao possui XRGrabInteractable. Ele nao pode ser restaurado no inventario.", persistente);
+            { }
             persistente.MarcarComoSoltoNaCena();
             return false;
         }
@@ -211,7 +211,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
         if (!slot.RestaurarItemSalvoNoSlot(grab, esconderNaPilha))
         {
-            Debug.LogWarning($"[InventarioSaveAdapter] Falha ao restaurar item existente '{data.itemId}' no slot {data.slot}.", persistente);
+            { }
             persistente.MarcarComoSoltoNaCena();
             return false;
         }
@@ -390,7 +390,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 {
                     if (totalCandidatos > 1)
                     {
-                        Debug.LogWarning($"[InventarioSaveAdapter] Original da cena nao removido para evitar apagar item errado. Existem {totalCandidatos} itens com instanciaId temporario e itemId '{data.itemId}'. Rode Tools/Save/Gerar IDs dos Itens Persistentes da Cena e crie um save novo.", this);
+                        { }
                     }
 
                     continue;
@@ -398,7 +398,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
                 removidos.Add(candidato);
                 instanciaIdsEncontrados.Add(instanciaId);
-                Debug.LogWarning($"[InventarioSaveAdapter] Removendo original com instanciaId temporario porque este item foi salvo no inventario. itemId: {data.itemId} | instanciaId salvo: {instanciaId}", candidato);
+                { }
                 Destroy(candidato.gameObject);
             }
         }
@@ -551,8 +551,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
     private InventorySaveData CriarSaveFallback(XRGrabInteractable item, int indiceSlot)
     {
         string nome = item.gameObject.name.Trim();
-        Debug.LogWarning($"[InventarioSaveAdapter] Item sem ItemPersistente. Usando gameObject.name como itemId: {nome}", this);
-
+        { }
         return new InventorySaveData
         {
             itemId = nome,

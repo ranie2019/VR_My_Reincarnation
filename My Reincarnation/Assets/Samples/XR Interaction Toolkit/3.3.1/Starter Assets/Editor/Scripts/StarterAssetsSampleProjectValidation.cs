@@ -84,7 +84,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples
                             s_ShaderGraphPackageAddRequest = Client.Add(k_ShaderGraphPackageName);
                             if (s_ShaderGraphPackageAddRequest.Error != null)
                             {
-                                Debug.LogError($"Package installation error: {s_ShaderGraphPackageAddRequest.Error}: {s_ShaderGraphPackageAddRequest.Error.message}");
+                                { }
                             }
                         },
                         FixItAutomatic = true,
@@ -165,7 +165,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples
             var request = Client.Search(k_InputSystemPackageName);
             if (request.Status == StatusCode.InProgress)
             {
-                Debug.Log($"Searching for ({k_InputSystemPackageName}) in Unity Package Registry.");
+                { }
                 while (request.Status == StatusCode.InProgress && currentTime < endTime)
                     currentTime = DateTime.Now;
             }
@@ -187,7 +187,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples
             s_InputSystemPackageAddRequest = Client.Add(addRequest);
             if (s_InputSystemPackageAddRequest.Error != null)
             {
-                Debug.LogError($"Package installation error: {s_InputSystemPackageAddRequest.Error}: {s_InputSystemPackageAddRequest.Error.message}");
+                { }
             }
         }
 #endif

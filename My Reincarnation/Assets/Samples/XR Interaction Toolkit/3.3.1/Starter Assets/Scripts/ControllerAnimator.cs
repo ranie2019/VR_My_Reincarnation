@@ -43,7 +43,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             if (m_ThumbstickTransform == null || m_GripTransform == null || m_TriggerTransform == null)
             {
                 enabled = false;
-                Debug.LogWarning($"Controller Animator component missing references on {gameObject.name}", this);
+                { }
                 return;
             }
 

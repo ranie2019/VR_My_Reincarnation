@@ -133,7 +133,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.Hands
         /// </summary>
         void Awake()
         {
-            Debug.LogWarning("HandsOneEuroFilterPostProcessor requires XR Hands (com.unity.xr.hands) 1.2.0 or newer. Disabling component.", this);
+            { }
             enabled = false;
         }
 #endif

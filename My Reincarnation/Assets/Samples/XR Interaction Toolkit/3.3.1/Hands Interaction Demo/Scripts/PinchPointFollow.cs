@@ -79,7 +79,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.Hands
             m_HasTargetRotationTransform = m_TargetRotation != null;
             m_BindingsGroup.AddBinding(m_QuaternionTweenableVariable.Subscribe(newValue => transform.rotation = newValue));
 #else
-            Debug.LogWarning("PinchPointFollow requires XR Hands (com.unity.xr.hands) 1.2.0 or newer. Disabling component.", this);
+            { }
             enabled = false;
 #endif
         }

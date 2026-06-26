@@ -87,15 +87,15 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
                     switch (openXRRuntimeName)
                     {
                         case k_RuntimeNameMeta:
-                            Debug.Log("Meta runtime detected.");
+                            { }
                             s_CurrentPlatform = XRPlatformType.OpenXRMeta;
                             break;
                         case k_RuntimeNameAndroidXR:
-                            Debug.Log("Android XR runtime detected.");
+                            { }
                             s_CurrentPlatform = XRPlatformType.OpenXRAndroidXR;
                             break;
                         default:
-                            Debug.Log($"Unknown OpenXR runtime detected: \"{openXRRuntimeName}\"");
+                            { }
                             s_CurrentPlatform = XRPlatformType.OpenXROther;
                             break;
                     }
@@ -103,7 +103,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"Failed to get OpenXR runtime: {e.Message}");
+                { }
                 s_CurrentPlatform = XRPlatformType.Other;
             }
 #else

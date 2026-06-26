@@ -25,7 +25,7 @@ public class OnButtonPress : MonoBehaviour
         }
         else
         {
-            Debug.LogError("InputAction not set on " + gameObject.name);
+            { }
         }
     }
 
@@ -62,7 +62,7 @@ public class OnButtonPress : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("OnPress event is not assigned in " + gameObject.name);
+            { }
         }
     }
 
@@ -74,7 +74,7 @@ public class OnButtonPress : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("OnRelease event is not assigned in " + gameObject.name);
+            { }
         }
     }
 }

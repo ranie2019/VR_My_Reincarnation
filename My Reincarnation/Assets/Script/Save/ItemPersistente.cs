@@ -77,7 +77,7 @@ public class ItemPersistente : MonoBehaviour
 
         if (!avisoFallbackIdMostrado)
         {
-            Debug.LogWarning($"[ItemPersistente] itemId vazio em '{name}'. Usando gameObject.name como fallback: {idFallback}", this);
+            { }
             avisoFallbackIdMostrado = true;
         }
 
@@ -114,7 +114,7 @@ public class ItemPersistente : MonoBehaviour
     {
         if (string.IsNullOrWhiteSpace(novoId))
         {
-            Debug.LogWarning($"[ItemPersistente] Tentativa de definir instanciaId vazio em '{name}'.", this);
+            { }
             return;
         }
 
@@ -255,7 +255,7 @@ public class ItemPersistente : MonoBehaviour
         }
         catch (Exception erro)
         {
-            Debug.LogWarning($"[ItemPersistente] Falha ao ler estadoJson do item: {erro.Message}");
+            { }
             return null;
         }
     }
@@ -293,9 +293,7 @@ public class ItemPersistente : MonoBehaviour
 
         if (!avisoInstanciaIdRuntimeMostrado)
         {
-            Debug.LogWarning(
-                $"[ItemPersistente] instanciaId vazio em '{name}'. Um ID temporario foi gerado apenas para este Play ({instanciaId}) e nao deve ser tratado como permanente. Se este item foi colocado manualmente na cena, saia do Play Mode, rode Tools/Save/Gerar IDs dos Itens Persistentes da Cena e salve a cena para evitar duplicacao no load.",
-                this);
+            { }
             avisoInstanciaIdRuntimeMostrado = true;
         }
     }
@@ -307,7 +305,7 @@ public class ItemPersistente : MonoBehaviour
 
         if (string.IsNullOrWhiteSpace(itemId) && !avisoItemIdVazioMostrado)
         {
-            Debug.LogWarning($"[ItemPersistente] itemId vazio em '{name}'. Configure um itemId ou rode a validacao em Tools/Save/Validar IDs Persistentes.", this);
+            { }
             avisoItemIdVazioMostrado = true;
         }
     }

@@ -102,14 +102,17 @@ public class ObjetoPersistente : MonoBehaviour, ISalvavel
 
         estadoJson = data.estadoJson;
 
-        if (salvarPosicao)
-            transform.position = new Vector3(data.posX, data.posY, data.posZ);
+        Vector3 posicao = new Vector3(data.posX, data.posY, data.posZ);
+        if (salvarPosicao && VetorFinito(posicao))
+            transform.position = posicao;
 
-        if (salvarRotacao)
-            transform.rotation = Quaternion.Euler(data.rotX, data.rotY, data.rotZ);
+        Vector3 rotacao = new Vector3(data.rotX, data.rotY, data.rotZ);
+        if (salvarRotacao && VetorFinito(rotacao))
+            transform.rotation = Quaternion.Euler(rotacao);
 
-        if (salvarEscala)
-            transform.localScale = new Vector3(data.scaleX, data.scaleY, data.scaleZ);
+        Vector3 escala = new Vector3(data.scaleX, data.scaleY, data.scaleZ);
+        if (salvarEscala && EscalaValida(escala))
+            transform.localScale = escala;
 
         if (salvarAtivo && gameObject.activeSelf != data.ativo)
             gameObject.SetActive(data.ativo);
@@ -119,6 +122,25 @@ public class ObjetoPersistente : MonoBehaviour, ISalvavel
     public void GerarNovoId()
     {
         objectId = Guid.NewGuid().ToString("N");
+    }
+
+    private static bool EscalaValida(Vector3 escala)
+    {
+        const float minimo = 0.0001f;
+        return VetorFinito(escala) &&
+               Mathf.Abs(escala.x) > minimo &&
+               Mathf.Abs(escala.y) > minimo &&
+               Mathf.Abs(escala.z) > minimo;
+    }
+
+    private static bool VetorFinito(Vector3 valor)
+    {
+        return ValorFinito(valor.x) && ValorFinito(valor.y) && ValorFinito(valor.z);
+    }
+
+    private static bool ValorFinito(float valor)
+    {
+        return !float.IsNaN(valor) && !float.IsInfinity(valor);
     }
 
     [ContextMenu("Copiar ID no Console")]

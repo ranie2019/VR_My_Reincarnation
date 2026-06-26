@@ -47,7 +47,7 @@ public class SaveManager : MonoBehaviour
     {
         if (Instancia != null && Instancia != this)
         {
-            Debug.LogWarning("[SaveManager] Existe mais de um SaveManager na cena. Removendo duplicado.", this);
+            { }
             Destroy(gameObject);
             return;
         }
@@ -117,7 +117,7 @@ public class SaveManager : MonoBehaviour
 
         if (data == null)
         {
-            Debug.LogWarning("[SaveManager] Falha ao ler o save. Dados vazios ou invalidos.", this);
+            { }
             return;
         }
 
@@ -202,11 +202,13 @@ public class SaveManager : MonoBehaviour
         if (data == null || player == null)
             return;
 
-        if (salvarPosicaoPlayer)
-            player.position = new Vector3(data.posX, data.posY, data.posZ);
+        Vector3 posicao = new Vector3(data.posX, data.posY, data.posZ);
+        if (salvarPosicaoPlayer && VetorFinito(posicao))
+            player.position = posicao;
 
-        if (salvarRotacaoPlayer)
-            player.rotation = Quaternion.Euler(data.rotX, data.rotY, data.rotZ);
+        Vector3 rotacao = new Vector3(data.rotX, data.rotY, data.rotZ);
+        if (salvarRotacaoPlayer && VetorFinito(rotacao))
+            player.rotation = Quaternion.Euler(rotacao);
 
         StatusPlayer status = player.GetComponentInChildren<StatusPlayer>(true);
         if (status != null)
@@ -239,7 +241,7 @@ public class SaveManager : MonoBehaviour
 
             if (!idsUsados.Add(id))
             {
-                Debug.LogWarning($"[SaveManager] ID duplicado ignorado no save: {id}", this);
+                { }
                 continue;
             }
 
@@ -275,7 +277,7 @@ public class SaveManager : MonoBehaviour
             }
 
             if (debugSave)
-                Debug.LogWarning($"[SaveManager] Objeto salvo nao existe nesta cena: {data.objectId}", this);
+                { }
         }
 
         RestaurarItensSoltosCena(objetosCena, instanciaIdsInventario);
@@ -298,14 +300,14 @@ public class SaveManager : MonoBehaviour
                 string.IsNullOrWhiteSpace(estadoItem.itemId) ||
                 string.IsNullOrWhiteSpace(estadoItem.instanciaId))
             {
-                Debug.LogWarning($"[SaveManager] Item solto ignorado por falta de itemId/instanciaId: {item.name}", this);
+                { }
                 continue;
             }
 
             string objectId = PrefixoObjetoItemPersistente + estadoItem.instanciaId;
             if (!idsUsados.Add(objectId))
             {
-                Debug.LogWarning($"[SaveManager] Item solto com instanciaId duplicado ignorado: {estadoItem.instanciaId}", this);
+                { }
                 continue;
             }
 
@@ -368,14 +370,14 @@ public class SaveManager : MonoBehaviour
             ItemPersistente.EstadoCenaItem estadoItem = LerEstadoItemCena(data);
             if (estadoItem == null || string.IsNullOrWhiteSpace(estadoItem.itemId))
             {
-                Debug.LogWarning($"[SaveManager] Item solto sem itemId no save: {data.objectId}", this);
+                { }
                 continue;
             }
 
             string instanciaId = NormalizarInstanciaId(estadoItem.instanciaId);
             if (!InstanciaIdValido(instanciaId))
             {
-                Debug.LogWarning($"[SaveManager] Item solto ignorado por falta de instanciaId valido. itemId: {estadoItem.itemId} | objectId: {data.objectId}", this);
+                { }
                 continue;
             }
 
@@ -385,7 +387,7 @@ public class SaveManager : MonoBehaviour
 
             if (!instanciaIdsCarregados.Add(instanciaId))
             {
-                Debug.LogWarning($"[SaveManager] instanciaId duplicado no save ignorado no load: {instanciaId} | itemId: {estadoItem.itemId}", this);
+                { }
                 continue;
             }
 
@@ -403,16 +405,12 @@ public class SaveManager : MonoBehaviour
 
                 if (itemMigravel != null)
                 {
-                    Debug.LogWarning(
-                        $"[SaveManager] Migrando item de cena com instanciaId temporario para o instanciaId salvo. itemId: {estadoItem.itemId} | instanciaId salvo: {instanciaId} | posicao salva: {new Vector3(data.posX, data.posY, data.posZ)}",
-                        itemMigravel);
+                    { }
                     item = itemMigravel;
                 }
                 else if (candidatosMigracao > 1)
                 {
-                    Debug.LogWarning(
-                        $"[SaveManager] Item solto nao restaurado porque existem {candidatosMigracao} itens com ID temporario e mesmo itemId na cena. itemId: {estadoItem.itemId} | instanciaId salvo: {instanciaId}. Rode Tools/Save/Gerar IDs dos Itens Persistentes da Cena e crie um save novo.",
-                        this);
+                    { }
                     continue;
                 }
             }
@@ -426,22 +424,20 @@ public class SaveManager : MonoBehaviour
 
                 if (itemMesmoTipo != null)
                 {
-                    Debug.LogWarning(
-                        $"[SaveManager] Item salvo nao foi instanciado para evitar duplicacao. O save aponta para itemId '{estadoItem.itemId}' instanciaId '{instanciaId}', mas ja existe um item solto do mesmo tipo na cena com instanciaId '{itemMesmoTipo.ObterInstanciaIdSemGerar()}'. Isso normalmente indica save antigo/contaminado ou IDs da cena gerados depois do save. Rode Tools/Save/Validar IDs Persistentes e crie um save novo/limpe o save antigo.",
-                        itemMesmoTipo);
+                    { }
                     continue;
                 }
 
                 if (database == null)
                 {
-                    Debug.LogWarning($"[SaveManager] ItemDatabaseLocal nao encontrado. Item solto nao sera recriado. itemId: {estadoItem.itemId} | instanciaId: {estadoItem.instanciaId}", this);
+                    { }
                     continue;
                 }
 
                 GameObject prefab = database.ObterPrefab(estadoItem.itemId);
                 if (prefab == null)
                 {
-                    Debug.LogWarning($"[SaveManager] Prefab nao encontrado no ItemDatabaseLocal para itemId: {estadoItem.itemId} | instanciaId: {estadoItem.instanciaId}", this);
+                    { }
                     continue;
                 }
 
@@ -558,9 +554,18 @@ public class SaveManager : MonoBehaviour
 
         Transform itemTransform = item.transform;
         itemTransform.SetParent(null, true);
-        itemTransform.position = new Vector3(data.posX, data.posY, data.posZ);
-        itemTransform.rotation = Quaternion.Euler(data.rotX, data.rotY, data.rotZ);
-        itemTransform.localScale = new Vector3(data.scaleX, data.scaleY, data.scaleZ);
+
+        Vector3 posicao = new Vector3(data.posX, data.posY, data.posZ);
+        if (VetorFinito(posicao))
+            itemTransform.position = posicao;
+
+        Vector3 rotacao = new Vector3(data.rotX, data.rotY, data.rotZ);
+        if (VetorFinito(rotacao))
+            itemTransform.rotation = Quaternion.Euler(rotacao);
+
+        Vector3 escala = new Vector3(data.scaleX, data.scaleY, data.scaleZ);
+        if (EscalaValida(escala))
+            itemTransform.localScale = escala;
 
         if (item.gameObject.activeSelf != data.ativo)
             item.gameObject.SetActive(data.ativo);
@@ -766,8 +771,7 @@ public class SaveManager : MonoBehaviour
         if (inventarioSalvavel == null)
         {
             if (debugSave)
-                Debug.LogWarning("[SaveManager] Inventario salvavel nao encontrado. Adicione InventarioSaveAdapter na cena.", this);
-
+                { }
             return new List<InventorySaveData>();
         }
 
@@ -783,8 +787,7 @@ public class SaveManager : MonoBehaviour
         if (inventarioSalvavel == null)
         {
             if (debugSave)
-                Debug.LogWarning("[SaveManager] Inventario salvavel nao encontrado. Nao foi possivel restaurar itens.", this);
-
+                { }
             return;
         }
 
@@ -921,7 +924,7 @@ public class SaveManager : MonoBehaviour
         }
         catch (Exception erro)
         {
-            Debug.LogWarning($"[SaveManager] Falha ao decodificar Base64. Tentando ler como JSON puro. {erro.Message}", this);
+            { }
             return conteudo;
         }
     }
@@ -956,6 +959,25 @@ public class SaveManager : MonoBehaviour
             return false;
 
         return componente.GetComponent<ItemPersistente>() != null;
+    }
+
+    private static bool EscalaValida(Vector3 escala)
+    {
+        const float minimo = 0.0001f;
+        return VetorFinito(escala) &&
+               Mathf.Abs(escala.x) > minimo &&
+               Mathf.Abs(escala.y) > minimo &&
+               Mathf.Abs(escala.z) > minimo;
+    }
+
+    private static bool VetorFinito(Vector3 valor)
+    {
+        return ValorFinito(valor.x) && ValorFinito(valor.y) && ValorFinito(valor.z);
+    }
+
+    private static bool ValorFinito(float valor)
+    {
+        return !float.IsNaN(valor) && !float.IsInfinity(valor);
     }
 
 }

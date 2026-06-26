@@ -103,7 +103,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples.Hands.Editor
                     s_ShaderGraphPackageAddRequest = Client.Add(k_ShaderGraphPackageName);
                     if (s_ShaderGraphPackageAddRequest.Error != null)
                     {
-                        Debug.LogError($"Package installation error: {s_ShaderGraphPackageAddRequest.Error}: {s_ShaderGraphPackageAddRequest.Error.message}");
+                        { }
                     }
                 },
                 FixItAutomatic = true,
@@ -162,13 +162,13 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples.Hands.Editor
             }
             catch (Exception e)
             {
-                Debug.LogError($"Couldn't find samples of the {ToString(packageName, packageVersion)} package; aborting project validation rule. Exception: {e}");
+                { }
                 return false;
             }
 
             if (packageSamples == null)
             {
-                Debug.LogWarning($"Couldn't find samples of the {ToString(packageName, packageVersion)} package; aborting project validation rule.");
+                { }
                 return false;
             }
 
@@ -181,7 +181,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples.Hands.Editor
                 }
             }
 
-            Debug.LogWarning($"Couldn't find {sampleDisplayName} sample in the {ToString(packageName, packageVersion)} package; aborting project validation rule.");
+            { }
             return false;
         }
 
@@ -199,7 +199,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples.Hands.Editor
             var request = Client.Search(k_HandsPackageName);
             if (request.Status == StatusCode.InProgress)
             {
-                Debug.Log($"Searching for ({k_HandsPackageName}) in Unity Package Registry.");
+                { }
                 while (request.Status == StatusCode.InProgress && currentTime < endTime)
                     currentTime = DateTime.Now;
             }
@@ -221,7 +221,7 @@ namespace UnityEditor.XR.Interaction.Toolkit.Samples.Hands.Editor
             s_HandsPackageAddRequest = Client.Add(addRequest);
             if (s_HandsPackageAddRequest.Error != null)
             {
-                Debug.LogError($"Package installation error: {s_HandsPackageAddRequest.Error}: {s_HandsPackageAddRequest.Error.message}");
+                { }
             }
         }
 

@@ -23,7 +23,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSampleXRInput
                 m_UsagesReuse = new List<InputFeatureUsage>();
 
             if (m_TargetText == null)
-                Debug.LogWarning("DisplayDeviceInfo Monobehaviour has no Target Text set. No information will be displayed.");
+                { }
         }
 
         void Update()

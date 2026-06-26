@@ -7,7 +7,7 @@ using UnityEngine.AI;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
-public class SlimeIA : MonoBehaviour
+public class SlimeIA : MonoBehaviour, IDano
 {
     private enum EstadoSlime
     {
@@ -61,6 +61,9 @@ public class SlimeIA : MonoBehaviour
     [SerializeField] private float velocidadePatrulha = 1.2f;
     [SerializeField] private float distanciaChegadaPonto = 0.35f;
     [SerializeField] private float tempoObservando = 2f;
+    [SerializeField] private bool gerarPontosAutomaticamente = true;
+    [SerializeField] private int quantidadePontosAuto = 4;
+    [SerializeField] private float raioPatrulhaAuto = 4f;
 
     [Header("Campo de visao")]
     [SerializeField] private string tagPlayer = "Player";
@@ -72,7 +75,16 @@ public class SlimeIA : MonoBehaviour
     [Header("Ataque")]
     [SerializeField] private float velocidadePerseguicao = 2.4f;
     [SerializeField] private float distanciaAtaque = 1.3f;
-    [SerializeField] private int danoAtaque = 1;
+
+    [Header("Combate")]
+    [SerializeField, Min(0)] private int danoAtaque = 3;
+
+    public int DanoAtaque
+    {
+        get => danoAtaque;
+        set => danoAtaque = Mathf.Max(0, value);
+    }
+
     [SerializeField] private Transform pontoOrigemAtaque;
     [SerializeField] private float alturaOrigemAtaque = 0.7f;
     [SerializeField] private float raioAtaque = 0.35f;
@@ -191,6 +203,28 @@ public class SlimeIA : MonoBehaviour
     public int VidaMaxima => vidaMaxima;
     public bool Morto => morto;
 
+    public float ObterDano()
+    {
+        return danoAtaque;
+    }
+
+    public GameObject ObterDono()
+    {
+        return gameObject;
+    }
+
+    public Transform[] ObterPontosPatrulha()
+    {
+        return pontosPatrulha;
+    }
+
+    public void DefinirPontosPatrulha(Transform[] novosPontos)
+    {
+        pontosPatrulha = novosPontos;
+        indicePatrulha = -1;
+        EscolherProximoPontoAleatorio();
+    }
+
     private void Awake()
     {
         if (animator == null)
@@ -236,6 +270,54 @@ public class SlimeIA : MonoBehaviour
         MudarEstado(QuantidadePontosValidos() > 0 ? EstadoSlime.Patrulhando : EstadoSlime.Parado);
     }
 
+    private void Start()
+    {
+        if (morto || !gerarPontosAutomaticamente)
+            return;
+
+        if (QuantidadePontosValidos() > 0)
+            return;
+
+        GerarPontosDePatrulhaAutomaticos();
+    }
+
+    private void GerarPontosDePatrulhaAutomaticos()
+    {
+        int quantidade = Mathf.Max(1, quantidadePontosAuto);
+        List<Transform> pontosValidos = new List<Transform>(quantidade);
+
+        for (int i = 0; i < quantidade; i++)
+        {
+            float angulo = i * (360f / quantidade) * Mathf.Deg2Rad;
+            Vector3 direcao = new Vector3(Mathf.Cos(angulo), 0f, Mathf.Sin(angulo));
+            Vector3 posicaoDesejada = transform.position + direcao * raioPatrulhaAuto;
+            Vector3 posicaoFinal = posicaoDesejada;
+
+            if (NavMesh.SamplePosition(posicaoDesejada, out NavMeshHit hit, raioPatrulhaAuto, NavMesh.AllAreas))
+                posicaoFinal = hit.position;
+
+            GameObject ponto = new GameObject($"PontoAuto_{gameObject.name}_{i}");
+            ponto.transform.position = posicaoFinal;
+            pontosValidos.Add(ponto.transform);
+        }
+
+        if (pontosValidos.Count == 0)
+            return;
+
+        pontosPatrulha = pontosValidos.ToArray();
+        indicePatrulha = -1;
+        EscolherProximoPontoAleatorio();
+
+        if (estadoAtual != EstadoSlime.Patrulhando &&
+            estadoAtual != EstadoSlime.Alerta &&
+            estadoAtual != EstadoSlime.Perseguindo &&
+            estadoAtual != EstadoSlime.Atacando &&
+            estadoAtual != EstadoSlime.TomandoDano)
+        {
+            MudarEstado(EstadoSlime.Patrulhando);
+        }
+    }
+
     private void OnDisable()
     {
         CancelarImpactoAtaquePendente();
@@ -267,6 +349,8 @@ public class SlimeIA : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         tempoAnimacaoDano = Mathf.Max(0f, tempoAnimacaoDano);
         tempoParaMorrer = Mathf.Max(0f, tempoParaMorrer);
+        quantidadePontosAuto = Mathf.Max(1, quantidadePontosAuto);
+        raioPatrulhaAuto = Mathf.Max(0.1f, raioPatrulhaAuto);
         NormalizarSpawnsNormais();
         NormalizarSpawnsMissao();
         volumeAndar = Mathf.Clamp01(volumeAndar);
@@ -1135,6 +1219,10 @@ public class SlimeIA : MonoBehaviour
         if (playerAlvo == null || dano <= 0)
             return false;
 
+        float danoConfigurado = Mathf.Max(0f, ObterDano());
+        if (danoConfigurado <= 0f)
+            return false;
+
         Component[] componentes = playerAlvo.GetComponentsInChildren<Component>(true);
         for (int i = 0; i < componentes.Length; i++)
         {
@@ -1146,13 +1234,26 @@ public class SlimeIA : MonoBehaviour
                 "ReceberDano",
                 BindingFlags.Instance | BindingFlags.Public,
                 null,
+                new[] { typeof(float), typeof(GameObject) },
+                null);
+
+            if (metodo != null)
+            {
+                metodo.Invoke(componente, new object[] { danoConfigurado, gameObject });
+                return true;
+            }
+
+            metodo = componente.GetType().GetMethod(
+                "ReceberDano",
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
                 new[] { typeof(int) },
                 null);
 
             if (metodo == null)
                 continue;
 
-            metodo.Invoke(componente, new object[] { dano });
+            metodo.Invoke(componente, new object[] { Mathf.RoundToInt(danoConfigurado) });
             return true;
         }
 
@@ -1699,11 +1800,12 @@ public class SlimeIA : MonoBehaviour
             RespawnMonstro.Instancia.AgendarRespawn(
                 idRespawnMonstro,
                 transform.position,
-                transform.rotation);
+                transform.rotation,
+                pontosPatrulha);
         }
         else
         {
-            Debug.LogWarning("[SlimeIA] RespawnMonstro nao encontrado na cena.", this);
+            { }
         }
 
         if (esconderCanvasAoMorrer && canvasVida != null)
@@ -1976,5 +2078,76 @@ public class SlimeIA : MonoBehaviour
             else if (parametro.nameHash == DieHash && parametro.type == AnimatorControllerParameterType.Trigger)
                 temDie = true;
         }
+    }
+    public void ReiniciarAposRespawn()
+    {
+        morto = false;
+        experienciaJaEntregue = false;
+        somMorteTocado = false;
+        impactoAtaqueResolvido = false;
+        investidaAtaqueEmAndamento = false;
+        agentPausadoPelaInvestida = false;
+        agentUpdatePositionAntesInvestida = true;
+        alvoPlayer = null;
+        ultimoPlayerResponsavel = null;
+        estadoAntesDano = EstadoSlime.Parado;
+        proximaBuscaPlayer = 0f;
+        proximoAtaque = 0f;
+        tempoRestanteObservando = 0f;
+        estadoAtual = EstadoSlime.Parado;
+
+        vidaAtual = vidaMaxima;
+        AtualizarBarraVida();
+
+        if (canvasVida != null)
+            canvasVida.gameObject.SetActive(true);
+
+        if (rotinaDano != null)
+        {
+            StopCoroutine(rotinaDano);
+            rotinaDano = null;
+        }
+
+        if (rotinaInvestidaAtaque != null)
+        {
+            StopCoroutine(rotinaInvestidaAtaque);
+            rotinaInvestidaAtaque = null;
+        }
+
+        if (rb == null)
+            rb = GetComponent<Rigidbody>();
+
+        if (agent == null)
+            agent = GetComponent<UnityEngine.AI.NavMeshAgent>();
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        if (agent != null && agent.enabled)
+        {
+            if (agent.isOnNavMesh)
+            {
+                agent.Warp(transform.position);
+                agent.isStopped = false;
+                agent.updatePosition = true;
+                agent.speed = velocidadePatrulha;
+                agent.ResetPath();
+            }
+        }
+
+        AtualizarCacheParametrosAnimator();
+
+        if (QuantidadePontosValidos() == 0 && gerarPontosAutomaticamente)
+            GerarPontosDePatrulhaAutomaticos();
+
+        EscolherProximoPontoAleatorio();
+
+        if (QuantidadePontosValidos() > 0)
+            MudarEstado(EstadoSlime.Patrulhando);
+        else
+            MudarEstado(EstadoSlime.Parado);
     }
 }

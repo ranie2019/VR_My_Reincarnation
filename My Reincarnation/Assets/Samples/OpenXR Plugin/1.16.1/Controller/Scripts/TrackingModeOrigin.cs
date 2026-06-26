@@ -47,7 +47,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
             }
 
 #if !ENABLE_INPUT_SYSTEM
-            Debug.LogWarning("This sample is not expected to work without the Input System backend enabled (Project Settings > Player > Other Settings > Configuration > Active Input Handling).");
+            { }
 #endif
         }
 

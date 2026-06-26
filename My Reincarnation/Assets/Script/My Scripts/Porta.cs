@@ -13,6 +13,9 @@ public class Porta : MonoBehaviour
     public float anguloMaximo = 95f;
     public bool inverterDirecao = false;
 
+    [Header("Direcao")]
+    [SerializeField] private Transform referenciaLadoExterno;
+
     [Header("Movimento")]
     public float sensibilidadeEmpurrao = 1f;
     public float velocidadeAbertura = 120f;
@@ -23,8 +26,14 @@ public class Porta : MonoBehaviour
     [Header("Estado")]
     public float anguloAtual;
 
+    [Header("Debug")]
+    [SerializeField] private bool debugPorta = false;
+
     const float DistanciaMinimaDobradicas = 0.05f;
+    const float DistanciaMinimaDeteccaoLado = 0.001f;
     const float SnapAnguloFechado = 0.15f;
+    const float AnguloQuaseFechado = 2f;
+    const float TempoLiberacaoDirecao = 0.15f;
 
     readonly HashSet<Collider> collidersEmpurrando = new HashSet<Collider>();
 
@@ -38,10 +47,14 @@ public class Porta : MonoBehaviour
     Vector3 eixoInicial;
     Vector3 vetorInicialAtePorta;
     Vector3 direcaoReferenciaPorta;
+    Vector3 normalPortaFechada;
+
+    float sinalLadoExterno = 1f;
 
     float anguloAlvo;
     float velocidadeAngularSuave;
     float tempoSemColisao;
+    bool direcaoTravada;
 
     void Awake()
     {
@@ -107,6 +120,11 @@ public class Porta : MonoBehaviour
         {
             tempoSemColisao += Time.fixedDeltaTime;
 
+            if (direcaoTravada && tempoSemColisao >= TempoLiberacaoDirecao)
+            {
+                direcaoTravada = false;
+            }
+
             if (tempoSemColisao >= tempoParaFechar)
             {
                 anguloAlvo = Mathf.MoveTowards(
@@ -118,12 +136,16 @@ public class Porta : MonoBehaviour
         }
 
         float tempoSuavizacao = 1f / Mathf.Max(0.01f, amortecimentoMovimento);
+        bool retornandoAutomaticamente = !recebendoEmpurrao && tempoSemColisao >= tempoParaFechar;
+        float velocidadeMaximaMovimento = retornandoAutomaticamente
+            ? Mathf.Infinity
+            : velocidadeAbertura * sensibilidadeEmpurrao;
         anguloAtual = Mathf.SmoothDampAngle(
             anguloAtual,
             anguloAlvo,
             ref velocidadeAngularSuave,
             tempoSuavizacao,
-            Mathf.Infinity,
+            velocidadeMaximaMovimento,
             Time.fixedDeltaTime
         );
 
@@ -134,6 +156,7 @@ public class Porta : MonoBehaviour
             anguloAtual = 0f;
             anguloAlvo = 0f;
             velocidadeAngularSuave = 0f;
+            direcaoTravada = false;
         }
 
         AplicarPoseDaPorta(anguloAtual);
@@ -153,31 +176,40 @@ public class Porta : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        RegistrarColliderAtivo(collision.collider);
-        ProcessarColisao(collision);
+        if (collision == null)
+        {
+            return;
+        }
+
+        ProcessarEntradaValida(collision.collider, "OnCollisionEnter");
     }
 
     void OnCollisionStay(Collision collision)
     {
-        RegistrarColliderAtivo(collision.collider);
-        ProcessarColisao(collision);
+        if (collision == null)
+        {
+            return;
+        }
+
+        ManterContatoValido(collision.collider);
     }
 
     void OnCollisionExit(Collision collision)
     {
-        RemoverColliderAtivo(collision.collider);
+        if (collision != null)
+        {
+            RemoverColliderAtivo(collision.collider);
+        }
     }
 
     void OnTriggerEnter(Collider other)
     {
-        RegistrarColliderAtivo(other);
-        ProcessarTrigger(other);
+        ProcessarEntradaValida(other, "OnTriggerEnter");
     }
 
     void OnTriggerStay(Collider other)
     {
-        RegistrarColliderAtivo(other);
-        ProcessarTrigger(other);
+        ManterContatoValido(other);
     }
 
     void OnTriggerExit(Collider other)
@@ -185,15 +217,52 @@ public class Porta : MonoBehaviour
         RemoverColliderAtivo(other);
     }
 
-    void RegistrarColliderAtivo(Collider other)
+    void ProcessarEntradaValida(Collider other, string origemEvento)
     {
-        if (other == null)
+        if (!EhEmpurradorValido(other, out string motivo))
         {
+            LogDebug($"Collider ignorado em {origemEvento}: {NomeCollider(other)}. Motivo: {motivo}");
             return;
         }
 
-        collidersEmpurrando.Add(other);
+        bool novoContato = collidersEmpurrando.Add(other);
         tempoSemColisao = 0f;
+
+        if (novoContato)
+        {
+            LogDebug($"Collider aceito em {origemEvento}: {NomeCollider(other)}");
+        }
+
+        bool unicoEmpurrador = collidersEmpurrando.Count == 1;
+        bool podeDefinirDirecao = !direcaoTravada || (PortaQuaseFechada() && unicoEmpurrador);
+
+        if (!podeDefinirDirecao)
+        {
+            LogDebug($"Direcao mantida para {NomeCollider(other)}. Alvo atual: {anguloAlvo:F1}");
+            return;
+        }
+
+        if (DefinirAlvoPeloLado(other))
+        {
+            direcaoTravada = true;
+        }
+    }
+
+    void ManterContatoValido(Collider other)
+    {
+        if (!EhEmpurradorValido(other, out _))
+        {
+            collidersEmpurrando.Remove(other);
+            return;
+        }
+
+        bool novoContato = collidersEmpurrando.Add(other);
+        tempoSemColisao = 0f;
+
+        if (novoContato)
+        {
+            LogDebug($"Collider aceito apenas para manter contato: {NomeCollider(other)}");
+        }
     }
 
     void RemoverColliderAtivo(Collider other)
@@ -216,98 +285,169 @@ public class Porta : MonoBehaviour
         collidersEmpurrando.RemoveWhere(colliderAtivo =>
             colliderAtivo == null ||
             !colliderAtivo.enabled ||
-            !colliderAtivo.gameObject.activeInHierarchy
+            !colliderAtivo.gameObject.activeInHierarchy ||
+            !EhEmpurradorValido(colliderAtivo, out _)
         );
     }
 
-    void ProcessarColisao(Collision collision)
+    bool EhEmpurradorValido(Collider outro, out string motivo)
     {
-        if (!dobradicasValidas || collision == null)
+        if (outro == null)
         {
-            return;
+            motivo = "collider nulo";
+            return false;
         }
 
-        if (collision.contactCount == 0)
+        if (!outro.enabled || !outro.gameObject.activeInHierarchy)
         {
-            return;
+            motivo = "collider desativado";
+            return false;
         }
 
-        ContactPoint contato = collision.GetContact(0);
-        Vector3 pontoContato = contato.point;
-        Vector3 direcaoEmpurrao = collision.relativeVelocity;
-
-        if (direcaoEmpurrao.sqrMagnitude < 0.0001f)
+        if (PertenceAEstruturaDaPorta(outro.transform))
         {
-            direcaoEmpurrao = -contato.normal;
+            motivo = "pertence a porta, moldura ou estrutura pai";
+            return false;
         }
 
-        float intensidadeExtra = 0f;
-
-        if (collision.rigidbody != null)
+        Rigidbody outroRigidbody = outro.attachedRigidbody;
+        if (outroRigidbody != null && outroRigidbody != rb && !outroRigidbody.isKinematic)
         {
-            intensidadeExtra = collision.rigidbody.mass * 0.08f;
+            motivo = string.Empty;
+            return true;
         }
 
-        AplicarEmpurrao(pontoContato, direcaoEmpurrao, intensidadeExtra);
+        CharacterController characterController = outro.GetComponentInParent<CharacterController>();
+        if (characterController != null && characterController.enabled && characterController.gameObject.activeInHierarchy)
+        {
+            motivo = string.Empty;
+            return true;
+        }
+
+        if (PossuiIdentidadeDeJogador(outro.transform))
+        {
+            motivo = string.Empty;
+            return true;
+        }
+
+        motivo = outroRigidbody == null
+            ? "sem Rigidbody dinamico ou CharacterController"
+            : "Rigidbody cinematico";
+        return false;
     }
 
-    void ProcessarTrigger(Collider other)
+    bool PertenceAEstruturaDaPorta(Transform outroTransform)
     {
-        if (!dobradicasValidas || other == null)
+        if (outroTransform == null)
         {
-            return;
+            return false;
         }
 
-        Vector3 pontoContato = other.ClosestPoint(transform.position);
-        Vector3 direcaoEmpurrao = Vector3.zero;
-        Rigidbody outroRigidbody = other.attachedRigidbody;
-
-        if (outroRigidbody != null)
+        if (outroTransform == transform || outroTransform.IsChildOf(transform))
         {
-            direcaoEmpurrao = outroRigidbody.GetPointVelocity(pontoContato);
+            return true;
         }
 
-        if (direcaoEmpurrao.sqrMagnitude < 0.0001f)
+        Transform estruturaPai = transform.parent;
+        if (estruturaPai == null)
         {
-            direcaoEmpurrao = pontoContato - pivoInicial;
+            return false;
         }
 
-        AplicarEmpurrao(pontoContato, direcaoEmpurrao, 0f);
+        return outroTransform == estruturaPai ||
+               outroTransform.IsChildOf(estruturaPai) ||
+               estruturaPai.IsChildOf(outroTransform);
     }
 
-    void AplicarEmpurrao(Vector3 pontoContato, Vector3 direcaoEmpurrao, float intensidadeExtra)
+    bool PossuiIdentidadeDeJogador(Transform origem)
     {
-        Vector3 radial = Vector3.ProjectOnPlane(pontoContato - pivoInicial, eixoInicial);
-
-        if (radial.sqrMagnitude < 0.0001f)
+        for (Transform atual = origem; atual != null; atual = atual.parent)
         {
-            radial = direcaoReferenciaPorta;
+            string tagAtual = atual.gameObject.tag;
+            string layerAtual = LayerMask.LayerToName(atual.gameObject.layer);
+
+            if (EhNomeDeJogadorMaoOuControle(tagAtual) || EhNomeDeJogadorMaoOuControle(layerAtual))
+            {
+                return true;
+            }
         }
 
-        Vector3 tangentePositiva = Vector3.Cross(eixoInicial, radial.normalized).normalized;
+        return false;
+    }
+
+    bool EhNomeDeJogadorMaoOuControle(string valor)
+    {
+        return string.Equals(valor, "Player", System.StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(valor, "Hand", System.StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(valor, "Controller", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    bool PortaQuaseFechada()
+    {
+        return Mathf.Abs(anguloAtual) <= AnguloQuaseFechado;
+    }
+
+    bool DefinirAlvoPeloLado(Collider outro)
+    {
+        if (!dobradicasValidas || outro == null)
+        {
+            return false;
+        }
+
+        Vector3 centroCollider = outro.bounds.center;
+        float distanciaAoPlano = Vector3.Dot(
+            centroCollider - posicaoInicial,
+            normalPortaFechada
+        );
+
+        if (Mathf.Abs(distanciaAoPlano) < DistanciaMinimaDeteccaoLado)
+        {
+            distanciaAoPlano = Vector3.Dot(
+                outro.transform.position - posicaoInicial,
+                normalPortaFechada
+            );
+        }
+
+        if (Mathf.Abs(distanciaAoPlano) < DistanciaMinimaDeteccaoLado)
+        {
+            LogDebug($"Nao foi possivel determinar o lado de {NomeCollider(outro)}.");
+            return false;
+        }
+
+        float sinalLadoCollider = Mathf.Sign(distanciaAoPlano);
+        bool colliderNoLadoExterno = Mathf.Approximately(
+            sinalLadoCollider,
+            sinalLadoExterno
+        );
+
+        float sinalAlvo = colliderNoLadoExterno
+            ? -sinalLadoExterno
+            : sinalLadoExterno;
 
         if (inverterDirecao)
         {
-            tangentePositiva = -tangentePositiva;
+            sinalAlvo = -sinalAlvo;
         }
 
-        float sinal = Mathf.Sign(Vector3.Dot(direcaoEmpurrao, tangentePositiva));
-
-        if (Mathf.Approximately(sinal, 0f))
-        {
-            sinal = Mathf.Sign(Vector3.Dot(direcaoEmpurrao, direcaoReferenciaPorta));
-        }
-
-        if (Mathf.Approximately(sinal, 0f))
-        {
-            return;
-        }
-
-        float intensidade = Mathf.Max(0.15f, direcaoEmpurrao.magnitude + intensidadeExtra);
-        float deltaAngulo = sinal * intensidade * sensibilidadeEmpurrao * velocidadeAbertura * Time.fixedDeltaTime;
-
-        anguloAlvo = Mathf.Clamp(anguloAlvo + deltaAngulo, anguloMinimo, anguloMaximo);
+        anguloAlvo = sinalAlvo > 0f ? anguloMaximo : anguloMinimo;
         tempoSemColisao = 0f;
+
+        string ladoDetectado = colliderNoLadoExterno ? "externo" : "interno";
+        LogDebug($"Lado detectado: {ladoDetectado}. Collider: {NomeCollider(outro)}. Angulo alvo: {anguloAlvo:F1}");
+        return true;
+    }
+
+    string NomeCollider(Collider outro)
+    {
+        return outro != null ? outro.name : "<nulo>";
+    }
+
+    void LogDebug(string mensagem)
+    {
+        if (debugPorta)
+        {
+            { }
+        }
     }
 
     void AtualizarDadosDasDobradicas()
@@ -346,6 +486,26 @@ public class Porta : MonoBehaviour
         }
 
         direcaoReferenciaPorta.Normalize();
+        normalPortaFechada = Vector3.Cross(
+            eixoInicial,
+            direcaoReferenciaPorta
+        ).normalized;
+
+        sinalLadoExterno = 1f;
+
+        if (referenciaLadoExterno != null)
+        {
+            float distanciaReferenciaAoPlano = Vector3.Dot(
+                referenciaLadoExterno.position - posicaoInicial,
+                normalPortaFechada
+            );
+
+            if (Mathf.Abs(distanciaReferenciaAoPlano) >= DistanciaMinimaDeteccaoLado)
+            {
+                sinalLadoExterno = Mathf.Sign(distanciaReferenciaAoPlano);
+            }
+        }
+
         dobradicasValidas = true;
     }
 
@@ -357,7 +517,7 @@ public class Porta : MonoBehaviour
         }
 
         avisoDobradicasMostrado = true;
-        Debug.LogWarning($"[Porta] {mensagem} Objeto: {name}", this);
+        { }
     }
 
     void AplicarPoseDaPorta(float angulo)
@@ -370,8 +530,11 @@ public class Porta : MonoBehaviour
         {
             rb.position = transform.position;
             rb.rotation = transform.rotation;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
         }
     }
 
@@ -384,8 +547,11 @@ public class Porta : MonoBehaviour
         {
             rb.position = posicaoInicial;
             rb.rotation = rotacaoInicial;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
         }
     }
 

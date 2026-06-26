@@ -19,10 +19,10 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
         private void OnEnable()
         {
             if (xAxisSlider == null)
-                Debug.LogWarning("ActionToSlider Monobehaviour started without any associated X-axis slider.  This input won't be reported.", this);
+                { }
 
             if (yAxisSlider == null)
-                Debug.LogWarning("ActionToSlider Monobehaviour started without any associated Y-axis slider.  This input won't be reported.", this);
+                { }
         }
 
         void Update()

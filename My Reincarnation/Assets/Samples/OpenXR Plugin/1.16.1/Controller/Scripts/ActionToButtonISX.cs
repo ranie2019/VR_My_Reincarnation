@@ -25,7 +25,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
         private void OnEnable()
         {
             if (image == null)
-                Debug.LogWarning("ActionToButton Monobehaviour started without any associated image. This input will not be reported.", this);
+                { }
 
             graphic = gameObject.GetComponent<Graphic>();
             graphics = gameObject.GetComponentsInChildren<Graphic>();

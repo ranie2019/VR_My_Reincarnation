@@ -214,19 +214,22 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  velocidadePatrulha: 1.5
+  velocidadePatrulha: 1.2
   distanciaChegadaPonto: 0.35
   tempoObservando: 2
+  gerarPontosAutomaticamente: 1
+  quantidadePontosAuto: 4
+  raioPatrulhaAuto: 4
   tagPlayer: Player
-  raioCampoVisao: 20
+  raioCampoVisao: 15
   anguloCampoVisao: 210
   layersObstaculo:
     serializedVersion: 2
     m_Bits: 0
-  distanciaIniciarPerseguicao: 17
+  distanciaIniciarPerseguicao: 10
   velocidadePerseguicao: 2.4
   distanciaAtaque: 1.3
-  danoAtaque: 1
+  danoAtaque: 3
   pontoOrigemAtaque: {fileID: 9206863076228226764}
   alturaOrigemAtaque: 0.7
   raioAtaque: 0.35
@@ -237,7 +240,7 @@ MonoBehaviour:
   distanciaInvestida: 1.5
   alturaInvestida: 0.6
   duracaoInvestida: 0.35
-  cooldownAtaque: 1.5
+  cooldownAtaque: 1.2
   raioVerificacaoColisaoInvestida: 0.35
   layersBloqueioInvestida:
     serializedVersion: 2
@@ -245,15 +248,14 @@ MonoBehaviour:
   margemParedeInvestida: 0.15
   tagsQueCausamDano:
   - Sword
-  - Machado
-  idRespawnMonstro: Slime Verde
+  idRespawnMonstro: SlimeVerde
   desenharGizmos: 1
   desenharGizmosSempre: 1
   alturaOlhos: 0.8
-  pontoOlhos: {fileID: 8364254030704716420}
+  pontoOlhos: {fileID: 9206863076228226764}
   prefabsSpawnNormal:
   - prefab: {fileID: 6804290456149850859, guid: 954e56c8a1d07c54a996b8b7ad496d2b, type: 3}
-    chance: 50
+    chance: 52
     quantidadeMinima: 1
     quantidadeMaxima: 1
     offsetSpawn: {x: 0, y: 1, z: 0}

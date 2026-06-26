@@ -222,6 +222,6 @@ public class StatusVR : MonoBehaviour
 
     private void LogWarning(string mensagem)
     {
-        Debug.LogWarning(mensagem, this);
+        { }
     }
 }

@@ -4,48 +4,48 @@ using System.Collections;
 public class RespawnManager : MonoBehaviour
 {
     [Header("Objeto para respawnar")]
-    [Tooltip("Referência ao prefab que será respawnado.")]
+    [Tooltip("Referï¿½ncia ao prefab que serï¿½ respawnado.")]
     [SerializeField] private GameObject objectToRespawn;
 
-    [Header("Posição do respawn")]
-    [Tooltip("Offset da posição onde o novo objeto será respawnado, baseado na posição original.")]
+    [Header("Posiï¿½ï¿½o do respawn")]
+    [Tooltip("Offset da posiï¿½ï¿½o onde o novo objeto serï¿½ respawnado, baseado na posiï¿½ï¿½o original.")]
     [SerializeField] private Vector3 respawnOffset = Vector3.zero;
 
     [Header("Tempo para Respawn")]
-    [Tooltip("Tempo em segundos antes de o objeto ser respawnado após a destruição.")]
+    [Tooltip("Tempo em segundos antes de o objeto ser respawnado apï¿½s a destruiï¿½ï¿½o.")]
     [SerializeField] public float respawnTime = 3f;
 
-    // Verifica se o prefab está definido ao iniciar
+    // Verifica se o prefab estï¿½ definido ao iniciar
     private void Start()
     {
         if (objectToRespawn == null)
         {
-            Debug.LogError("O prefab objectToRespawn não está definido no RespawnManager!");
+            { }
         }
     }
 
-    // Método público para iniciar o respawn de um objeto após um tempo
+    // Mï¿½todo pï¿½blico para iniciar o respawn de um objeto apï¿½s um tempo
     public void RespawnObjectWithDelay(Vector3 originalPosition)
     {
         if (objectToRespawn == null)
         {
-            Debug.LogError("O prefab objectToRespawn não está definido!");
+            { }
             return;
         }
 
         StartCoroutine(RespawnAfterDelay(originalPosition));
     }
 
-    // Coroutine para respawnar o objeto após um tempo
+    // Coroutine para respawnar o objeto apï¿½s um tempo
     private IEnumerator RespawnAfterDelay(Vector3 originalPosition)
     {
         // Espera pelo tempo de respawn antes de criar o objeto novamente
         yield return new WaitForSeconds(respawnTime);
 
-        // Calcula a posição onde o objeto será respawnado
+        // Calcula a posiï¿½ï¿½o onde o objeto serï¿½ respawnado
         Vector3 respawnPosition = originalPosition + respawnOffset;
 
-        // Respawna o novo objeto na posição e rotação padrão
+        // Respawna o novo objeto na posiï¿½ï¿½o e rotaï¿½ï¿½o padrï¿½o
         Instantiate(objectToRespawn, respawnPosition, Quaternion.identity);
     }
 }

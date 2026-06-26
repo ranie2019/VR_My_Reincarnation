@@ -92,7 +92,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.DeviceSimulator
         {
             if (!simulator.gameObject.TryGetComponent(out m_HandExpressionManager))
             {
-                Debug.LogError($"Could not find SimulatedHandExpressionManager component on {simulator.name}, disabling simulator UI.");
+                { }
                 gameObject.SetActive(false);
                 return;
             }
@@ -102,7 +102,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.DeviceSimulator
                 var simulatedExpression = m_HandExpressionManager.simulatedHandExpressions[index];
                 if (index >= m_Expressions.Count)
                 {
-                    Debug.LogWarning("The Device Simulator has more expressions than the UI can display.", this);
+                    { }
                 }
                 else
                 {
@@ -116,7 +116,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.DeviceSimulator
                             action = simulatedExpression.toggleInput.inputActionPerformed;
                             break;
                         default:
-                            Debug.LogWarning($"Toggle Input for Simulated Hand Expression \"{simulatedExpression.name}\" is not an input action, cannot display binding or icon in UI.", this);
+                            { }
                             break;
                     }
 
@@ -166,11 +166,11 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.DeviceSimulator
 
             if (index >= m_Expressions.Count)
             {
-                Debug.LogWarning("The Device Simulator has more expressions than the UI can display.", this);
+                { }
             }
             else if (index < 0)
             {
-                Debug.LogError($"The Device Simulator tried to toggle {simulatedExpression.name} but it was not found in the list of simulated hand expressions, the UI can not be updated.", this);
+                { }
             }
             else
             {

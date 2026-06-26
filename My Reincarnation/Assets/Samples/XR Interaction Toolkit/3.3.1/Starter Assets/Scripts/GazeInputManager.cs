@@ -37,7 +37,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             InputDevices.GetDevicesWithCharacteristics(InputDeviceCharacteristics.EyeTracking, inputDeviceList);
             if (inputDeviceList.Count > 0)
             {
-                Debug.Log("Eye tracking device found!", this);
+                { }
                 m_EyeTrackingDeviceFound = true;
                 return;
             }
@@ -46,13 +46,13 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             {
                 if (device.layout == k_EyeGazeLayoutName)
                 {
-                    Debug.Log("Eye gaze device found!", this);
+                    { }
                     m_EyeTrackingDeviceFound = true;
                     return;
                 }
             }
 
-            Debug.LogWarning($"Could not find a device that supports eye tracking on Awake. {this} has subscribed to device connected events and will activate the GameObject when an eye tracking device is connected.", this);
+            { }
 
             InputDevices.deviceConnected += OnDeviceConnected;
             InputSystem.InputSystem.onDeviceChange += OnDeviceChange;
@@ -74,7 +74,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             if (m_EyeTrackingDeviceFound || !inputDevice.characteristics.HasFlag(InputDeviceCharacteristics.EyeTracking))
                 return;
 
-            Debug.Log("Eye tracking device found!", this);
+            { }
             m_EyeTrackingDeviceFound = true;
             gameObject.SetActive(true);
         }
@@ -86,7 +86,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
 
             if (device.layout == k_EyeGazeLayoutName)
             {
-                Debug.Log("Eye gaze device found!", this);
+                { }
                 m_EyeTrackingDeviceFound = true;
                 gameObject.SetActive(true);
             }

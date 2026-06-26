@@ -46,7 +46,7 @@ public class TranslateObject : MonoBehaviour
     {
         transform.SetPositionAndRotation(startPos, startRot);
 
-;
+{ }
     }
 
 }

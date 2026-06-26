@@ -220,11 +220,11 @@ public class VidaArvore : MonoBehaviour
         }
         else if (RespawnNatureza.Instancia == null)
         {
-            Debug.LogWarning("[VidaArvore] RespawnNatureza nao encontrado na cena.", this);
+            { }
         }
         else if (string.IsNullOrWhiteSpace(respawnId))
         {
-            Debug.LogWarning("[VidaArvore] Respawn ID vazio. Respawn da arvore nao sera agendado.", this);
+            { }
         }
 
         Destroy(gameObject);

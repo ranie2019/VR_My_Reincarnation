@@ -20,7 +20,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
         void OnEnable()
         {
             if (targetText == null)
-                Debug.LogWarning("DisplayDeviceInfo Monobehaviour has no Target Text set. No information will be displayed.");
+                { }
         }
 
         void Update()

@@ -15,7 +15,6 @@ public class RespawnMonstro : MonoBehaviour
         public float tempoRespawn = 10f;
         public Vector3 offsetRespawn = Vector3.zero;
         public bool usarRotacaoDaMorte = true;
-        public bool debugRespawn = true;
     }
 
     [Header("Configuracoes de respawn por monstro")]
@@ -25,9 +24,7 @@ public class RespawnMonstro : MonoBehaviour
     {
         if (Instancia != null && Instancia != this)
         {
-            Debug.LogWarning(
-                $"[RespawnMonstro] Existe mais de um RespawnMonstro na cena. Mantendo '{Instancia.name}' e ignorando '{name}'.",
-                this);
+            { }
             enabled = false;
             return;
         }
@@ -58,17 +55,26 @@ public class RespawnMonstro : MonoBehaviour
 
     public void AgendarRespawn(string idMonstro, Vector3 posicaoMorte, Quaternion rotacaoMorte)
     {
+        AgendarRespawn(idMonstro, posicaoMorte, rotacaoMorte, null);
+    }
+
+    public void AgendarRespawn(
+        string idMonstro,
+        Vector3 posicaoMorte,
+        Quaternion rotacaoMorte,
+        Transform[] pontosPatrulhaOriginais)
+    {
         ConfiguracaoRespawnMonstro config = BuscarConfiguracao(idMonstro);
 
         if (config == null)
         {
-            Debug.LogWarning($"[RespawnMonstro] Configuracao nao encontrada para ID Monstro: '{idMonstro}'.", this);
+            { }
             return;
         }
 
         if (config.prefabRespawn == null)
         {
-            Debug.LogWarning($"[RespawnMonstro] Prefab Respawn vazio para ID Monstro: '{idMonstro}'.", this);
+            { }
             return;
         }
 
@@ -77,29 +83,31 @@ public class RespawnMonstro : MonoBehaviour
             ? rotacaoMorte
             : config.prefabRespawn.transform.rotation;
 
-        Log(config, "AgendarRespawn chamado.");
-        Log(config, $"ID Monstro: {idMonstro}");
-        Log(config, $"Posicao da morte: {posicaoMorte}");
-        Log(config, $"Prefab usado: {config.prefabRespawn.name}");
-        Log(config, $"Tempo respawn: {config.tempoRespawn}");
-
-        StartCoroutine(RotinaRespawn(config, posicaoFinal, rotacaoFinal));
+        StartCoroutine(RotinaRespawn(config, posicaoFinal, rotacaoFinal, CopiarPontosPatrulha(pontosPatrulhaOriginais)));
     }
 
-    private IEnumerator RotinaRespawn(ConfiguracaoRespawnMonstro config, Vector3 posicaoFinal, Quaternion rotacaoFinal)
+    private IEnumerator RotinaRespawn(
+        ConfiguracaoRespawnMonstro config,
+        Vector3 posicaoFinal,
+        Quaternion rotacaoFinal,
+        Transform[] pontosPatrulhaOriginais)
     {
         yield return new WaitForSeconds(config.tempoRespawn);
 
         if (config.prefabRespawn == null)
         {
-            Debug.LogWarning($"[RespawnMonstro] Respawn cancelado: prefabRespawn ficou null para ID '{config.idMonstro}'.", this);
+            { }
             yield break;
         }
 
         GameObject novoMonstro = Instantiate(config.prefabRespawn, posicaoFinal, rotacaoFinal);
+        SlimeIA slimeNovo = novoMonstro.GetComponent<SlimeIA>();
 
-        Log(config, $"Instantiate executado: {novoMonstro.name}");
-        Log(config, $"Posicao final: {posicaoFinal}");
+        if (slimeNovo != null)
+        {
+            slimeNovo.DefinirPontosPatrulha(pontosPatrulhaOriginais);
+            slimeNovo.ReiniciarAposRespawn();
+        }
     }
 
     private ConfiguracaoRespawnMonstro BuscarConfiguracao(string idMonstro)
@@ -122,9 +130,13 @@ public class RespawnMonstro : MonoBehaviour
         return null;
     }
 
-    private void Log(ConfiguracaoRespawnMonstro config, string mensagem)
+    private Transform[] CopiarPontosPatrulha(Transform[] pontosPatrulhaOriginais)
     {
-        if (config != null && config.debugRespawn)
-            Debug.Log($"[RespawnMonstro] {mensagem}", this);
+        if (pontosPatrulhaOriginais == null || pontosPatrulhaOriginais.Length == 0)
+            return pontosPatrulhaOriginais;
+
+        Transform[] copia = new Transform[pontosPatrulhaOriginais.Length];
+        Array.Copy(pontosPatrulhaOriginais, copia, pontosPatrulhaOriginais.Length);
+        return copia;
     }
 }

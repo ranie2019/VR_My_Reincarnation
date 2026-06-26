@@ -23,7 +23,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     [Header("Limite visual final do item")]
     [SerializeField] private Vector3 tamanhoVisualMaximoSlot = Vector3.zero;
-    [SerializeField] private float fatorReducaoVisualInventario = 0.65f;
+    [SerializeField] private bool debugEscalaInventario = true;
 
     [Header("Contador")]
     [SerializeField] private TMP_Text contadorTMP;
@@ -94,7 +94,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private void OnValidate()
     {
         margemDeSeguranca = Mathf.Clamp(margemDeSeguranca, 0.01f, 1f);
-        fatorReducaoVisualInventario = Mathf.Clamp(fatorReducaoVisualInventario, 0.01f, 1f);
         limiteStack = Mathf.Clamp(limiteStack, 1, 99);
 
         if (socketInteractor == null)
@@ -576,22 +575,41 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             rb.detectCollisions = true;
         }
 
-        if (fluxoRestore)
+        bool escalaVisualJaAplicada = TentarAplicarEscalaVisualInventario(item, estado);
+        if (escalaVisualJaAplicada)
         {
-            ReaplicarEscalaRestauradaDoSave(item, estado);
+            PosicionarItemNoPontoDoSlot(item.transform);
+
+            if (debugEscalaInventario)
+            {
+                { }
+            }
         }
         else
         {
-            GarantirEscalaOriginal(item.transform);
+            if (fluxoRestore)
+            {
+                ReaplicarEscalaRestauradaDoSave(item, estado);
+            }
+            else
+            {
+                GarantirEscalaOriginal(item.transform);
+                PosicionarItemNoPontoDoSlot(item.transform);
+                PrepararEscalaParaSlot(item.transform, estado);
+                AjustarEscalaAdaptativa(item.transform);
+            }
+
             PosicionarItemNoPontoDoSlot(item.transform);
-            PrepararEscalaParaSlot(item.transform, estado);
-            AjustarEscalaAdaptativa(item.transform);
+            AjustarEscalaVisualFinalNoSlot(item.transform);
+            RegistrarEscalaVisualInventario(item);
+
+            if (debugEscalaInventario)
+            {
+                Vector3 escalaOriginal = ObterEscalaOriginalMundo(item, estado);
+                { }
+            }
         }
 
-        PosicionarItemNoPontoDoSlot(item.transform);
-        AjustarEscalaVisualFinalNoSlot(item.transform);
-        RegistrarEscalaVisualInventario(item);
-        AplicarFatorReducaoVisualInventario(item.transform);
         Physics.SyncTransforms();
     }
 
@@ -817,12 +835,15 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         if (!escalaComp.inicializado || !EscalaValida(escalaComp.escalaOriginal))
         {
-            escalaComp.escalaOriginal = estado.LossyScaleOriginal;
-            escalaComp.inicializado = true;
+            if (EscalaValida(estado.LossyScaleOriginal))
+            {
+                escalaComp.escalaOriginal = estado.LossyScaleOriginal;
+                escalaComp.inicializado = true;
+            }
         }
 
         var itemEscalavel = item.GetComponent<ItemInventarioEscalavel>();
-        if (itemEscalavel != null)
+        if (itemEscalavel != null && EscalaValida(escalaComp.escalaOriginal))
             itemEscalavel.DefinirEscalaOriginalMundo(escalaComp.escalaOriginal);
     }
 
@@ -1019,7 +1040,13 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (pilhaItens.Count > 0)
         {
             if (pilhaItens.Contains(item))
+            {
+                itemGuardado = item;
+                ReancorarItemAtualNoSlot();
+                AtualizarContadorTMP();
+                AtualizarVisibilidadeVisual();
                 return;
+            }
 
             if (!TentarEmpilharItemExtra(item))
                 RejeitarSelecaoDoSocket(item, "item recusado pela pilha");
@@ -1079,7 +1106,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private void OnItemRetirado(SelectExitEventArgs args)
     {
-        if (operacaoInternaSocket || args.isCanceled)
+        // Fechar o inventario desativa temporariamente o XRSocketInteractor.
+        // Essa saida tecnica nao representa uma retirada feita pelo jogador.
+        if (operacaoInternaSocket || args.isCanceled || !inventarioAberto)
             return;
 
         if (ignorarProximoExited)
@@ -1168,7 +1197,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         PosicionarItemNoPontoDoSlot(item.transform);
         PrepararEscalaParaSlot(item.transform, estado);
         AjustarEscalaAdaptativa(item.transform);
-        RegistrarEscalaVisualInventario(item);
     }
 
     private void ReaplicarEscalaBaseRestauradaDoSave(XRGrabInteractable item, EstadoOriginalItem estado)
@@ -1201,7 +1229,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private void RegistrarEscalaVisualInventario(XRGrabInteractable item)
     {
-        if (item == null)
+        if (item == null || !EscalaValida(item.transform.localScale))
             return;
 
         escalasVisuaisInventario[item] = item.transform.localScale;
@@ -1232,6 +1260,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private void GarantirEscalaOriginal(Transform item)
     {
+        if (item == null || !EscalaValida(item.lossyScale))
+            return;
+
         var comp = item.GetComponent<EscalaOriginalItem>();
 
         if (comp == null)
@@ -1273,22 +1304,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
     }
 
-    private void AplicarFatorReducaoVisualInventario(Transform item)
-    {
-        if (item == null)
-            return;
-
-        float fator = Mathf.Clamp(fatorReducaoVisualInventario, 0.01f, 1f);
-        if (Mathf.Approximately(fator, 1f))
-            return;
-
-        item.localScale *= fator;
-
-        var grab = item.GetComponent<XRGrabInteractable>();
-        if (grab != null)
-            grab.SetTargetLocalScale(item.localScale);
-    }
-
     private void AjustarEscalaVisualFinalNoSlot(Transform item)
     {
         if (item == null)
@@ -1312,6 +1327,12 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         Vector3 centro = slotCollider != null ? slotCollider.center : Vector3.zero;
         Vector3 tamanho = slotCollider != null ? slotCollider.size : Vector3.one;
 
+        if (!VetorFinito(centro) || !TamanhoValido(tamanho))
+        {
+            boundsPermitido = default;
+            return false;
+        }
+
         if (TamanhoVisualConfiguradoValido())
         {
             tamanho = tamanhoVisualMaximoSlot;
@@ -1334,7 +1355,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         tamanho *= margem;
-        if (!TamanhoValido(tamanho))
+        if (!VetorFinito(centro) || !TamanhoValido(tamanho))
         {
             boundsPermitido = default;
             return false;
@@ -1360,7 +1381,13 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         bool iniciou = false;
         for (int i = 0; i < cantos.Length; i++)
         {
+            if (!VetorFinito(cantos[i]))
+                continue;
+
             Vector3 pontoLocal = transform.InverseTransformPoint(cantos[i]);
+            if (!VetorFinito(pontoLocal))
+                continue;
+
             if (!iniciou)
             {
                 boundsVisual = new Bounds(pontoLocal, Vector3.zero);
@@ -1372,19 +1399,22 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             }
         }
 
-        return iniciou && TamanhoValido(new Vector3(boundsVisual.size.x, boundsVisual.size.y, 0.01f));
+        return iniciou &&
+               VetorFinito(boundsVisual.center) &&
+               TamanhoValido(new Vector3(boundsVisual.size.x, boundsVisual.size.y, 0.01f));
     }
 
     private bool TamanhoVisualConfiguradoValido()
     {
-        return tamanhoVisualMaximoSlot.x > 0f &&
+        return VetorFinito(tamanhoVisualMaximoSlot) &&
+               tamanhoVisualMaximoSlot.x > 0f &&
                tamanhoVisualMaximoSlot.y > 0f &&
                tamanhoVisualMaximoSlot.z > 0f;
     }
 
     private static bool TamanhoValido(Vector3 tamanho)
     {
-        return tamanho.x > 0f && tamanho.y > 0f && tamanho.z > 0f;
+        return VetorFinito(tamanho) && tamanho.x > 0f && tamanho.y > 0f && tamanho.z > 0f;
     }
 
     private void PrepararEscalaParaSlot(Transform item, EstadoOriginalItem estado)
@@ -1393,6 +1423,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
 
         Vector3 escalaOriginalMundo = ObterEscalaOriginalMundo(item.GetComponent<XRGrabInteractable>(), estado);
+        if (!EscalaValida(escalaOriginalMundo))
+            return;
 
         var escalaComp = item.GetComponent<EscalaOriginalItem>();
         if (escalaComp != null)
@@ -1423,7 +1455,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (estado != null && EscalaValida(estado.LossyScaleOriginal))
             return estado.LossyScaleOriginal;
 
-        return item != null ? item.transform.lossyScale : Vector3.one;
+        Vector3 escalaAtual = item != null ? item.transform.lossyScale : Vector3.one;
+        return EscalaValida(escalaAtual) ? escalaAtual : Vector3.one;
     }
 
     private Vector3 ObterEscalaOriginalMundoDoEstado(XRGrabInteractable item, EstadoOriginalItem estado)
@@ -1437,7 +1470,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private static bool EscalaValida(Vector3 escala)
     {
         const float minimo = 0.0001f;
-        return Mathf.Abs(escala.x) > minimo &&
+        return VetorFinito(escala) &&
+               Mathf.Abs(escala.x) > minimo &&
                Mathf.Abs(escala.y) > minimo &&
                Mathf.Abs(escala.z) > minimo;
     }
@@ -1484,17 +1518,39 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private static float DividirSeguro(float valor, float divisor)
     {
-        return Mathf.Approximately(divisor, 0f) ? valor : valor / divisor;
+        if (!ValorFinito(valor))
+            return 1f;
+
+        if (!ValorFinito(divisor) || Mathf.Approximately(divisor, 0f))
+            return valor;
+
+        float resultado = valor / divisor;
+        return ValorFinito(resultado) ? resultado : valor;
     }
 
     private static Vector3 ConverterEscalaMundoParaLocal(Vector3 escalaMundo, Transform parent)
     {
+        if (!EscalaValida(escalaMundo))
+            return Vector3.one;
+
         Vector3 escalaParent = parent != null ? parent.lossyScale : Vector3.one;
-        return new Vector3(
+        Vector3 escalaLocal = new Vector3(
             DividirSeguro(escalaMundo.x, escalaParent.x),
             DividirSeguro(escalaMundo.y, escalaParent.y),
             DividirSeguro(escalaMundo.z, escalaParent.z)
         );
+
+        return EscalaValida(escalaLocal) ? escalaLocal : Vector3.one;
+    }
+
+    private static bool VetorFinito(Vector3 valor)
+    {
+        return ValorFinito(valor.x) && ValorFinito(valor.y) && ValorFinito(valor.z);
+    }
+
+    private static bool ValorFinito(float valor)
+    {
+        return !float.IsNaN(valor) && !float.IsInfinity(valor);
     }
 
     private void TocarSom(AudioClip clip)
@@ -1569,12 +1625,35 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         AtualizarVisibilidadeVisual();
     }
 
+    private void ReancorarItemAtualNoSlot()
+    {
+        XRGrabInteractable item = itemGuardado != null ? itemGuardado : TopoDaPilha();
+        if (item == null)
+            return;
+
+        itemGuardado = item;
+
+        ParentarItemNoSlot(item);
+        PosicionarItemNoPontoDoSlot(item.transform);
+
+        if (estadosOriginais.TryGetValue(item, out EstadoOriginalItem estado))
+        {
+            TentarAplicarEscalaVisualInventario(item, estado);
+        }
+
+        RegistrarFiltroNoItemGuardado();
+        Physics.SyncTransforms();
+    }
+
     public void SetInventarioAberto(bool aberto)
     {
         inventarioAberto = aberto;
 
         if (aberto)
+        {
             ignorarProximoExited = false;
+            ReancorarItemAtualNoSlot();
+        }
 
         AtualizarVisibilidadeVisual();
     }

@@ -19,7 +19,7 @@ namespace Unity.VRTemplate
             m_SelectInteractable = GetComponent<IXRSelectInteractable>();
             if (m_SelectInteractable as Object == null)
             {
-                Debug.LogError($"Ray Attach Modifier missing required Select Interactable on {name}", this);
+                { }
                 return;
             }
 

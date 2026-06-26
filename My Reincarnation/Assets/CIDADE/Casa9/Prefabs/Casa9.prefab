@@ -5316,52 +5316,6 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4480800297239355216, guid: d6b9a6f80f5f92b459110478179aa185, type: 3}
---- !u!1 &760516191130342060
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7416730655441284397}
-  - component: {fileID: 1261622258199692942}
-  m_Layer: 0
-  m_Name: WindZone
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &7416730655441284397
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 760516191130342060}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.072, y: -0, z: 0.76}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 8219156448290851851}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!182 &1261622258199692942
-WindZone:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 760516191130342060}
-  m_Enabled: 1
-  m_Mode: 1
-  m_Radius: 0.5
-  m_WindMain: 1
-  m_WindTurbulence: 1
-  m_WindPulseMagnitude: 0.5
-  m_WindPulseFrequency: 0.01
 --- !u!1 &845245465016372388
 GameObject:
   m_ObjectHideFlags: 0
@@ -6580,7 +6534,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6730086336141694079}
-  - {fileID: 7416730655441284397}
   - {fileID: 1179254522574747948}
   - {fileID: 435842216972503793}
   m_Father: {fileID: 6160362512347912492}
@@ -11355,7 +11308,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: a9047639596e60d49a5fc7c0918be41b, type: 2}
+  - {fileID: 2100000, guid: 9c0d424683780c24f8e75202b91d943e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -12697,7 +12650,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_BoundingSphereOverride: {x: 4.95e-43, y: 2.1399341e+30, z: 4.95e-43, w: 2.262559e+29}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
@@ -12746,7 +12699,8 @@ GameObject:
   - component: {fileID: 8753888336700267378}
   - component: {fileID: 90720215129754640}
   - component: {fileID: 5807321662983658749}
-  - component: {fileID: 1346346333947299274}
+  - component: {fileID: 6604346008635702319}
+  - component: {fileID: 4910484537630941632}
   - component: {fileID: 360998481994580640}
   m_Layer: 0
   m_Name: wall_wood_door1.004
@@ -12764,8 +12718,8 @@ Transform:
   m_GameObject: {fileID: 3670670322093315541}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.0112543, y: 0.49675745, z: 2.469841}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: -2.9924, y: 0.5334, z: 2.4698}
+  m_LocalScale: {x: 0.96212023, y: 0.9732367, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6019037950887020786}
@@ -12831,8 +12785,35 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &1346346333947299274
-MeshCollider:
+--- !u!54 &6604346008635702319
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3670670322093315541}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 1
+  m_Constraints: 0
+  m_CollisionDetection: 3
+--- !u!65 &4910484537630941632
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -12849,10 +12830,9 @@ MeshCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: -6930984794925110711, guid: c574cc45e2bdcd848be38ef6e5a3f21c, type: 3}
+  serializedVersion: 3
+  m_Size: {x: 0.5991532, y: 1.6844926, z: 0.13180327}
+  m_Center: {x: 0.37771016, y: 0.9232308, z: 1.8030003e-15}
 --- !u!114 &360998481994580640
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12867,15 +12847,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Porta
   dobradicaSuperior: {fileID: 6019037950887020786}
   dobradicaInferior: {fileID: 2847185696559562900}
-  anguloMinimo: -95
-  anguloMaximo: 95
-  inverterDirecao: 0
+  anguloMinimo: -140
+  anguloMaximo: 140
+  inverterDirecao: 1
+  referenciaLadoExterno: {fileID: 0}
   sensibilidadeEmpurrao: 1
   velocidadeAbertura: 120
   amortecimentoMovimento: 8
   tempoParaFechar: 3
   velocidadeRetorno: 90
   anguloAtual: 0
+  debugPorta: 0
 --- !u!1 &3677554059223227617
 GameObject:
   m_ObjectHideFlags: 0
@@ -18651,6 +18633,7 @@ GameObject:
   - component: {fileID: 8681201370464168736}
   - component: {fileID: 1274897511085670641}
   - component: {fileID: 2386737010496429666}
+  - component: {fileID: 3150887374097314710}
   m_Layer: 0
   m_Name: wooden_barrel
   m_TagString: Untagged
@@ -18667,7 +18650,7 @@ Transform:
   m_GameObject: {fileID: 4678681342649132830}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: -4.05, y: 0.1737799, z: 2.98}
+  m_LocalPosition: {x: -4.05, y: 0.59, z: 3.03}
   m_LocalScale: {x: 0.7915425, y: 0.7553178, z: 0.6757297}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -18752,6 +18735,33 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: -7631922094654946258, guid: eea3a0f53c684b74ebdbe0e4b6b20ce3, type: 3}
+--- !u!54 &3150887374097314710
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4678681342649132830}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 2
 --- !u!1 &4680621193561510177
 GameObject:
   m_ObjectHideFlags: 0
@@ -19005,8 +19015,8 @@ Transform:
   m_GameObject: {fileID: 4820171711909157684}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.141, y: 0, z: 0.261}
-  m_LocalScale: {x: 0.7, y: 0.7, z: 0.7}
+  m_LocalPosition: {x: -0.005, y: 0, z: 0.261}
+  m_LocalScale: {x: 2.2457511, y: 1.4245716, z: 2.47373}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8219156448290851851}
@@ -24187,6 +24197,7 @@ GameObject:
   - component: {fileID: 5265764506231339863}
   - component: {fileID: 6544409304815752579}
   - component: {fileID: 6644497464951423247}
+  - component: {fileID: 4372567885204028577}
   m_Layer: 0
   m_Name: wooden_bucket
   m_TagString: Untagged
@@ -24203,7 +24214,7 @@ Transform:
   m_GameObject: {fileID: 5148224562410977249}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: -5.6, y: 0.17377546, z: 1.72}
+  m_LocalPosition: {x: -5.69, y: 0.53, z: 1.72}
   m_LocalScale: {x: 0.7915425, y: 0.7553178, z: 0.6757297}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -24288,6 +24299,33 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: -1759057481834910765, guid: eea3a0f53c684b74ebdbe0e4b6b20ce3, type: 3}
+--- !u!54 &4372567885204028577
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5148224562410977249}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 2
 --- !u!1 &5315244940794144463
 GameObject:
   m_ObjectHideFlags: 0
@@ -29320,7 +29358,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: dcd2df3816e7e7c4f9648f9f6cb6dc19, type: 2}
+  - {fileID: 2100000, guid: 9c0d424683780c24f8e75202b91d943e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -31968,7 +32006,7 @@ GameObject:
   - component: {fileID: 5802449382994005196}
   - component: {fileID: 3557675281658030905}
   - component: {fileID: 1911731248885448100}
-  - component: {fileID: 7705737549662520890}
+  - component: {fileID: 6018601373717973883}
   m_Layer: 0
   m_Name: wall_wood_entry_1m_1.001
   m_TagString: Untagged
@@ -32051,8 +32089,8 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &7705737549662520890
-MeshCollider:
+--- !u!65 &6018601373717973883
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -32069,10 +32107,9 @@ MeshCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 1621934071169275084, guid: c574cc45e2bdcd848be38ef6e5a3f21c, type: 3}
+  serializedVersion: 3
+  m_Size: {x: 1.0000002, y: 0.9621227, z: 0.13313109}
+  m_Center: {x: 0, y: 2.5189338, z: 0}
 --- !u!1 &8074238275354348651
 GameObject:
   m_ObjectHideFlags: 0

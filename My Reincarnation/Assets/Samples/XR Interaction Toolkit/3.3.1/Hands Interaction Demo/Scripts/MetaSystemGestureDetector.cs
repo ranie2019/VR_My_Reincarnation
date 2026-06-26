@@ -152,7 +152,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.Hands
                 UpdateAimFlags((MetaAimFlags)action.ReadValue<int>(), true);
 #endif
 #else
-            Debug.LogWarning("Script requires XR Hands (com.unity.xr.hands) package to monitor Meta Aim Flags. Install using Window > Package Manager or click Fix on the related issue in Edit > Project Settings > XR Plug-in Management > Project Validation.", this);
+            { }
             SetGestureState(SystemGestureState.Ended, true);
 #endif
         }

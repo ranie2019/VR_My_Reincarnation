@@ -107,7 +107,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
                 }
                 else
                 {
-                    Debug.Log($"User has permission for: {permission.permissionId}", this);
+                    { }
                 }
             }
 
@@ -129,7 +129,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             var permission = m_CurrentPlatformPermissionGroup.permissions.Find(p => p.permissionId == permissionStr);
             if (permission == null)
             {
-                Debug.LogWarning($"Permission granted callback received for an unexpected permission request, permission ID {permissionStr}", this);
+                { }
                 return;
             }
 
@@ -137,7 +137,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             permission.granted = true;
             permission.responseReceived = true;
 
-            Debug.Log($"User granted permission for: {permissionStr}", this);
+            { }
             permission.onPermissionGranted.Invoke(permissionStr);
         }
 
@@ -147,7 +147,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             var permission = m_CurrentPlatformPermissionGroup.permissions.Find(p => p.permissionId == permissionStr);
             if (permission == null)
             {
-                Debug.LogWarning($"Permission denied callback received for an unexpected permission request, permission ID {permissionStr}", this);
+                { }
                 return;
             }
 
@@ -155,7 +155,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets
             permission.granted = false;
             permission.responseReceived = true;
 
-            Debug.LogWarning($"User denied permission for: {permissionStr}", this);
+            { }
             permission.onPermissionDenied.Invoke(permissionStr);
         }
     }

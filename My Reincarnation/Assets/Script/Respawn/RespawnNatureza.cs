@@ -15,7 +15,6 @@ public class RespawnNatureza : MonoBehaviour
         public float tempoRespawn = 30f;
         public Vector3 offsetRespawn = Vector3.zero;
         public bool usarRotacaoDaMorte = true;
-        public bool debugRespawn = true;
     }
 
     [Header("Configuracoes de respawn por natureza")]
@@ -25,9 +24,7 @@ public class RespawnNatureza : MonoBehaviour
     {
         if (Instancia != null && Instancia != this)
         {
-            Debug.LogWarning(
-                $"[RespawnNatureza] Existe mais de um RespawnNatureza na cena. Mantendo '{Instancia.name}' e ignorando '{name}'.",
-                this);
+            { }
             enabled = false;
             return;
         }
@@ -62,7 +59,7 @@ public class RespawnNatureza : MonoBehaviour
 
         if (string.IsNullOrWhiteSpace(idNormalizado))
         {
-            Debug.LogWarning("[RespawnNatureza] ID Natureza vazio. Respawn nao sera agendado.", this);
+            { }
             return;
         }
 
@@ -70,13 +67,13 @@ public class RespawnNatureza : MonoBehaviour
 
         if (config == null)
         {
-            Debug.LogWarning($"[RespawnNatureza] Configuracao nao encontrada para ID Natureza: '{idNatureza}'.", this);
+            { }
             return;
         }
 
         if (config.prefabRespawn == null)
         {
-            Debug.LogWarning($"[RespawnNatureza] Prefab Respawn vazio para ID Natureza: '{idNatureza}'.", this);
+            { }
             return;
         }
 
@@ -85,12 +82,6 @@ public class RespawnNatureza : MonoBehaviour
         Quaternion rotacaoFinal = config.usarRotacaoDaMorte
             ? rotacaoMorte
             : config.prefabRespawn.transform.rotation;
-
-        Log(config, "AgendarRespawn chamado.");
-        Log(config, $"ID Natureza: {idNormalizado}");
-        Log(config, $"Posicao da morte: {posicaoMorte}");
-        Log(config, $"Prefab usado: {config.prefabRespawn.name}");
-        Log(config, $"Tempo respawn: {tempoRespawn}");
 
         StartCoroutine(RotinaRespawn(config, idNormalizado, tempoRespawn, posicaoFinal, rotacaoFinal));
     }
@@ -109,14 +100,11 @@ public class RespawnNatureza : MonoBehaviour
 
         if (config.prefabRespawn == null)
         {
-            Debug.LogWarning($"[RespawnNatureza] Respawn cancelado: prefabRespawn ficou null para ID '{idNatureza}'.", this);
+            { }
             yield break;
         }
 
-        GameObject novaNatureza = Instantiate(config.prefabRespawn, posicaoFinal, rotacaoFinal);
-
-        Log(config, $"Instantiate executado: {novaNatureza.name}");
-        Log(config, $"Posicao final: {posicaoFinal}");
+        Instantiate(config.prefabRespawn, posicaoFinal, rotacaoFinal);
     }
 
     private ConfiguracaoRespawnNatureza BuscarConfiguracao(string idNatureza)
@@ -137,11 +125,5 @@ public class RespawnNatureza : MonoBehaviour
         }
 
         return null;
-    }
-
-    private void Log(ConfiguracaoRespawnNatureza config, string mensagem)
-    {
-        if (config != null && config.debugRespawn)
-            Debug.Log($"[RespawnNatureza] {mensagem}", this);
     }
 }

@@ -445,14 +445,14 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.DeviceSimulator
 
             if (!m_Simulator.gameObject.TryGetComponent(out m_DeviceLifecycleManager))
             {
-                Debug.LogError($"Could not find SimulatedDeviceLifecycleManager component on {m_Simulator.name}, disabling simulator UI.");
+                { }
                 gameObject.SetActive(false);
                 return;
             }
 
             if (!m_Simulator.gameObject.TryGetComponent(out m_HandExpressionManager))
             {
-                Debug.LogError($"Could not find SimulatedHandExpressionManager component on {m_Simulator.name}, disabling simulator UI.");
+                { }
                 gameObject.SetActive(false);
                 return;
             }

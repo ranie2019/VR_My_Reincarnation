@@ -191,6 +191,9 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     private void AplicarEscalaLocal(Vector3 escalaLocal)
     {
+        if (!EscalaValida(escalaLocal))
+            return;
+
         transform.localScale = escalaLocal;
 
         var grab = GetComponent<XRGrabInteractable>();
@@ -209,6 +212,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
         foreach (Collider col in colliders)
         {
             if (col == null || !col.enabled || !col.transform.IsChildOf(transform)) continue;
+            if (!BoundsValido(col.bounds)) continue;
 
             EncapsularBoundsNoSlot(slotTransform, col.bounds, ref boundsLocal, ref achou);
         }
@@ -217,6 +221,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
         foreach (Renderer r in renderers)
         {
             if (r == null || !r.transform.IsChildOf(transform)) continue;
+            if (!BoundsValido(r.bounds)) continue;
 
             EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
         }
@@ -233,6 +238,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
         foreach (Renderer r in renderers)
         {
             if (r == null || !r.transform.IsChildOf(transform)) continue;
+            if (!BoundsValido(r.bounds)) continue;
 
             EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
         }
@@ -242,6 +248,9 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     private static void EncapsularBoundsNoSlot(Transform slotTransform, Bounds boundsMundo, ref Bounds boundsLocal, ref bool achou)
     {
+        if (slotTransform == null || !BoundsValido(boundsMundo))
+            return;
+
         Vector3 min = boundsMundo.min;
         Vector3 max = boundsMundo.max;
 
@@ -257,7 +266,13 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     private static void EncapsularPontoNoSlot(Transform slotTransform, Vector3 pontoMundo, ref Bounds boundsLocal, ref bool achou)
     {
+        if (slotTransform == null || !VetorFinito(pontoMundo))
+            return;
+
         Vector3 pontoLocal = slotTransform.InverseTransformPoint(pontoMundo);
+        if (!VetorFinito(pontoLocal))
+            return;
+
         if (!achou)
         {
             boundsLocal = new Bounds(pontoLocal, Vector3.zero);
@@ -271,8 +286,19 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     private void CentralizarNoSlot(Transform slotTransform, Bounds boundsItem, Bounds boundsPermitido)
     {
+        if (slotTransform == null || !BoundsValido(boundsItem) || !BoundsValido(boundsPermitido))
+            return;
+
         Vector3 deslocamentoLocal = boundsPermitido.center - boundsItem.center;
-        transform.position += slotTransform.TransformVector(deslocamentoLocal);
+        Vector3 deslocamentoMundo = slotTransform.TransformVector(deslocamentoLocal);
+        if (!VetorFinito(deslocamentoMundo))
+            return;
+
+        Vector3 novaPosicao = transform.position + deslocamentoMundo;
+        if (!VetorFinito(novaPosicao))
+            return;
+
+        transform.position = novaPosicao;
     }
 
     private static bool BoundsDentroDoPermitido(Bounds boundsItem, Bounds boundsPermitido)
@@ -297,19 +323,43 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     private static bool TamanhoValido(Vector3 tamanho)
     {
-        return tamanho.x > 0f && tamanho.y > 0f && tamanho.z > 0f;
+        return VetorFinito(tamanho) && tamanho.x > 0f && tamanho.y > 0f && tamanho.z > 0f;
     }
 
     private static bool EscalaValida(Vector3 escala)
     {
         const float minimo = 0.0001f;
-        return Mathf.Abs(escala.x) > minimo &&
+        return VetorFinito(escala) &&
+               Mathf.Abs(escala.x) > minimo &&
                Mathf.Abs(escala.y) > minimo &&
                Mathf.Abs(escala.z) > minimo;
     }
 
     private static float DividirSeguro(float valor, float divisor)
     {
-        return Mathf.Approximately(divisor, 0f) ? valor : valor / divisor;
+        if (!ValorFinito(valor))
+            return 1f;
+
+        if (!ValorFinito(divisor) || Mathf.Approximately(divisor, 0f))
+            return valor;
+
+        float resultado = valor / divisor;
+        return ValorFinito(resultado) ? resultado : valor;
+    }
+
+    private static bool BoundsValido(Bounds bounds)
+    {
+        return VetorFinito(bounds.center) && VetorFinito(bounds.size) &&
+               bounds.size.x >= 0f && bounds.size.y >= 0f && bounds.size.z >= 0f;
+    }
+
+    private static bool VetorFinito(Vector3 valor)
+    {
+        return ValorFinito(valor.x) && ValorFinito(valor.y) && ValorFinito(valor.z);
+    }
+
+    private static bool ValorFinito(float valor)
+    {
+        return !float.IsNaN(valor) && !float.IsInfinity(valor);
     }
 }

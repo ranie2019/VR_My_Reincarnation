@@ -29,7 +29,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
             if (_ActionReference != null)
             {
                 bool result = OpenXRInput.TrySetControllerLateLatchAction(_ActionReference.action);
-                Debug.LogFormat("TrySetControllerLateLatchAction returns {0} for action {1}.", result, _ActionReference);
+                { }
             }
         }
 

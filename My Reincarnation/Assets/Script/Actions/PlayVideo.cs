@@ -141,7 +141,7 @@ public class PlayVideo : MonoBehaviour
             else
             {
                 // Registra um erro no console se o shader não for encontrado
-                Debug.LogError("Shader 'Universal Render Pipeline/Unlit' não encontrado! Certifique-se de que o shader está incluído no projeto.");
+                { }
             }
         }
     }

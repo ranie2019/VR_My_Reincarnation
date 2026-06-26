@@ -24,13 +24,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 703153934228275062}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: -0, y: -0, z: 2.99}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4552462647971102318}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!1 &889784534296644387
 GameObject:
   m_ObjectHideFlags: 0
@@ -87,7 +87,7 @@ Transform:
   m_GameObject: {fileID: 3155746811763624712}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: -0, y: -0, z: 2.08}
+  m_LocalPosition: {x: -0, y: -0, z: 2.12}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -149,7 +149,7 @@ Transform:
   m_GameObject: {fileID: 5540559935617218890}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: -0, y: -0, z: 0.35}
+  m_LocalPosition: {x: -0, y: -0, z: 0.4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -295,9 +295,35 @@ MonoBehaviour:
   pratoInferior: {fileID: 2719807122238246198}
   materialAgua: {fileID: 0}
   alturaAguaPrato: 0.03
-  escalaAguaPratoSuperior: 1.1
+  escalaAguaPratoSuperior: 0.8
   escalaAguaPratoMeio: 1.45
-  escalaAguaPratoInferior: 1.8
+  escalaAguaPratoInferior: 2.8
+  deslocamentoVerticalPratoSuperior: 0.02
+  deslocamentoVerticalPratoMeio: 0.02
+  deslocamentoVerticalPratoInferior: 0.02
+  usarRotacaoDoPrato: 1
+  rotacaoAguaPratoSuperior: {x: -90, y: 0, z: 0}
+  rotacaoAguaPratoMeio: {x: -90, y: 0, z: 0}
+  rotacaoAguaPratoInferior: {x: -90, y: 0, z: 0}
+  alturaJatoInicial: 1.2
+  quantidadeParticulasJatoInicial: 220
+  tamanhoParticulaJatoInicial: 0.045
+  velocidadeJatoInicial: 5.5
+  larguraJatoInicial: 0.025
+  gravidadeJatoInicial: 0.35
+  vidaParticulaJatoInicial: 0.45
+  inclinacaoJatoInicial: 0
+  quantidadeParticulasQueda: 260
+  tamanhoParticulaQueda: 0.06
+  velocidadeQueda: 1.8
+  larguraQueda: 1.2
+  gravidadeQueda: 1.4
+  vidaParticulaQueda: 1.1
+  alturaInicioQueda: 0.9
+  raioAreaQueda: 1.4
+  espalharQuedaEmCirculo: 1
+  jatoSempreParaCima: 1
+  usarAlvoParaQueda: 1
   velocidadeAnimacaoUV: 0.05
   intensidadeOndulacao: 0.015
   velocidadeOndulacao: 1.6

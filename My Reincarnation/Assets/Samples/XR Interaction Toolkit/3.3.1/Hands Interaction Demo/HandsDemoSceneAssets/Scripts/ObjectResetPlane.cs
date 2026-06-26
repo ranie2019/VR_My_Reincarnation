@@ -42,7 +42,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.Hands
                 }
                 else
                 {
-                    Debug.LogWarning("Objects To Reset contained a null element. Update the reference or delete the array element of the missing object.", this);
+                    { }
                     m_OriginalPositions.Add(new Pose());
                 }
             }

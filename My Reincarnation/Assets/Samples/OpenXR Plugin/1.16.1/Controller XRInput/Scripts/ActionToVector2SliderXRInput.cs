@@ -19,10 +19,10 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSampleXRInput
         void Start()
         {
             if (m_XAxisSlider == null)
-                Debug.LogWarning("ActionToSlider Monobehaviour started without any associated X-axis slider.  This input won't be reported.", this);
+                { }
 
             if (m_YAxisSlider == null)
-                Debug.LogWarning("ActionToSlider Monobehaviour started without any associated Y-axis slider.  This input won't be reported.", this);
+                { }
 
             m_Graphic = gameObject.GetComponent<Graphic>();
             m_Graphics = gameObject.GetComponentsInChildren<Graphic>();

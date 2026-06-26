@@ -25,7 +25,7 @@ public class ItemDatabaseLocal : MonoBehaviour
     {
         if (Instancia != null && Instancia != this)
         {
-            Debug.LogWarning("[ItemDatabaseLocal] Existe mais de um banco local de itens na cena. Mantendo o primeiro.", this);
+            { }
             enabled = false;
             return;
         }
@@ -89,25 +89,22 @@ public class ItemDatabaseLocal : MonoBehaviour
             if (entrada == null)
             {
                 if (validarCamposObrigatorios)
-                    Debug.LogWarning($"[ItemDatabaseLocal] Entrada vazia no indice {i}.", this);
-
+                    { }
                 continue;
             }
 
             if (string.IsNullOrWhiteSpace(entrada.itemId))
             {
                 if (validarCamposObrigatorios)
-                    Debug.LogWarning($"[ItemDatabaseLocal] itemId vazio no indice {i}.", this);
-
+                    { }
                 continue;
             }
 
             if (validarCamposObrigatorios && entrada.prefab == null)
-                Debug.LogWarning($"[ItemDatabaseLocal] Prefab vazio para itemId: {entrada.itemId.Trim()}", this);
-
+                { }
             string id = entrada.itemId.Trim();
             if (!ids.Add(id))
-                Debug.LogWarning($"[ItemDatabaseLocal] itemId duplicado: {id}", this);
+                { }
         }
     }
 

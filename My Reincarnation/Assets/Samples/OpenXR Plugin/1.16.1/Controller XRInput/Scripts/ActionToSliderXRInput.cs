@@ -13,7 +13,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSampleXRInput
         void Start()
         {
             if (m_Slider == null)
-                Debug.LogWarning("ActionToSliderXRInput MonoBehaviour started without any associated slider. This input will not be reported.", this);
+                { }
 
             m_Graphic = gameObject.GetComponent<Graphic>();
             m_Graphics = gameObject.GetComponentsInChildren<Graphic>();
