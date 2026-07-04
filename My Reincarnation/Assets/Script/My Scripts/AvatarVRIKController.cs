@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Animations.Rigging;
 using UnityEngine.Serialization;
 
 [DisallowMultipleComponent]
@@ -130,14 +132,16 @@ public class AvatarVRIKController : MonoBehaviour
     [SerializeField] private Vector3 offsetPosicaoMaoEsquerda = Vector3.zero;
 
     [Tooltip("Offset local de rotação aplicado ao controle esquerdo.")]
-    [SerializeField] private Vector3 offsetRotacaoMaoEsquerdaEuler = Vector3.zero;
+    [FormerlySerializedAs("offsetRotacaoMaoEsquerdaEuler")]
+    [SerializeField] private Vector3 offsetRotacaoMaoEsquerda = Vector3.zero;
 
     [Header("Offsets da Mão Direita")]
     [Tooltip("Offset local de posição aplicado a partir da rotação do controle direito.")]
     [SerializeField] private Vector3 offsetPosicaoMaoDireita = Vector3.zero;
 
     [Tooltip("Offset local de rotação aplicado ao controle direito.")]
-    [SerializeField] private Vector3 offsetRotacaoMaoDireitaEuler = Vector3.zero;
+    [FormerlySerializedAs("offsetRotacaoMaoDireitaEuler")]
+    [SerializeField] private Vector3 offsetRotacaoMaoDireita = Vector3.zero;
 
     [Header("Cotovelos")]
     [FormerlySerializedAs("distanciaHintCotovelo")]
@@ -197,6 +201,42 @@ public class AvatarVRIKController : MonoBehaviour
     [Tooltip("Usa Animator IK se o avatar for Humanoid e a layer do Animator estiver com IK Pass ativo.")]
     [SerializeField] private bool usarAnimatorIKHumanoidComoFallback = true;
 
+    [Header("Animation Rigging - Bracos VR")]
+    [Tooltip("Quando ativo, usa Two Bone IK para fazer a mao real chegar ao controle VR.")]
+    [SerializeField] private bool usarAnimationRiggingBracos = true;
+
+    [Tooltip("Cria/configura RigBuilder, Rig e Two Bone IK automaticamente quando as referencias estao preenchidas.")]
+    [SerializeField] private bool configurarAnimationRiggingAutomaticamente = true;
+
+    [Tooltip("Se existir um ponto de interacao dentro do controle, usa esse ponto como rastreador da mao.")]
+    [SerializeField] private bool usarPontoInteracaoDoControle = true;
+
+    [Tooltip("Referencia final da mao esquerda no controle VR. Se vazio, sera preenchido automaticamente.")]
+    [SerializeField] private Transform referenciaMaoEsquerdaVR;
+
+    [Tooltip("Referencia final da mao direita no controle VR. Se vazio, sera preenchido automaticamente.")]
+    [SerializeField] private Transform referenciaMaoDireitaVR;
+
+    [SerializeField] private RigBuilder rigBuilderAvatar;
+    [SerializeField] private Rig rigBracosVR;
+    [SerializeField] private TwoBoneIKConstraint ikBracoEsquerdo;
+    [SerializeField] private TwoBoneIKConstraint ikBracoDireito;
+    [SerializeField, Range(0f, 1f)] private float pesoAnimationRiggingBracos = 1f;
+
+    [Header("Movimentacao Direta dos Bracos")]
+    [Tooltip("Modo temporario: targets seguem os controles VR. Se Animation Rigging estiver configurado, o Two Bone IK move os bracos.")]
+    [SerializeField] private bool MovimentacaoDiretaDosBracos = true;
+
+    [SerializeField, Range(0f, 1f)] private float pesoBraco = 1f;
+    [SerializeField, Range(0f, 1f)] private float pesoAnteBraco = 1f;
+    [SerializeField, Range(0f, 1f)] private float pesoMao = 1f;
+    [SerializeField] private bool permitirStretch = true;
+    [SerializeField, Min(1f)] private float limiteStretch = 1.08f;
+
+    [Header("Diagnóstico Visual das Mãos")]
+    [SerializeField] private bool mostrarGizmosMaos = true;
+    [SerializeField] private float tamanhoGizmoMao = 0.06f;
+
     [Header("Status")]
     [Tooltip("Resumo da configuração atual. Este campo é apenas informativo.")]
     [SerializeField, TextArea(10, 25)] private string statusConfiguracao;
@@ -208,21 +248,34 @@ public class AvatarVRIKController : MonoBehaviour
     private const string NomeAlvoMaoDireita = "Alvo_Mao_Direita_IK";
     private const string NomeAlvoCotoveloEsquerdo = "Alvo_Cotovelo_Esquerdo_IK";
     private const string NomeAlvoCotoveloDireito = "Alvo_Cotovelo_Direito_IK";
-    private const string NomeRigArms = "AvatarVR_ArmsRig";
+    private const string NomeRigArms = "Rig_Bracos_VR";
+    private const string NomeIKBracoEsquerdoVR = "IK_Braco_Esquerdo_VR";
+    private const string NomeIKBracoDireitoVR = "IK_Braco_Direito_VR";
 
     private bool animationRiggingDisponivel;
     private bool animatorHumanoidDisponivel;
+    private bool animationRiggingBracosAtivo;
     private Quaternion baseYawAvatar = Quaternion.identity;
     private Quaternion baseRotacaoPescoco = Quaternion.identity;
     private Quaternion baseRotacaoPeito = Quaternion.identity;
     private Quaternion baseRotacaoColuna = Quaternion.identity;
     private bool rotacoesBaseCapturadas;
+    private bool dadosNaturaisBracosCapturados;
+    private Vector3 escalaNaturalBracoEsquerdoSuperior = Vector3.one;
+    private Vector3 escalaNaturalBracoEsquerdoInferior = Vector3.one;
+    private Vector3 escalaNaturalBracoDireitoSuperior = Vector3.one;
+    private Vector3 escalaNaturalBracoDireitoInferior = Vector3.one;
+    private float comprimentoNaturalBracoEsquerdoSuperior;
+    private float comprimentoNaturalBracoEsquerdoInferior;
+    private float comprimentoNaturalBracoDireitoSuperior;
+    private float comprimentoNaturalBracoDireitoInferior;
 
     private void Reset()
     {
         ConfigurarAvatarAutomaticamenteInterno(true);
         AtualizarAlturaVirtualCamera();
         CapturarRotacoesBase();
+        CapturarDadosNaturaisBracos();
         AtualizarStatusConfiguracao();
     }
 
@@ -232,6 +285,7 @@ public class AvatarVRIKController : MonoBehaviour
         ConfigurarAvatarAutomaticamenteInterno(false);
         AtualizarAlturaVirtualCamera();
         CapturarRotacoesBase();
+        CapturarDadosNaturaisBracos();
         AtualizarStatusConfiguracao();
     }
 
@@ -247,6 +301,7 @@ public class AvatarVRIKController : MonoBehaviour
         ConfigurarAvatarAutomaticamenteInterno(true);
         AtualizarAlturaVirtualCamera();
         CapturarRotacoesBase();
+        CapturarDadosNaturaisBracos();
         AtualizarStatusConfiguracao();
     }
 
@@ -255,6 +310,7 @@ public class AvatarVRIKController : MonoBehaviour
     {
         ConfigurarAvatarAutomaticamenteInterno(false);
         CapturarRotacoesBase();
+        CapturarDadosNaturaisBracos();
         AtualizarStatusConfiguracao();
     }
 
@@ -265,6 +321,14 @@ public class AvatarVRIKController : MonoBehaviour
         ConfigurarAnimatorAvatar(sobrescreverCamposPreenchidos);
         ConfigurarOssosAvatar(sobrescreverCamposPreenchidos);
         ConfigurarAlvosIK(sobrescreverCamposPreenchidos);
+        ConfigurarReferenciasMaoVR(sobrescreverCamposPreenchidos);
+        ConfigurarAnimationRiggingBracos(sobrescreverCamposPreenchidos);
+    }
+
+    private void Update()
+    {
+        if (AnimationRiggingBracosPodeControlar())
+            AtualizarAlvosAnimationRiggingBracos();
     }
 
     private void LateUpdate()
@@ -277,11 +341,24 @@ public class AvatarVRIKController : MonoBehaviour
 
         AtualizarRotacaoDoAvatarInteiro();
 
-        if (!usarIK)
+        bool usarTwoBoneIKBracos = AnimationRiggingBracosPodeControlar();
+
+        if (!usarIK && !MovimentacaoDiretaDosBracos && !usarTwoBoneIKBracos)
             return;
 
-        AtualizarAlvosDasMaos();
-        AtualizarAlvosDosCotovelos();
+        if (usarTwoBoneIKBracos)
+        {
+            AtualizarAlvosAnimationRiggingBracos();
+        }
+        else if (MovimentacaoDiretaDosBracos)
+        {
+            AtualizarMovimentacaoDiretaDosBracos();
+        }
+        else
+        {
+            AtualizarAlvosDasMaos();
+            AtualizarAlvosDosCotovelos();
+        }
 
         if (controlarCabeca)
             AtualizarCabecaOpcional();
@@ -292,6 +369,9 @@ public class AvatarVRIKController : MonoBehaviour
 
     private void OnAnimatorIK(int layerIndex)
     {
+        if (MovimentacaoDiretaDosBracos || AnimationRiggingBracosPodeControlar())
+            return;
+
         if (!usarIK || !usarAnimatorIKHumanoidComoFallback || !AnimatorHumanoidValido())
             return;
 
@@ -300,6 +380,32 @@ public class AvatarVRIKController : MonoBehaviour
 
         AplicarAnimatorIK(AvatarIKGoal.LeftHand, AvatarIKHint.LeftElbow, alvoMaoEsquerda, alvoCotoveloEsquerdo);
         AplicarAnimatorIK(AvatarIKGoal.RightHand, AvatarIKHint.RightElbow, alvoMaoDireita, alvoCotoveloDireito);
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (!mostrarGizmosMaos)
+            return;
+
+        DesenharGizmoMao(maoEsquerdaVR, Color.blue, "Controle Esquerdo");
+        DesenharGizmoMao(alvoMaoEsquerda, Color.cyan, "Alvo Mão Esquerda");
+
+        DesenharGizmoMao(maoDireitaVR, Color.red, "Controle Direito");
+        DesenharGizmoMao(alvoMaoDireita, Color.magenta, "Alvo Mão Direita");
+    }
+
+    private void DesenharGizmoMao(Transform alvo, Color cor, string nome)
+    {
+        if (alvo == null)
+            return;
+
+        Gizmos.color = cor;
+        Gizmos.DrawSphere(alvo.position, tamanhoGizmoMao);
+
+        Gizmos.DrawLine(
+            alvo.position,
+            alvo.position + alvo.forward * tamanhoGizmoMao * 3f
+        );
     }
 
     private void AtualizarAlturaVirtualCamera()
@@ -486,28 +592,894 @@ public class AvatarVRIKController : MonoBehaviour
         return criado.transform;
     }
 
+    private void ConfigurarReferenciasMaoVR(bool sobrescrever)
+    {
+        if (sobrescrever || referenciaMaoEsquerdaVR == null)
+            referenciaMaoEsquerdaVR = ObterReferenciaPreferidaControle(maoEsquerdaVR) ?? referenciaMaoEsquerdaVR;
+
+        if (sobrescrever || referenciaMaoDireitaVR == null)
+            referenciaMaoDireitaVR = ObterReferenciaPreferidaControle(maoDireitaVR) ?? referenciaMaoDireitaVR;
+    }
+
+    private Transform ObterReferenciaPreferidaControle(Transform controle)
+    {
+        if (controle == null)
+            return null;
+
+        if (!usarPontoInteracaoDoControle)
+            return controle;
+
+        Transform pontoInteracao =
+            ProcurarFilhoPorNome(controle, "Poke Point") ??
+            ProcurarFilhoPorNome(controle, "Interaction Attach") ??
+            ProcurarFilhoPorNome(controle, "InteractionAttach") ??
+            ProcurarFilhoPorNome(controle, "Ray Origin") ??
+            ProcurarFilhoPorNome(controle, "Laser Origin") ??
+            ProcurarFilhoPorNome(controle, "Line Visual") ??
+            ProcurarFilhoPorNome(controle, "LineVisual");
+
+        return pontoInteracao != null ? pontoInteracao : controle;
+    }
+
+    private Transform ObterReferenciaMaoAtual(bool esquerdo)
+    {
+        Transform referencia = esquerdo ? referenciaMaoEsquerdaVR : referenciaMaoDireitaVR;
+        if (referencia != null)
+            return referencia;
+
+        Transform controle = esquerdo ? maoEsquerdaVR : maoDireitaVR;
+        referencia = ObterReferenciaPreferidaControle(controle);
+
+        if (esquerdo)
+            referenciaMaoEsquerdaVR = referencia;
+        else
+            referenciaMaoDireitaVR = referencia;
+
+        return referencia;
+    }
+
+    private void ConfigurarAnimationRiggingBracos(bool sobrescrever)
+    {
+        animationRiggingBracosAtivo = false;
+
+        if (!usarAnimationRiggingBracos || animatorAvatar == null)
+            return;
+
+        bool podeCriar = configurarAnimationRiggingAutomaticamente;
+
+        if (sobrescrever || rigBuilderAvatar == null)
+            rigBuilderAvatar = animatorAvatar.GetComponent<RigBuilder>();
+
+        if (rigBuilderAvatar == null && podeCriar)
+            rigBuilderAvatar = animatorAvatar.gameObject.AddComponent<RigBuilder>();
+
+        if (rigBuilderAvatar == null)
+            return;
+
+        rigBuilderAvatar.enabled = true;
+
+        if (sobrescrever || rigBracosVR == null)
+            rigBracosVR = ObterRigBracosExistente();
+
+        if (rigBracosVR == null && podeCriar)
+        {
+            Transform rigTransform = ObterOuCriarFilhoDireto(animatorAvatar.transform, NomeRigArms);
+            rigBracosVR = rigTransform.GetComponent<Rig>();
+
+            if (rigBracosVR == null)
+                rigBracosVR = rigTransform.gameObject.AddComponent<Rig>();
+        }
+
+        if (rigBracosVR == null)
+            return;
+
+        rigBracosVR.enabled = true;
+        rigBracosVR.weight = pesoAnimationRiggingBracos;
+        RegistrarRigNoBuilder();
+
+        bool esquerdoConfigurado = ConfigurarTwoBoneIK(
+            ref ikBracoEsquerdo,
+            NomeIKBracoEsquerdoVR,
+            bracoEsquerdoSuperior,
+            bracoEsquerdoInferior,
+            maoEsquerdaOsso,
+            alvoMaoEsquerda,
+            alvoCotoveloEsquerdo,
+            sobrescrever,
+            podeCriar
+        );
+
+        bool direitoConfigurado = ConfigurarTwoBoneIK(
+            ref ikBracoDireito,
+            NomeIKBracoDireitoVR,
+            bracoDireitoSuperior,
+            bracoDireitoInferior,
+            maoDireitaOsso,
+            alvoMaoDireita,
+            alvoCotoveloDireito,
+            sobrescrever,
+            podeCriar
+        );
+
+        animationRiggingBracosAtivo = esquerdoConfigurado && direitoConfigurado;
+
+        if (animationRiggingBracosAtivo && Application.isPlaying)
+        {
+            rigBuilderAvatar.Clear();
+            rigBuilderAvatar.Build();
+        }
+    }
+
+    private Rig ObterRigBracosExistente()
+    {
+        Transform raizBusca = animatorAvatar != null ? animatorAvatar.transform : raizAvatar;
+        if (raizBusca == null)
+            return null;
+
+        Transform rigTransform = ProcurarFilhoPorNome(raizBusca, NomeRigArms);
+        return rigTransform != null ? rigTransform.GetComponent<Rig>() : null;
+    }
+
+    private Transform ObterOuCriarFilhoDireto(Transform pai, string nome)
+    {
+        if (pai == null)
+            return null;
+
+        for (int i = 0; i < pai.childCount; i++)
+        {
+            Transform filho = pai.GetChild(i);
+            if (filho != null && string.Equals(filho.name, nome, StringComparison.Ordinal))
+                return filho;
+        }
+
+        GameObject criado = new GameObject(nome);
+        criado.transform.SetParent(pai, false);
+        return criado.transform;
+    }
+
+    private void RegistrarRigNoBuilder()
+    {
+        if (rigBuilderAvatar == null || rigBracosVR == null)
+            return;
+
+        List<RigLayer> layers = rigBuilderAvatar.layers;
+
+        for (int i = 0; i < layers.Count; i++)
+        {
+            RigLayer layer = layers[i];
+            if (layer != null && layer.rig == rigBracosVR)
+            {
+                layer.active = true;
+                return;
+            }
+        }
+
+        layers.Add(new RigLayer(rigBracosVR, true));
+    }
+
+    private bool ConfigurarTwoBoneIK(
+        ref TwoBoneIKConstraint constraint,
+        string nomeObjeto,
+        Transform root,
+        Transform mid,
+        Transform tip,
+        Transform target,
+        Transform hint,
+        bool sobrescrever,
+        bool podeCriar
+    )
+    {
+        if (root == null || mid == null || tip == null || target == null)
+            return false;
+
+        if (sobrescrever || constraint == null)
+            constraint = EncontrarTwoBoneIK(nomeObjeto, tip, target);
+
+        if (constraint == null && podeCriar && rigBracosVR != null)
+        {
+            Transform constraintTransform = ObterOuCriarFilhoDireto(rigBracosVR.transform, nomeObjeto);
+            constraint = constraintTransform.GetComponent<TwoBoneIKConstraint>();
+
+            if (constraint == null)
+                constraint = constraintTransform.gameObject.AddComponent<TwoBoneIKConstraint>();
+        }
+
+        if (constraint == null)
+            return false;
+
+        constraint.enabled = true;
+        constraint.weight = 1f;
+        ref TwoBoneIKConstraintData data = ref constraint.data;
+        data.root = root;
+        data.mid = mid;
+        data.tip = tip;
+        data.target = target;
+        data.hint = hint;
+        data.targetPositionWeight = 1f;
+        data.targetRotationWeight = 1f;
+        data.hintWeight = hint != null ? 1f : 0f;
+        data.maintainTargetPositionOffset = false;
+        data.maintainTargetRotationOffset = false;
+
+        return ConstraintTwoBoneIKConfigurado(constraint, root, mid, tip, target);
+    }
+
+    private TwoBoneIKConstraint EncontrarTwoBoneIK(string nomeObjeto, Transform tip, Transform target)
+    {
+        Transform raizBusca = raizAvatar != null ? raizAvatar : transform;
+        TwoBoneIKConstraint[] constraints = raizBusca.GetComponentsInChildren<TwoBoneIKConstraint>(true);
+
+        for (int i = 0; i < constraints.Length; i++)
+        {
+            TwoBoneIKConstraint constraint = constraints[i];
+            if (constraint != null && string.Equals(constraint.gameObject.name, nomeObjeto, StringComparison.Ordinal))
+                return constraint;
+        }
+
+        for (int i = 0; i < constraints.Length; i++)
+        {
+            TwoBoneIKConstraint constraint = constraints[i];
+            if (constraint == null)
+                continue;
+
+            if ((tip != null && constraint.data.tip == tip) ||
+                (target != null && constraint.data.target == target))
+            {
+                return constraint;
+            }
+        }
+
+        return null;
+    }
+
+    private bool ConstraintTwoBoneIKConfigurado(TwoBoneIKConstraint constraint, Transform root, Transform mid, Transform tip, Transform target)
+    {
+        if (constraint == null)
+            return false;
+
+        if (root == null || mid == null || tip == null || target == null)
+            return false;
+
+        return constraint.data.root == root &&
+               constraint.data.mid == mid &&
+               constraint.data.tip == tip &&
+               constraint.data.target == target &&
+               constraint.data.targetPositionWeight > 0.999f &&
+               constraint.data.targetRotationWeight > 0.999f;
+    }
+
+    private bool AnimationRiggingBracosPodeControlar()
+    {
+        if (!usarIK || !MovimentacaoDiretaDosBracos || !usarAnimationRiggingBracos)
+            return false;
+
+        if (rigBuilderAvatar == null || rigBracosVR == null)
+            return false;
+
+        if (!rigBuilderAvatar.enabled || !rigBuilderAvatar.gameObject.activeInHierarchy)
+            return false;
+
+        if (!rigBracosVR.enabled || !rigBracosVR.gameObject.activeInHierarchy || rigBracosVR.weight <= 0f)
+            return false;
+
+        bool esquerdoAtivo = ConstraintTwoBoneIKAtivo(ikBracoEsquerdo, alvoMaoEsquerda);
+        bool direitoAtivo = ConstraintTwoBoneIKAtivo(ikBracoDireito, alvoMaoDireita);
+
+        animationRiggingBracosAtivo = esquerdoAtivo && direitoAtivo;
+        return animationRiggingBracosAtivo;
+    }
+
+    private bool ConstraintTwoBoneIKAtivo(TwoBoneIKConstraint constraint, Transform targetEsperado)
+    {
+        if (constraint == null || !constraint.enabled || !constraint.gameObject.activeInHierarchy)
+            return false;
+
+        if (constraint.weight <= 0f || targetEsperado == null)
+            return false;
+
+        if (constraint.data.target != targetEsperado)
+            return false;
+
+        return constraint.IsValid();
+    }
+
     private void AtualizarAlvosDasMaos()
     {
-        AtualizarAlvoMao(maoEsquerdaVR, alvoMaoEsquerda, offsetPosicaoMaoEsquerda, offsetRotacaoMaoEsquerdaEuler);
-        AtualizarAlvoMao(maoDireitaVR, alvoMaoDireita, offsetPosicaoMaoDireita, offsetRotacaoMaoDireitaEuler);
+        AtualizarAlvoMao(maoEsquerdaVR, alvoMaoEsquerda, offsetPosicaoMaoEsquerda, offsetRotacaoMaoEsquerda);
+        AtualizarAlvoMao(maoDireitaVR, alvoMaoDireita, offsetPosicaoMaoDireita, offsetRotacaoMaoDireita);
+    }
+
+    private void AtualizarAlvosAnimationRiggingBracos()
+    {
+        AtualizarAlvoMaoInstantaneo(
+            ObterReferenciaMaoAtual(true),
+            alvoMaoEsquerda,
+            offsetPosicaoMaoEsquerda,
+            offsetRotacaoMaoEsquerda
+        );
+
+        AtualizarAlvoMaoInstantaneo(
+            ObterReferenciaMaoAtual(false),
+            alvoMaoDireita,
+            offsetPosicaoMaoDireita,
+            offsetRotacaoMaoDireita
+        );
+
+        AtualizarStretchParaAnimationRigging(true);
+        AtualizarStretchParaAnimationRigging(false);
+        AtualizarAlvoCotoveloParaRigging(true);
+        AtualizarAlvoCotoveloParaRigging(false);
+
+        if (rigBuilderAvatar != null)
+            rigBuilderAvatar.SyncLayers();
+    }
+
+    private void AtualizarAlvoMaoInstantaneo(Transform controle, Transform alvo, Vector3 offsetPosicao, Vector3 offsetRotacaoEuler)
+    {
+        if (alvo == null || !TentarObterPoseMao(controle, offsetPosicao, offsetRotacaoEuler, out Vector3 posicaoAlvo, out Quaternion rotacaoAlvo))
+            return;
+
+        alvo.SetPositionAndRotation(posicaoAlvo, rotacaoAlvo);
+    }
+
+    private void AtualizarStretchParaAnimationRigging(bool esquerdo)
+    {
+        Transform bracoSuperior = esquerdo ? bracoEsquerdoSuperior : bracoDireitoSuperior;
+        Transform anteBraco = esquerdo ? bracoEsquerdoInferior : bracoDireitoInferior;
+        Transform maoOsso = esquerdo ? maoEsquerdaOsso : maoDireitaOsso;
+        Transform alvoMao = esquerdo ? alvoMaoEsquerda : alvoMaoDireita;
+
+        if (bracoSuperior == null || anteBraco == null || alvoMao == null)
+            return;
+
+        GarantirDadosNaturaisBracos();
+
+        float comprimentoBraco = ObterComprimentoNaturalBracoSuperior(bracoSuperior, anteBraco);
+        float comprimentoAnteBraco = ObterComprimentoNaturalAnteBraco(anteBraco, maoOsso, alvoMao.position);
+        float fatorStretch = CalcularFatorStretch(bracoSuperior.position, alvoMao.position, comprimentoBraco, comprimentoAnteBraco);
+
+        AplicarStretchVisual(bracoSuperior, anteBraco, fatorStretch);
     }
 
     private void AtualizarAlvoMao(Transform controle, Transform alvo, Vector3 offsetPosicao, Vector3 offsetRotacaoEuler)
     {
-        if (controle == null || alvo == null)
+        if (alvo == null || !TentarObterPoseMao(controle, offsetPosicao, offsetRotacaoEuler, out Vector3 posicaoAlvo, out Quaternion rotacaoAlvo))
             return;
-
-        Vector3 posicaoAlvo = controle.position + controle.rotation * offsetPosicao;
-        Quaternion rotacaoAlvo = controle.rotation * Quaternion.Euler(offsetRotacaoEuler);
 
         alvo.position = Vector3.Lerp(alvo.position, posicaoAlvo, FatorSuavizacao(suavidadeMao));
         alvo.rotation = Quaternion.Slerp(alvo.rotation, rotacaoAlvo, FatorSuavizacao(suavidadeRotacaoMao));
+    }
+
+    private bool TentarObterPoseMao(Transform controle, Vector3 offsetPosicao, Vector3 offsetRotacao, out Vector3 posicaoAlvo, out Quaternion rotacaoAlvo)
+    {
+        posicaoAlvo = Vector3.zero;
+        rotacaoAlvo = Quaternion.identity;
+
+        if (controle == null)
+            return false;
+
+        posicaoAlvo = offsetPosicao.sqrMagnitude > 0.0000001f
+            ? controle.TransformPoint(offsetPosicao)
+            : controle.position;
+        rotacaoAlvo = controle.rotation * Quaternion.Euler(offsetRotacao);
+        return true;
+    }
+
+    private void AtualizarMovimentacaoDiretaDosBracos()
+    {
+        AtualizarBracoDireto(
+            bracoEsquerdoSuperior,
+            bracoEsquerdoInferior,
+            maoEsquerdaOsso,
+            maoEsquerdaVR,
+            ref alvoMaoEsquerda,
+            ref alvoCotoveloEsquerdo,
+            offsetPosicaoMaoEsquerda,
+            offsetRotacaoMaoEsquerda,
+            pesoBraco,
+            pesoAnteBraco,
+            pesoMao
+        );
+
+        AtualizarBracoDireto(
+            bracoDireitoSuperior,
+            bracoDireitoInferior,
+            maoDireitaOsso,
+            maoDireitaVR,
+            ref alvoMaoDireita,
+            ref alvoCotoveloDireito,
+            offsetPosicaoMaoDireita,
+            offsetRotacaoMaoDireita,
+            pesoBraco,
+            pesoAnteBraco,
+            pesoMao
+        );
+    }
+
+    private void AtualizarBracoDireto(
+        Transform bracoSuperior,
+        Transform anteBraco,
+        Transform maoOsso,
+        Transform controleVR,
+        ref Transform alvoMao,
+        ref Transform alvoCotovelo,
+        Vector3 offsetPosicaoMao,
+        Vector3 offsetRotacaoMao,
+        float pesoBraco,
+        float pesoAnteBraco,
+        float pesoMao
+    )
+    {
+        bool twoBoneIKAtivo = TentarSincronizarComTwoBoneIKAtivo(bracoSuperior, anteBraco, maoOsso, ref alvoMao, ref alvoCotovelo);
+
+        if (!TentarObterPoseMao(controleVR, offsetPosicaoMao, offsetRotacaoMao, out Vector3 posicaoMaoAlvo, out Quaternion rotacaoMaoAlvo))
+            return;
+
+        if (alvoMao != null)
+        {
+            alvoMao.position = posicaoMaoAlvo;
+            alvoMao.rotation = rotacaoMaoAlvo;
+        }
+
+        Vector3 destinoMao = alvoMao != null ? alvoMao.position : posicaoMaoAlvo;
+
+        if (twoBoneIKAtivo)
+        {
+            RestaurarStretchNatural(bracoSuperior, anteBraco);
+            return;
+        }
+
+        if (bracoSuperior != null && anteBraco != null)
+        {
+            GarantirDadosNaturaisBracos();
+            float comprimentoBraco = ObterComprimentoNaturalBracoSuperior(bracoSuperior, anteBraco);
+            float comprimentoAnteBraco = ObterComprimentoNaturalAnteBraco(anteBraco, maoOsso, destinoMao);
+            float fatorStretch = CalcularFatorStretch(bracoSuperior.position, destinoMao, comprimentoBraco, comprimentoAnteBraco);
+
+            AplicarStretchVisual(bracoSuperior, anteBraco, fatorStretch);
+
+            float comprimentoBracoEsticado = comprimentoBraco * fatorStretch;
+            float comprimentoAnteBracoEsticado = comprimentoAnteBraco * fatorStretch;
+
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 posicaoCotovelo = CalcularPosicaoCotoveloEstavel(bracoSuperior, anteBraco, alvoCotovelo, destinoMao, comprimentoBracoEsticado, comprimentoAnteBracoEsticado);
+
+                bool bracoAlinhado = AplicarRotacaoParaAlinharFilho(bracoSuperior, anteBraco, posicaoCotovelo, pesoBraco);
+                bool antebracoAlinhado = AplicarRotacaoParaAlinharFilho(anteBraco, maoOsso, destinoMao, pesoAnteBraco);
+
+                if (!bracoAlinhado)
+                    AplicarLookRotationDireto(bracoSuperior, posicaoCotovelo - bracoSuperior.position, pesoBraco);
+
+                if (!antebracoAlinhado)
+                    AplicarLookRotationDireto(anteBraco, destinoMao - anteBraco.position, pesoAnteBraco);
+            }
+
+            AplicarRotacaoMaoNoControle(maoOsso, rotacaoMaoAlvo, pesoMao);
+        }
+        else if (anteBraco != null)
+        {
+            RestaurarStretchNatural(bracoSuperior, anteBraco);
+            if (!AplicarRotacaoParaAlinharFilho(anteBraco, maoOsso, destinoMao, pesoAnteBraco))
+                AplicarLookRotationDireto(anteBraco, destinoMao - anteBraco.position, pesoAnteBraco);
+
+            AplicarRotacaoMaoNoControle(maoOsso, rotacaoMaoAlvo, pesoMao);
+        }
+    }
+
+    private Vector3 CalcularPosicaoCotoveloEstavel(Transform bracoSuperior, Transform anteBraco, Transform alvoCotovelo, Vector3 posicaoMaoAlvo, float comprimentoBraco, float comprimentoAnteBraco)
+    {
+        Vector3 posicaoOmbro = bracoSuperior.position;
+        Vector3 direcaoOmbroMao = posicaoMaoAlvo - posicaoOmbro;
+        float distanciaOmbroMao = direcaoOmbroMao.magnitude;
+
+        if (distanciaOmbroMao < 0.0001f)
+            return anteBraco.position;
+
+        if (comprimentoBraco < 0.0001f)
+            comprimentoBraco = distanciaOmbroMao * 0.5f;
+
+        if (comprimentoAnteBraco < 0.0001f)
+            comprimentoAnteBraco = distanciaOmbroMao * 0.5f;
+
+        Vector3 direcaoNormalizada = direcaoOmbroMao / distanciaOmbroMao;
+        float alcanceMaximo = Mathf.Max(0.0001f, comprimentoBraco + comprimentoAnteBraco - 0.0001f);
+        float alcanceMinimo = Mathf.Max(0.0001f, Mathf.Abs(comprimentoBraco - comprimentoAnteBraco) + 0.0001f);
+        float distanciaCalculo = Mathf.Clamp(distanciaOmbroMao, alcanceMinimo, alcanceMaximo);
+
+        Vector3 direcaoDobra = ObterDirecaoDobraCotovelo(posicaoOmbro, direcaoNormalizada, anteBraco, alvoCotovelo);
+        float distanciaAoLongo = (comprimentoBraco * comprimentoBraco - comprimentoAnteBraco * comprimentoAnteBraco + distanciaCalculo * distanciaCalculo) / (2f * distanciaCalculo);
+        float distanciaLateral = Mathf.Sqrt(Mathf.Max(0f, comprimentoBraco * comprimentoBraco - distanciaAoLongo * distanciaAoLongo));
+
+        return posicaoOmbro + direcaoNormalizada * distanciaAoLongo + direcaoDobra * distanciaLateral;
+    }
+
+    private Vector3 ObterDirecaoDobraCotovelo(Vector3 posicaoOmbro, Vector3 direcaoOmbroMao, Transform anteBraco, Transform alvoCotovelo)
+    {
+        Vector3 direcaoHint = Vector3.zero;
+
+        if (alvoCotovelo != null)
+            direcaoHint = alvoCotovelo.position - posicaoOmbro;
+
+        direcaoHint = Vector3.ProjectOnPlane(direcaoHint, direcaoOmbroMao);
+
+        if (direcaoHint.sqrMagnitude < 0.0001f && anteBraco != null)
+            direcaoHint = Vector3.ProjectOnPlane(anteBraco.position - posicaoOmbro, direcaoOmbroMao);
+
+        if (direcaoHint.sqrMagnitude < 0.0001f)
+            direcaoHint = Vector3.ProjectOnPlane(ObterDireitaCorpo(), direcaoOmbroMao);
+
+        if (direcaoHint.sqrMagnitude < 0.0001f)
+            direcaoHint = Vector3.ProjectOnPlane(raizAvatar != null ? raizAvatar.up : transform.up, direcaoOmbroMao);
+
+        return direcaoHint.sqrMagnitude > 0.0001f ? direcaoHint.normalized : Vector3.up;
+    }
+
+    private bool TentarSincronizarComTwoBoneIKAtivo(Transform bracoSuperior, Transform anteBraco, Transform maoOsso, ref Transform alvoMao, ref Transform alvoCotovelo)
+    {
+        if (!AnimationRiggingEstaDisponivel())
+            return false;
+
+        Transform raizBusca = raizAvatar != null ? raizAvatar : transform;
+        Component[] componentes = raizBusca.GetComponentsInChildren<Component>(true);
+
+        for (int i = 0; i < componentes.Length; i++)
+        {
+            Component componente = componentes[i];
+            if (!ComponenteTwoBoneIKAtivo(componente))
+                continue;
+
+            object dados = ObterValorMembro(componente, "data") ?? ObterValorMembro(componente, "m_Data");
+            Transform root = ObterTransformMembro(dados, "root") ?? ObterTransformMembro(dados, "m_Root");
+            Transform mid = ObterTransformMembro(dados, "mid") ?? ObterTransformMembro(dados, "m_Mid");
+            Transform tip = ObterTransformMembro(dados, "tip") ?? ObterTransformMembro(dados, "m_Tip");
+            Transform target = ObterTransformMembro(dados, "target") ?? ObterTransformMembro(dados, "m_Target");
+            Transform hint = ObterTransformMembro(dados, "hint") ?? ObterTransformMembro(dados, "m_Hint");
+
+            if (!ConstraintPertenceAoBraco(root, mid, tip, target, bracoSuperior, anteBraco, maoOsso, alvoMao))
+                continue;
+
+            if (target == null)
+                continue;
+
+            alvoMao = target;
+
+            if (hint != null)
+                alvoCotovelo = hint;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool ComponenteTwoBoneIKAtivo(Component componente)
+    {
+        if (componente == null)
+            return false;
+
+        Type tipo = componente.GetType();
+        if (tipo.FullName != "UnityEngine.Animations.Rigging.TwoBoneIKConstraint" &&
+            tipo.Name != "TwoBoneIKConstraint")
+        {
+            return false;
+        }
+
+        if (componente is Behaviour behaviour && (!behaviour.enabled || !behaviour.gameObject.activeInHierarchy))
+            return false;
+
+        float pesoConstraint = ObterFloatMembro(componente, "weight", 1f);
+        return pesoConstraint > 0f && RigAnimationRiggingAtivo(componente.transform);
+    }
+
+    private bool RigAnimationRiggingAtivo(Transform origem)
+    {
+        bool rigAtivo = false;
+        bool rigBuilderAtivo = false;
+
+        Transform atual = origem;
+        while (atual != null)
+        {
+            Component[] componentes = atual.GetComponents<Component>();
+            for (int i = 0; i < componentes.Length; i++)
+            {
+                Component componente = componentes[i];
+                if (componente == null)
+                    continue;
+
+                Type tipo = componente.GetType();
+                bool componenteAtivo = !(componente is Behaviour behaviour) || (behaviour.enabled && behaviour.gameObject.activeInHierarchy);
+                float peso = ObterFloatMembro(componente, "weight", 1f);
+
+                if (tipo.FullName == "UnityEngine.Animations.Rigging.Rig" || tipo.Name == "Rig")
+                    rigAtivo |= componenteAtivo && peso > 0f;
+
+                if (tipo.FullName == "UnityEngine.Animations.Rigging.RigBuilder" || tipo.Name == "RigBuilder")
+                    rigBuilderAtivo |= componenteAtivo;
+            }
+
+            atual = atual.parent;
+        }
+
+        return rigAtivo && rigBuilderAtivo;
+    }
+
+    private bool ConstraintPertenceAoBraco(Transform root, Transform mid, Transform tip, Transform target, Transform bracoSuperior, Transform anteBraco, Transform maoOsso, Transform alvoMao)
+    {
+        if (tip != null && maoOsso != null && tip == maoOsso)
+            return true;
+
+        if (mid != null && anteBraco != null && mid == anteBraco)
+            return true;
+
+        if (root != null && bracoSuperior != null && root == bracoSuperior)
+            return true;
+
+        if (target != null && alvoMao != null && target == alvoMao)
+            return true;
+
+        return false;
+    }
+
+    private object ObterValorMembro(object objeto, string nome)
+    {
+        if (objeto == null || string.IsNullOrEmpty(nome))
+            return null;
+
+        Type tipo = objeto.GetType();
+        const System.Reflection.BindingFlags flags =
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic;
+
+        System.Reflection.PropertyInfo propriedade = tipo.GetProperty(nome, flags);
+        if (propriedade != null)
+            return propriedade.GetValue(objeto, null);
+
+        System.Reflection.FieldInfo campo = tipo.GetField(nome, flags);
+        return campo != null ? campo.GetValue(objeto) : null;
+    }
+
+    private Transform ObterTransformMembro(object objeto, string nome)
+    {
+        return ObterValorMembro(objeto, nome) as Transform;
+    }
+
+    private float ObterFloatMembro(object objeto, string nome, float valorPadrao)
+    {
+        object valor = ObterValorMembro(objeto, nome);
+        return valor is float numero ? numero : valorPadrao;
+    }
+
+    private void GarantirDadosNaturaisBracos()
+    {
+        if (!dadosNaturaisBracosCapturados ||
+            comprimentoNaturalBracoEsquerdoSuperior <= 0f ||
+            comprimentoNaturalBracoEsquerdoInferior <= 0f ||
+            comprimentoNaturalBracoDireitoSuperior <= 0f ||
+            comprimentoNaturalBracoDireitoInferior <= 0f)
+        {
+            CapturarDadosNaturaisBracos();
+        }
+    }
+
+    private void CapturarDadosNaturaisBracos()
+    {
+        escalaNaturalBracoEsquerdoSuperior = bracoEsquerdoSuperior != null ? bracoEsquerdoSuperior.localScale : Vector3.one;
+        escalaNaturalBracoEsquerdoInferior = bracoEsquerdoInferior != null ? bracoEsquerdoInferior.localScale : Vector3.one;
+        escalaNaturalBracoDireitoSuperior = bracoDireitoSuperior != null ? bracoDireitoSuperior.localScale : Vector3.one;
+        escalaNaturalBracoDireitoInferior = bracoDireitoInferior != null ? bracoDireitoInferior.localScale : Vector3.one;
+
+        comprimentoNaturalBracoEsquerdoSuperior = MedirComprimentoOsso(bracoEsquerdoSuperior, bracoEsquerdoInferior);
+        comprimentoNaturalBracoEsquerdoInferior = MedirComprimentoOsso(bracoEsquerdoInferior, maoEsquerdaOsso);
+        comprimentoNaturalBracoDireitoSuperior = MedirComprimentoOsso(bracoDireitoSuperior, bracoDireitoInferior);
+        comprimentoNaturalBracoDireitoInferior = MedirComprimentoOsso(bracoDireitoInferior, maoDireitaOsso);
+
+        dadosNaturaisBracosCapturados = true;
+    }
+
+    private float MedirComprimentoOsso(Transform inicio, Transform fim)
+    {
+        if (inicio == null || fim == null)
+            return 0f;
+
+        return Vector3.Distance(inicio.position, fim.position);
+    }
+
+    private float ObterComprimentoNaturalBracoSuperior(Transform bracoSuperior, Transform anteBraco)
+    {
+        if (bracoSuperior == bracoEsquerdoSuperior && comprimentoNaturalBracoEsquerdoSuperior > 0f)
+            return comprimentoNaturalBracoEsquerdoSuperior;
+
+        if (bracoSuperior == bracoDireitoSuperior && comprimentoNaturalBracoDireitoSuperior > 0f)
+            return comprimentoNaturalBracoDireitoSuperior;
+
+        return MedirComprimentoOsso(bracoSuperior, anteBraco);
+    }
+
+    private float ObterComprimentoNaturalAnteBraco(Transform anteBraco, Transform maoOsso, Vector3 destinoMao)
+    {
+        if (anteBraco == bracoEsquerdoInferior && comprimentoNaturalBracoEsquerdoInferior > 0f)
+            return comprimentoNaturalBracoEsquerdoInferior;
+
+        if (anteBraco == bracoDireitoInferior && comprimentoNaturalBracoDireitoInferior > 0f)
+            return comprimentoNaturalBracoDireitoInferior;
+
+        if (anteBraco != null && maoOsso != null)
+            return Vector3.Distance(anteBraco.position, maoOsso.position);
+
+        return anteBraco != null ? Vector3.Distance(anteBraco.position, destinoMao) : 0f;
+    }
+
+    private float CalcularFatorStretch(Vector3 posicaoOmbro, Vector3 destinoMao, float comprimentoBraco, float comprimentoAnteBraco)
+    {
+        if (!permitirStretch)
+            return 1f;
+
+        float comprimentoNaturalTotal = comprimentoBraco + comprimentoAnteBraco;
+        if (comprimentoNaturalTotal <= 0.0001f)
+            return 1f;
+
+        float distanciaOmbroMao = Vector3.Distance(posicaoOmbro, destinoMao);
+        if (distanciaOmbroMao <= comprimentoNaturalTotal)
+            return 1f;
+
+        return Mathf.Clamp(distanciaOmbroMao / comprimentoNaturalTotal, 1f, limiteStretch);
+    }
+
+    private void AplicarStretchVisual(Transform bracoSuperior, Transform anteBraco, float fatorStretch)
+    {
+        fatorStretch = Mathf.Max(1f, fatorStretch);
+        AplicarStretchNoOsso(bracoSuperior, ObterEscalaNatural(bracoSuperior), fatorStretch);
+        AplicarStretchNoOsso(anteBraco, ObterEscalaNatural(anteBraco), fatorStretch);
+    }
+
+    private void RestaurarStretchNatural(Transform bracoSuperior, Transform anteBraco)
+    {
+        AplicarStretchNoOsso(bracoSuperior, ObterEscalaNatural(bracoSuperior), 1f);
+        AplicarStretchNoOsso(anteBraco, ObterEscalaNatural(anteBraco), 1f);
+    }
+
+    private Vector3 ObterEscalaNatural(Transform osso)
+    {
+        if (osso == bracoEsquerdoSuperior)
+            return escalaNaturalBracoEsquerdoSuperior;
+
+        if (osso == bracoEsquerdoInferior)
+            return escalaNaturalBracoEsquerdoInferior;
+
+        if (osso == bracoDireitoSuperior)
+            return escalaNaturalBracoDireitoSuperior;
+
+        if (osso == bracoDireitoInferior)
+            return escalaNaturalBracoDireitoInferior;
+
+        return osso != null ? osso.localScale : Vector3.one;
+    }
+
+    private void AplicarStretchNoOsso(Transform osso, Vector3 escalaBase, float fatorStretch)
+    {
+        if (osso == null)
+            return;
+
+        Vector3 escala = escalaBase;
+
+        switch (ObterIndiceEixoComprimentoLocal(osso))
+        {
+            case 0:
+                escala.x *= fatorStretch;
+                break;
+            case 1:
+                escala.y *= fatorStretch;
+                break;
+            default:
+                escala.z *= fatorStretch;
+                break;
+        }
+
+        osso.localScale = escala;
+    }
+
+    private int ObterIndiceEixoComprimentoLocal(Transform osso)
+    {
+        Transform filhoComprimento = ObterFilhoComprimentoOsso(osso);
+        if (osso == null || filhoComprimento == null)
+            return 2;
+
+        Vector3 direcaoLocal = filhoComprimento.parent == osso
+            ? filhoComprimento.localPosition
+            : osso.InverseTransformPoint(filhoComprimento.position);
+
+        direcaoLocal.x = Mathf.Abs(direcaoLocal.x);
+        direcaoLocal.y = Mathf.Abs(direcaoLocal.y);
+        direcaoLocal.z = Mathf.Abs(direcaoLocal.z);
+
+        if (direcaoLocal.x >= direcaoLocal.y && direcaoLocal.x >= direcaoLocal.z)
+            return 0;
+
+        if (direcaoLocal.y >= direcaoLocal.x && direcaoLocal.y >= direcaoLocal.z)
+            return 1;
+
+        return 2;
+    }
+
+    private Transform ObterFilhoComprimentoOsso(Transform osso)
+    {
+        if (osso == bracoEsquerdoSuperior)
+            return bracoEsquerdoInferior;
+
+        if (osso == bracoEsquerdoInferior)
+            return maoEsquerdaOsso;
+
+        if (osso == bracoDireitoSuperior)
+            return bracoDireitoInferior;
+
+        if (osso == bracoDireitoInferior)
+            return maoDireitaOsso;
+
+        return null;
+    }
+
+    private bool AplicarRotacaoParaAlinharFilho(Transform osso, Transform filho, Vector3 destinoFilho, float peso)
+    {
+        if (osso == null || filho == null || peso <= 0f)
+            return false;
+
+        Vector3 direcaoAtual = filho.position - osso.position;
+        Vector3 direcaoDesejada = destinoFilho - osso.position;
+
+        if (direcaoAtual.sqrMagnitude < 0.0001f || direcaoDesejada.sqrMagnitude < 0.0001f)
+            return false;
+
+        Quaternion delta = Quaternion.FromToRotation(direcaoAtual.normalized, direcaoDesejada.normalized);
+        Quaternion rotacaoAlvo = delta * osso.rotation;
+        osso.rotation = Quaternion.Slerp(osso.rotation, rotacaoAlvo, Mathf.Clamp01(peso));
+        return true;
+    }
+
+    private void AplicarRotacaoMaoNoControle(Transform maoOsso, Quaternion rotacaoAlvo, float peso)
+    {
+        if (maoOsso == null || peso <= 0f)
+            return;
+
+        maoOsso.rotation = Quaternion.Slerp(maoOsso.rotation, rotacaoAlvo, Mathf.Clamp01(peso));
+    }
+
+    private void AplicarLookRotationDireto(Transform osso, Vector3 direcao, float peso)
+    {
+        if (osso == null || peso <= 0f || direcao.sqrMagnitude < 0.0001f)
+            return;
+
+        Vector3 up = raizAvatar != null ? raizAvatar.up : transform.up;
+        if (up.sqrMagnitude < 0.0001f)
+            up = Vector3.up;
+
+        Vector3 direcaoNormalizada = direcao.normalized;
+        up = up.normalized;
+
+        if (Mathf.Abs(Vector3.Dot(direcaoNormalizada, up)) > 0.995f)
+        {
+            up = Vector3.Cross(direcaoNormalizada, transform.right);
+            if (up.sqrMagnitude < 0.0001f)
+                up = Vector3.Cross(direcaoNormalizada, transform.forward);
+            if (up.sqrMagnitude < 0.0001f)
+                up = Vector3.up;
+            up.Normalize();
+        }
+
+        Quaternion rotacaoAlvo = Quaternion.LookRotation(direcaoNormalizada, up);
+        osso.rotation = Quaternion.Slerp(osso.rotation, rotacaoAlvo, Mathf.Clamp01(peso));
     }
 
     private void AtualizarAlvosDosCotovelos()
     {
         AtualizarAlvoCotovelo(true);
         AtualizarAlvoCotovelo(false);
+    }
+
+    private void AtualizarAlvoCotoveloParaRigging(bool esquerdo)
+    {
+        AtualizarAlvoCotovelo(esquerdo);
     }
 
     private void AtualizarAlvoCotovelo(bool esquerdo)
@@ -823,6 +1795,11 @@ public class AvatarVRIKController : MonoBehaviour
         pesoRotacaoPeito = Mathf.Clamp01(pesoRotacaoPeito);
         pesoRotacaoColuna = Mathf.Clamp01(pesoRotacaoColuna);
         pesoRotacaoPescoco = Mathf.Clamp01(pesoRotacaoPescoco);
+        pesoBraco = Mathf.Clamp01(pesoBraco);
+        pesoAnteBraco = Mathf.Clamp01(pesoAnteBraco);
+        pesoMao = Mathf.Clamp01(pesoMao);
+        pesoAnimationRiggingBracos = Mathf.Clamp01(pesoAnimationRiggingBracos);
+        limiteStretch = Mathf.Max(1f, limiteStretch);
     }
 
     private void AtualizarStatusConfiguracao()
@@ -840,6 +1817,15 @@ public class AvatarVRIKController : MonoBehaviour
         bool alturaVirtualConfigurada = !usarAlturaVirtual || cameraOffsetEncontrado;
         bool raizAvatarEncontrada = raizAvatar != null;
         bool seguirMovimentoFisicoConfigurado = avatarSegueMovimentoFisicoDaCabeca && cameraVREncontrada && raizAvatarEncontrada;
+        bool movimentacaoDiretaConfigurada = !MovimentacaoDiretaDosBracos ||
+                                             (maoEsquerdaVR != null &&
+                                              maoDireitaVR != null &&
+                                              bracoEsquerdoSuperior != null &&
+                                              bracoEsquerdoInferior != null &&
+                                              maoEsquerdaOsso != null &&
+                                              bracoDireitoSuperior != null &&
+                                              bracoDireitoInferior != null &&
+                                              maoDireitaOsso != null);
         bool cabecaEncontrada = ossoCabeca != null;
         bool bracoEsquerdoEncontrado = bracoEsquerdoSuperior != null;
         bool antebracoEsquerdoEncontrado = bracoEsquerdoInferior != null;
@@ -849,6 +1835,23 @@ public class AvatarVRIKController : MonoBehaviour
         bool maoDireitaEncontrada = maoDireitaOsso != null;
         bool targetsEncontrados = alvoMaoEsquerda != null && alvoMaoDireita != null;
         bool hintsEncontrados = alvoCotoveloEsquerdo != null && alvoCotoveloDireito != null;
+        bool referenciasMaoVREncontradas = (referenciaMaoEsquerdaVR != null || maoEsquerdaVR != null) &&
+                                           (referenciaMaoDireitaVR != null || maoDireitaVR != null);
+        bool rigBuilderConfigurado = rigBuilderAvatar != null && rigBracosVR != null;
+        bool twoBoneEsquerdoConfigurado = ConstraintTwoBoneIKConfigurado(
+            ikBracoEsquerdo,
+            bracoEsquerdoSuperior,
+            bracoEsquerdoInferior,
+            maoEsquerdaOsso,
+            alvoMaoEsquerda
+        );
+        bool twoBoneDireitoConfigurado = ConstraintTwoBoneIKConfigurado(
+            ikBracoDireito,
+            bracoDireitoSuperior,
+            bracoDireitoInferior,
+            maoDireitaOsso,
+            alvoMaoDireita
+        );
 
         StringBuilder status = new StringBuilder(900);
         status.AppendLine(LinhaStatus("Animator encontrado", animatorEncontrado));
@@ -861,6 +1864,7 @@ public class AvatarVRIKController : MonoBehaviour
         status.AppendLine(LinhaStatus("Altura Virtual VR configurada", alturaVirtualConfigurada));
         status.AppendLine(LinhaStatus("Raiz do avatar encontrada", raizAvatarEncontrada));
         status.AppendLine(LinhaStatus("Avatar segue movimento fisico da cabeca", seguirMovimentoFisicoConfigurado));
+        status.AppendLine(LinhaStatus("Movimentacao direta dos bracos configurada", movimentacaoDiretaConfigurada));
         status.AppendLine("\u2714 IK Pass: verifica\u00e7\u00e3o manual necess\u00e1ria na Base Layer do Animator.");
         status.AppendLine(LinhaStatus("Cabe\u00e7a encontrada", cabecaEncontrada));
         status.AppendLine(LinhaStatus("Bra\u00e7o esquerdo encontrado", bracoEsquerdoEncontrado));
@@ -871,6 +1875,11 @@ public class AvatarVRIKController : MonoBehaviour
         status.AppendLine(LinhaStatus("M\u00e3o direita encontrada", maoDireitaEncontrada));
         status.AppendLine(LinhaStatus("Targets encontrados", targetsEncontrados));
         status.AppendLine(LinhaStatus("Hints encontrados", hintsEncontrados));
+        status.AppendLine(LinhaStatus("Animation Rigging instalado", animationRiggingDisponivel));
+        status.AppendLine(LinhaStatus("Referencias finais das maos VR encontradas", referenciasMaoVREncontradas));
+        status.AppendLine(LinhaStatus("RigBuilder/Rig dos bracos configurado", rigBuilderConfigurado));
+        status.AppendLine(LinhaStatus("Two Bone IK esquerdo configurado", twoBoneEsquerdoConfigurado));
+        status.AppendLine(LinhaStatus("Two Bone IK direito configurado", twoBoneDireitoConfigurado));
         status.AppendLine();
 
         if (!animatorEncontrado)
@@ -916,7 +1925,13 @@ public class AvatarVRIKController : MonoBehaviour
         if (!targetsEncontrados || !hintsEncontrados)
             status.AppendLine("Use 'Configurar Avatar VR Automaticamente' para criar/preencher Targets e Hints. Isso n\u00e3o depende de Humanoid perfeito.");
 
-        if (!animationRiggingDisponivel && usarAnimatorIKHumanoidComoFallback)
+        if (MovimentacaoDiretaDosBracos && animationRiggingBracosAtivo)
+            status.AppendLine("Movimentacao direta dos bracos ativa com Animation Rigging: os targets seguem os controles VR e o Two Bone IK move os bracos. O fallback manual fica desligado.");
+        else if (MovimentacaoDiretaDosBracos && usarAnimationRiggingBracos && (!twoBoneEsquerdoConfigurado || !twoBoneDireitoConfigurado))
+            status.AppendLine("Movimentacao direta dos bracos ativa, mas o Two Bone IK ainda nao esta totalmente configurado. O script usara o fallback manual por rotacao dos bones.");
+        else if (MovimentacaoDiretaDosBracos)
+            status.AppendLine("Movimentacao direta dos bracos ativa: usando fallback manual por rotacao dos bones.");
+        else if (!animationRiggingDisponivel && usarAnimatorIKHumanoidComoFallback)
             status.AppendLine("Animation Rigging n\u00e3o detectado: usando fallback por Animator IK Humanoid, dependente do IK Pass.");
         else if (animationRiggingDisponivel)
             status.AppendLine("Animation Rigging detectado: os targets/hints deste script podem alimentar o rig configurado no avatar.");
@@ -940,8 +1955,7 @@ public class AvatarVRIKController : MonoBehaviour
 
     private bool AnimationRiggingEstaDisponivel()
     {
-        return Type.GetType("UnityEngine.Animations.Rigging.RigBuilder, Unity.Animation.Rigging") != null &&
-               Type.GetType("UnityEngine.Animations.Rigging.TwoBoneIKConstraint, Unity.Animation.Rigging") != null;
+        return true;
     }
 
     private static string NormalizarNome(string nome)
