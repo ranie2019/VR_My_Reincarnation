@@ -7987,20 +7987,53 @@ MonoBehaviour:
   pesoMao: 1
   permitirStretch: 1
   limiteStretch: 1.08
-  usarAcompanhamentoAntebracoComMao: 1
-  pesoAcompanhamentoAntebracoDireito: 0.75
-  pesoAcompanhamentoAntebracoEsquerdo: 0.75
-  limiteAcompanhamentoAntebracoDireito: 120
-  limiteAcompanhamentoAntebracoEsquerdo: 120
-  inverterAcompanhamentoAntebracoDireito: 0
-  inverterAcompanhamentoAntebracoEsquerdo: 0
-  usarPoseBaseNaturalAntebraco: 1
-  twistMaoDireitaGraus: 0
-  twistMaoEsquerdaGraus: 0
-  twistAplicadoAntebracoDireitoGraus: 0
-  twistAplicadoAntebracoEsquerdoGraus: 0
-  eixoAcompanhamentoDireitoValido: 0
-  eixoAcompanhamentoEsquerdoValido: 0
+  usarLimiteRotacaoMaoY: 1
+  limiteMaoYPositivoDireito: 10
+  limiteMaoYNegativoDireito: -10
+  limiteAntebracoYPositivoDireito: 45
+  limiteAntebracoYNegativoDireito: -45
+  inverterRepasseYDireito: 0
+  limiteMaoYPositivoEsquerdo: 10
+  limiteMaoYNegativoEsquerdo: -10
+  limiteAntebracoYPositivoEsquerdo: 45
+  limiteAntebracoYNegativoEsquerdo: -45
+  inverterRepasseYEsquerdo: 0
+  rotacaoMaoYDireita: 0
+  rotacaoMaoYEsquerda: 0
+  excedenteMaoYDireita: 0
+  excedenteMaoYEsquerda: 0
+  rotacaoAplicadaAntebracoYDireita: 0
+  rotacaoAplicadaAntebracoYEsquerda: 0
+  usarDistribuicaoNaturalPulsoAntebraco: 1
+  direcaoDedosEsquerda: {fileID: 109653357}
+  direcaoDedosDireita: {fileID: 1857102934}
+  limiteLivrePulsoDireito: 2
+  limiteLivrePulsoEsquerdo: 2
+  limiteTwistAntebracoDireito: 45
+  limiteTwistAntebracoEsquerdo: 45
+  pesoAntebracoAposLimiteDireito: 1
+  pesoAntebracoAposLimiteEsquerdo: 1
+  inverterTwistAntebracoDireito: 0
+  inverterTwistAntebracoEsquerdo: 0
+  usarLimitesSeparadosPositivoNegativo: 0
+  suavidadeDistribuicaoPulsoAntebraco: 18
+  velocidadeMaximaTwistAntebraco: 540
+  limiteLivrePulsoPositivoDireito: 2
+  limiteLivrePulsoNegativoDireito: 2
+  limiteLivrePulsoPositivoEsquerdo: 2
+  limiteLivrePulsoNegativoEsquerdo: 2
+  limiteTwistAntebracoPositivoDireito: 45
+  limiteTwistAntebracoNegativoDireito: 45
+  limiteTwistAntebracoPositivoEsquerdo: 45
+  limiteTwistAntebracoNegativoEsquerdo: 45
+  twistTotalDireito: 0
+  twistTotalEsquerdo: 0
+  twistPulsoPermitidoDireito: 0
+  twistPulsoPermitidoEsquerdo: 0
+  twistAplicadoAntebracoDireito: 0
+  twistAplicadoAntebracoEsquerdo: 0
+  twistExcedenteDireito: 0
+  twistExcedenteEsquerdo: 0
   mostrarGizmosMaos: 1
   tamanhoGizmoMao: 0.06
   statusConfiguracao: "\u2714 Animator encontrado\r\n\u2718 Avatar encontrado\r\n\u2718
@@ -8013,12 +8046,10 @@ MonoBehaviour:
     esquerdo encontrado\r\n\u2714 M\xE3o esquerda encontrada\r\n\u2714 Bra\xE7o direito
     encontrado\r\n\u2714 Antebra\xE7o direito encontrado\r\n\u2714 M\xE3o direita
     encontrada\r\n\u2714 Targets encontrados\r\n\u2714 Hints encontrados\r\n\u2714
-    Animation Rigging instalado\r\n\u2714 Referencias finais das maos VR encontradas\r\n\u2714
-    RigBuilder/Rig dos bracos configurado\r\n\u2718 Two Bone IK esquerdo configurado\r\n\u2718
-    Two Bone IK direito configurado\r\n\u2714 Acompanhamento antebra\xE7o/m\xE3o
-    ativo\r\n  Peso acompanhamento direito: 0,75 | esquerdo: 0,75\r\n  Twist m\xE3o
-    direita: 0,0\xB0 -> antebra\xE7o 0,0\xB0 | eixo v\xE1lido: False\r\n  Twist m\xE3o
-    esquerda: 0,0\xB0 -> antebra\xE7o 0,0\xB0 | eixo v\xE1lido: False\r\n\r\nAvatar
+    Limite real rotacao mao Y configurado\r\n\u2714 Distribuicao pulso antebraco
+    configurada\r\n\u2714 Animation Rigging instalado\r\n\u2714 Referencias finais
+    das maos VR encontradas\r\n\u2714 RigBuilder/Rig dos bracos configurado\r\n\u2718
+    Two Bone IK esquerdo configurado\r\n\u2718 Two Bone IK direito configurado\r\n\r\nAvatar
     n\xE3o configurado. Configure o modelo como Humanoid.\r\nPasso manual:\r\n1.
     Abra o modelo FBX do avatar.\r\n2. Rig > Animation Type = Humanoid.\r\n3. Avatar
     Definition = Create From This Model.\r\n4. Apply.\r\nMovimentacao direta dos
@@ -36433,7 +36464,7 @@ Transform:
   m_GameObject: {fileID: 8843030832919907336}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 601.8, y: 0, z: -429.12}
+  m_LocalPosition: {x: 601.8, y: 0, z: -427.87}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

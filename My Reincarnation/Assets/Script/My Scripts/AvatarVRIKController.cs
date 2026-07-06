@@ -233,6 +233,39 @@ public class AvatarVRIKController : MonoBehaviour
     [SerializeField] private bool permitirStretch = true;
     [SerializeField, Min(1f)] private float limiteStretch = 1.08f;
 
+    [Header("Acompanhamento do Antebraço com a Mão")]
+    [Tooltip("Quando ativo, o antebraço acompanha a torção da mão no eixo real antebraço -> mão. Mantém a mão apontando para o controle/laser e distribui parte da rotação para o antebraço.")]
+    [SerializeField] private bool usarAcompanhamentoAntebracoComMao = true;
+
+    [Tooltip("Quanto da torção da mão direita é repassada para o antebraço direito. 0 = não acompanha. 1 = acompanha totalmente dentro do limite.")]
+    [SerializeField, Range(0f, 1f)] private float pesoAcompanhamentoAntebracoDireito = 0.75f;
+
+    [Tooltip("Quanto da torção da mão esquerda é repassada para o antebraço esquerdo. 0 = não acompanha. 1 = acompanha totalmente dentro do limite.")]
+    [SerializeField, Range(0f, 1f)] private float pesoAcompanhamentoAntebracoEsquerdo = 0.75f;
+
+    [Tooltip("Limite máximo de torção aplicada no antebraço direito por frame, em graus.")]
+    [SerializeField, Range(0f, 120f)] private float limiteAcompanhamentoAntebracoDireito = 65f;
+
+    [Tooltip("Limite máximo de torção aplicada no antebraço esquerdo por frame, em graus.")]
+    [SerializeField, Range(0f, 120f)] private float limiteAcompanhamentoAntebracoEsquerdo = 65f;
+
+    [Tooltip("Inverte somente o sinal do acompanhamento do antebraço direito, caso ele gire para o lado contrário da mão.")]
+    [SerializeField] private bool inverterAcompanhamentoAntebracoDireito = false;
+
+    [Tooltip("Inverte somente o sinal do acompanhamento do antebraço esquerdo, caso ele gire para o lado contrário da mão.")]
+    [SerializeField] private bool inverterAcompanhamentoAntebracoEsquerdo = false;
+
+    [Tooltip("Usa a diferença inicial entre antebraço e mão como pose neutra. Desligue apenas se o antebraço ficar torcido em repouso.")]
+    [SerializeField] private bool usarPoseBaseNaturalAntebraco = true;
+
+    [Header("Diagnóstico Antebraço/Mão")]
+    [SerializeField] private float twistMaoDireitaGraus;
+    [SerializeField] private float twistMaoEsquerdaGraus;
+    [SerializeField] private float twistAplicadoAntebracoDireitoGraus;
+    [SerializeField] private float twistAplicadoAntebracoEsquerdoGraus;
+    [SerializeField] private bool eixoAcompanhamentoDireitoValido;
+    [SerializeField] private bool eixoAcompanhamentoEsquerdoValido;
+
     [Header("Diagnóstico Visual das Mãos")]
     [SerializeField] private bool mostrarGizmosMaos = true;
     [SerializeField] private float tamanhoGizmoMao = 0.06f;
@@ -269,6 +302,9 @@ public class AvatarVRIKController : MonoBehaviour
     private float comprimentoNaturalBracoEsquerdoInferior;
     private float comprimentoNaturalBracoDireitoSuperior;
     private float comprimentoNaturalBracoDireitoInferior;
+    private bool baseTwistAntebracoMaoCapturada;
+    private float baseTwistAntebracoMaoEsquerda;
+    private float baseTwistAntebracoMaoDireita;
 
     private void Reset()
     {
@@ -276,6 +312,7 @@ public class AvatarVRIKController : MonoBehaviour
         AtualizarAlturaVirtualCamera();
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
+        CapturarBaseTwistAntebracoMao();
         AtualizarStatusConfiguracao();
     }
 
@@ -286,6 +323,7 @@ public class AvatarVRIKController : MonoBehaviour
         AtualizarAlturaVirtualCamera();
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
+        CapturarBaseTwistAntebracoMao();
         AtualizarStatusConfiguracao();
     }
 
@@ -302,6 +340,7 @@ public class AvatarVRIKController : MonoBehaviour
         AtualizarAlturaVirtualCamera();
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
+        CapturarBaseTwistAntebracoMao();
         AtualizarStatusConfiguracao();
     }
 
@@ -311,6 +350,7 @@ public class AvatarVRIKController : MonoBehaviour
         ConfigurarAvatarAutomaticamenteInterno(false);
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
+        CapturarBaseTwistAntebracoMao();
         AtualizarStatusConfiguracao();
     }
 
@@ -328,7 +368,7 @@ public class AvatarVRIKController : MonoBehaviour
     private void Update()
     {
         if (AnimationRiggingBracosPodeControlar())
-            AtualizarAlvosAnimationRiggingBracos();
+            AtualizarAlvosAnimationRiggingBracos(false);
     }
 
     private void LateUpdate()
@@ -348,7 +388,7 @@ public class AvatarVRIKController : MonoBehaviour
 
         if (usarTwoBoneIKBracos)
         {
-            AtualizarAlvosAnimationRiggingBracos();
+            AtualizarAlvosAnimationRiggingBracos(true);
         }
         else if (MovimentacaoDiretaDosBracos)
         {
@@ -889,7 +929,7 @@ public class AvatarVRIKController : MonoBehaviour
         AtualizarAlvoMao(maoDireitaVR, alvoMaoDireita, offsetPosicaoMaoDireita, offsetRotacaoMaoDireita);
     }
 
-    private void AtualizarAlvosAnimationRiggingBracos()
+    private void AtualizarAlvosAnimationRiggingBracos(bool aplicarAcompanhamentoAntebraco)
     {
         AtualizarAlvoMaoInstantaneo(
             ObterReferenciaMaoAtual(true),
@@ -909,6 +949,23 @@ public class AvatarVRIKController : MonoBehaviour
         AtualizarStretchParaAnimationRigging(false);
         AtualizarAlvoCotoveloParaRigging(true);
         AtualizarAlvoCotoveloParaRigging(false);
+
+        if (aplicarAcompanhamentoAntebraco)
+        {
+            AplicarAcompanhamentoAntebracoComMao(
+                bracoEsquerdoInferior,
+                maoEsquerdaOsso,
+                alvoMaoEsquerda != null ? alvoMaoEsquerda.rotation : maoEsquerdaOsso != null ? maoEsquerdaOsso.rotation : Quaternion.identity,
+                true
+            );
+
+            AplicarAcompanhamentoAntebracoComMao(
+                bracoDireitoInferior,
+                maoDireitaOsso,
+                alvoMaoDireita != null ? alvoMaoDireita.rotation : maoDireitaOsso != null ? maoDireitaOsso.rotation : Quaternion.identity,
+                false
+            );
+        }
 
         if (rigBuilderAvatar != null)
             rigBuilderAvatar.SyncLayers();
@@ -978,7 +1035,8 @@ public class AvatarVRIKController : MonoBehaviour
             offsetRotacaoMaoEsquerda,
             pesoBraco,
             pesoAnteBraco,
-            pesoMao
+            pesoMao,
+            true
         );
 
         AtualizarBracoDireto(
@@ -992,7 +1050,8 @@ public class AvatarVRIKController : MonoBehaviour
             offsetRotacaoMaoDireita,
             pesoBraco,
             pesoAnteBraco,
-            pesoMao
+            pesoMao,
+            false
         );
     }
 
@@ -1007,7 +1066,8 @@ public class AvatarVRIKController : MonoBehaviour
         Vector3 offsetRotacaoMao,
         float pesoBraco,
         float pesoAnteBraco,
-        float pesoMao
+        float pesoMao,
+        bool esquerdo
     )
     {
         bool twoBoneIKAtivo = TentarSincronizarComTwoBoneIKAtivo(bracoSuperior, anteBraco, maoOsso, ref alvoMao, ref alvoCotovelo);
@@ -1056,6 +1116,7 @@ public class AvatarVRIKController : MonoBehaviour
             }
 
             AplicarRotacaoMaoNoControle(maoOsso, rotacaoMaoAlvo, pesoMao);
+            AplicarAcompanhamentoAntebracoComMao(anteBraco, maoOsso, rotacaoMaoAlvo, esquerdo);
         }
         else if (anteBraco != null)
         {
@@ -1064,6 +1125,7 @@ public class AvatarVRIKController : MonoBehaviour
                 AplicarLookRotationDireto(anteBraco, destinoMao - anteBraco.position, pesoAnteBraco);
 
             AplicarRotacaoMaoNoControle(maoOsso, rotacaoMaoAlvo, pesoMao);
+            AplicarAcompanhamentoAntebracoComMao(anteBraco, maoOsso, rotacaoMaoAlvo, esquerdo);
         }
     }
 
@@ -1445,6 +1507,152 @@ public class AvatarVRIKController : MonoBehaviour
         maoOsso.rotation = Quaternion.Slerp(maoOsso.rotation, rotacaoAlvo, Mathf.Clamp01(peso));
     }
 
+    private void CapturarBaseTwistAntebracoMao()
+    {
+        baseTwistAntebracoMaoEsquerda = CalcularTwistMaoRelativoAntebraco(
+            bracoEsquerdoInferior,
+            maoEsquerdaOsso,
+            maoEsquerdaOsso != null ? maoEsquerdaOsso.rotation : Quaternion.identity,
+            out _
+        );
+
+        baseTwistAntebracoMaoDireita = CalcularTwistMaoRelativoAntebraco(
+            bracoDireitoInferior,
+            maoDireitaOsso,
+            maoDireitaOsso != null ? maoDireitaOsso.rotation : Quaternion.identity,
+            out _
+        );
+
+        baseTwistAntebracoMaoCapturada = true;
+    }
+
+    private void AplicarAcompanhamentoAntebracoComMao(Transform anteBraco, Transform maoOsso, Quaternion rotacaoMaoFinal, bool esquerdo)
+    {
+        if (!usarAcompanhamentoAntebracoComMao || anteBraco == null || maoOsso == null)
+            return;
+
+        if (!baseTwistAntebracoMaoCapturada)
+            CapturarBaseTwistAntebracoMao();
+
+        float peso = esquerdo ? pesoAcompanhamentoAntebracoEsquerdo : pesoAcompanhamentoAntebracoDireito;
+        float limite = esquerdo ? limiteAcompanhamentoAntebracoEsquerdo : limiteAcompanhamentoAntebracoDireito;
+
+        if (peso <= 0f || limite <= 0f)
+            return;
+
+        float twistAtual = CalcularTwistMaoRelativoAntebraco(anteBraco, maoOsso, rotacaoMaoFinal, out Vector3 eixoAntebraco);
+
+        bool eixoValido = eixoAntebraco.sqrMagnitude > 0.0001f;
+        if (esquerdo)
+            eixoAcompanhamentoEsquerdoValido = eixoValido;
+        else
+            eixoAcompanhamentoDireitoValido = eixoValido;
+
+        if (!eixoValido)
+            return;
+
+        float baseTwist = usarPoseBaseNaturalAntebraco
+            ? (esquerdo ? baseTwistAntebracoMaoEsquerda : baseTwistAntebracoMaoDireita)
+            : 0f;
+
+        float twistRelativo = NormalizarAngulo180(twistAtual - baseTwist);
+        float twistAplicado = Mathf.Clamp(twistRelativo * Mathf.Clamp01(peso), -limite, limite);
+
+        if (esquerdo ? inverterAcompanhamentoAntebracoEsquerdo : inverterAcompanhamentoAntebracoDireito)
+            twistAplicado *= -1f;
+
+        if (esquerdo)
+        {
+            twistMaoEsquerdaGraus = twistRelativo;
+            twistAplicadoAntebracoEsquerdoGraus = twistAplicado;
+        }
+        else
+        {
+            twistMaoDireitaGraus = twistRelativo;
+            twistAplicadoAntebracoDireitoGraus = twistAplicado;
+        }
+
+        if (Mathf.Abs(twistAplicado) < 0.0001f)
+            return;
+
+        Vector3 posicaoMaoFinal = maoOsso.position;
+        Quaternion rotacaoMaoPreservada = rotacaoMaoFinal;
+
+        anteBraco.rotation = Quaternion.AngleAxis(twistAplicado, eixoAntebraco) * anteBraco.rotation;
+
+        // A mão é filha do antebraço. Depois que o antebraço acompanha a torção,
+        // preservamos a pose final da mão para manter a sincronização com o controle/laser.
+        maoOsso.SetPositionAndRotation(posicaoMaoFinal, rotacaoMaoPreservada);
+    }
+
+    private float CalcularTwistMaoRelativoAntebraco(Transform anteBraco, Transform maoOsso, Quaternion rotacaoMaoFinal, out Vector3 eixoAntebraco)
+    {
+        eixoAntebraco = Vector3.zero;
+
+        if (anteBraco == null || maoOsso == null)
+            return 0f;
+
+        eixoAntebraco = maoOsso.position - anteBraco.position;
+
+        if (eixoAntebraco.sqrMagnitude < 0.0001f)
+            return 0f;
+
+        eixoAntebraco.Normalize();
+
+        Quaternion deltaMaoAntebraco = rotacaoMaoFinal * Quaternion.Inverse(anteBraco.rotation);
+        Quaternion twist = ExtrairTwist(deltaMaoAntebraco, eixoAntebraco);
+
+        twist.ToAngleAxis(out float angulo, out Vector3 eixoTwist);
+
+        if (float.IsNaN(angulo) || eixoTwist.sqrMagnitude < 0.0001f)
+            return 0f;
+
+        if (angulo > 180f)
+            angulo -= 360f;
+
+        if (Vector3.Dot(eixoTwist.normalized, eixoAntebraco) < 0f)
+            angulo *= -1f;
+
+        return NormalizarAngulo180(angulo);
+    }
+
+    private static Quaternion ExtrairTwist(Quaternion rotacao, Vector3 eixoNormalizado)
+    {
+        eixoNormalizado.Normalize();
+
+        Vector3 parteVetor = new Vector3(rotacao.x, rotacao.y, rotacao.z);
+        Vector3 projecao = Vector3.Project(parteVetor, eixoNormalizado);
+
+        Quaternion twist = new Quaternion(projecao.x, projecao.y, projecao.z, rotacao.w);
+        float magnitude = Mathf.Sqrt(
+            twist.x * twist.x +
+            twist.y * twist.y +
+            twist.z * twist.z +
+            twist.w * twist.w
+        );
+
+        if (magnitude < 0.0001f)
+            return Quaternion.identity;
+
+        return new Quaternion(
+            twist.x / magnitude,
+            twist.y / magnitude,
+            twist.z / magnitude,
+            twist.w / magnitude
+        );
+    }
+
+    private static float NormalizarAngulo180(float angulo)
+    {
+        while (angulo > 180f)
+            angulo -= 360f;
+
+        while (angulo < -180f)
+            angulo += 360f;
+
+        return angulo;
+    }
+
     private void AplicarLookRotationDireto(Transform osso, Vector3 direcao, float peso)
     {
         if (osso == null || peso <= 0f || direcao.sqrMagnitude < 0.0001f)
@@ -1799,6 +2007,10 @@ public class AvatarVRIKController : MonoBehaviour
         pesoAnteBraco = Mathf.Clamp01(pesoAnteBraco);
         pesoMao = Mathf.Clamp01(pesoMao);
         pesoAnimationRiggingBracos = Mathf.Clamp01(pesoAnimationRiggingBracos);
+        pesoAcompanhamentoAntebracoDireito = Mathf.Clamp01(pesoAcompanhamentoAntebracoDireito);
+        pesoAcompanhamentoAntebracoEsquerdo = Mathf.Clamp01(pesoAcompanhamentoAntebracoEsquerdo);
+        limiteAcompanhamentoAntebracoDireito = Mathf.Clamp(limiteAcompanhamentoAntebracoDireito, 0f, 120f);
+        limiteAcompanhamentoAntebracoEsquerdo = Mathf.Clamp(limiteAcompanhamentoAntebracoEsquerdo, 0f, 120f);
         limiteStretch = Mathf.Max(1f, limiteStretch);
     }
 
@@ -1880,6 +2092,10 @@ public class AvatarVRIKController : MonoBehaviour
         status.AppendLine(LinhaStatus("RigBuilder/Rig dos bracos configurado", rigBuilderConfigurado));
         status.AppendLine(LinhaStatus("Two Bone IK esquerdo configurado", twoBoneEsquerdoConfigurado));
         status.AppendLine(LinhaStatus("Two Bone IK direito configurado", twoBoneDireitoConfigurado));
+        status.AppendLine(LinhaStatus("Acompanhamento antebraço/mão ativo", usarAcompanhamentoAntebracoComMao));
+        status.AppendLine($"  Peso acompanhamento direito: {pesoAcompanhamentoAntebracoDireito:0.00} | esquerdo: {pesoAcompanhamentoAntebracoEsquerdo:0.00}");
+        status.AppendLine($"  Twist mão direita: {twistMaoDireitaGraus:0.0}° -> antebraço {twistAplicadoAntebracoDireitoGraus:0.0}° | eixo válido: {eixoAcompanhamentoDireitoValido}");
+        status.AppendLine($"  Twist mão esquerda: {twistMaoEsquerdaGraus:0.0}° -> antebraço {twistAplicadoAntebracoEsquerdoGraus:0.0}° | eixo válido: {eixoAcompanhamentoEsquerdoValido}");
         status.AppendLine();
 
         if (!animatorEncontrado)
