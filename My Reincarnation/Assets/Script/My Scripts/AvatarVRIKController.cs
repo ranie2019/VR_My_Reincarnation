@@ -8,6 +8,13 @@ using UnityEngine.Serialization;
 [DisallowMultipleComponent]
 public class AvatarVRIKController : MonoBehaviour
 {
+    private enum EixoLocalAvancoOmbro
+    {
+        X,
+        Y,
+        Z
+    }
+
     [Header("Referências VR")]
     [Tooltip("Transform da câmera/HMD do jogador. Normalmente é o objeto Main Camera.")]
     [SerializeField] private Transform cameraVR;
@@ -266,6 +273,40 @@ public class AvatarVRIKController : MonoBehaviour
     [SerializeField] private bool eixoAcompanhamentoDireitoValido;
     [SerializeField] private bool eixoAcompanhamentoEsquerdoValido;
 
+    [Header("Avanço do Ombro (opcional)")]
+    [Tooltip("Quando ativo, permite que o ombro (clavícula) gire um pouco no eixo local selecionado, imitando o movimento humano de levar o ombro à frente para aumentar o alcance da mão. Se desligado, o ombro fica sempre na pose natural.")]
+    [SerializeField] private bool usarAvancoDoOmbro = false;
+
+    [Tooltip("Eixo local usado para aplicar o avanco visual da clavicula/ombro. Use X, Y ou Z para descobrir qual eixo do rig move o ombro para frente sem torcer o braco.")]
+    [SerializeField] private EixoLocalAvancoOmbro eixoLocalAvancoOmbro = EixoLocalAvancoOmbro.Z;
+
+    [Tooltip("Ângulo máximo de avanço do ombro, em graus. Recomendado 3 a 8 graus para ficar sutil e natural; nunca passa do Limite Máximo Ombro abaixo, mesmo se você aumentar este valor.")]
+    [SerializeField, Range(0f, 30f)] private float anguloMaximoAvancoOmbro = 6f;
+
+    [Tooltip("Distância à frente do ombro (em metros) a partir da qual o avanço começa a aparecer. Abaixo disso o ombro fica parado.")]
+    [SerializeField, Min(0f)] private float limiarAvancoOmbro = 0.15f;
+
+    [Tooltip("Distância à frente do ombro (em metros) na qual o avanço já atinge o ângulo máximo.")]
+    [SerializeField, Min(0.01f)] private float distanciaAvancoOmbroMaximo = 0.45f;
+
+    [Tooltip("Suavidade da transição do avanço do ombro (maior = reage mais rápido).")]
+    [SerializeField] private float suavidadeAvancoOmbro = 10f;
+
+    [Tooltip("Limite público de segurança (em graus) para a rotação do ombro no eixo local selecionado. Trava o ângulo final e impede qualquer rotação exagerada (ex.: 360°), mesmo que outros valores estejam configurados errado. Ex.: -30 e 30.")]
+    [SerializeField] private float limiteMinimoOmbro = -30f;
+
+    [SerializeField] private float limiteMaximoOmbro = 30f;
+
+    [Tooltip("Inverte o sinal do avanço do ombro direito, caso o ombro gire para o lado errado no seu esqueleto.")]
+    [SerializeField] private bool inverterAvancoOmbroDireito = false;
+
+    [Tooltip("Inverte o sinal do avanço do ombro esquerdo, caso o ombro gire para o lado errado no seu esqueleto.")]
+    [SerializeField] private bool inverterAvancoOmbroEsquerdo = false;
+
+    [Header("Diagnóstico Avanço do Ombro")]
+    [SerializeField] private float avancoOmbroDireitoGraus;
+    [SerializeField] private float avancoOmbroEsquerdoGraus;
+
     [Header("Diagnóstico Visual das Mãos")]
     [SerializeField] private bool mostrarGizmosMaos = true;
     [SerializeField] private float tamanhoGizmoMao = 0.06f;
@@ -305,6 +346,11 @@ public class AvatarVRIKController : MonoBehaviour
     private bool baseTwistAntebracoMaoCapturada;
     private float baseTwistAntebracoMaoEsquerda;
     private float baseTwistAntebracoMaoDireita;
+    private bool baseRotacaoOmbroCapturada;
+    private Quaternion baseLocalRotacaoClaviculaEsquerda = Quaternion.identity;
+    private Quaternion baseLocalRotacaoClaviculaDireita = Quaternion.identity;
+    private float anguloAtualOmbroEsquerdo;
+    private float anguloAtualOmbroDireito;
 
     private void Reset()
     {
@@ -313,6 +359,7 @@ public class AvatarVRIKController : MonoBehaviour
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
         CapturarBaseTwistAntebracoMao();
+        CapturarBaseRotacaoOmbros();
         AtualizarStatusConfiguracao();
     }
 
@@ -324,6 +371,7 @@ public class AvatarVRIKController : MonoBehaviour
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
         CapturarBaseTwistAntebracoMao();
+        CapturarBaseRotacaoOmbros();
         AtualizarStatusConfiguracao();
     }
 
@@ -341,6 +389,7 @@ public class AvatarVRIKController : MonoBehaviour
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
         CapturarBaseTwistAntebracoMao();
+        CapturarBaseRotacaoOmbros();
         AtualizarStatusConfiguracao();
     }
 
@@ -351,6 +400,7 @@ public class AvatarVRIKController : MonoBehaviour
         CapturarRotacoesBase();
         CapturarDadosNaturaisBracos();
         CapturarBaseTwistAntebracoMao();
+        CapturarBaseRotacaoOmbros();
         AtualizarStatusConfiguracao();
     }
 
@@ -368,7 +418,14 @@ public class AvatarVRIKController : MonoBehaviour
     private void Update()
     {
         if (AnimationRiggingBracosPodeControlar())
+        {
             AtualizarAlvosAnimationRiggingBracos(false);
+        }
+        else
+        {
+            RestaurarOmbroNatural(claviculaEsquerda, baseLocalRotacaoClaviculaEsquerda, ref anguloAtualOmbroEsquerdo);
+            RestaurarOmbroNatural(claviculaDireita, baseLocalRotacaoClaviculaDireita, ref anguloAtualOmbroDireito);
+        }
     }
 
     private void LateUpdate()
@@ -944,6 +1001,26 @@ public class AvatarVRIKController : MonoBehaviour
             offsetPosicaoMaoDireita,
             offsetRotacaoMaoDireita
         );
+
+        if (!aplicarAcompanhamentoAntebraco)
+        {
+            // Fase de Update(): o Animation Rigging resolve o IK entre Update() e LateUpdate().
+            // O ombro precisa ser atualizado agora, com o alvo da mão já atualizado acima,
+            // para que o Two Bone IK deste frame já resolva a mão considerando a nova base do braço.
+            if (!baseRotacaoOmbroCapturada)
+                CapturarBaseRotacaoOmbros();
+
+            if (usarAvancoDoOmbro)
+            {
+                AplicarAvancoOmbro(claviculaEsquerda, alvoMaoEsquerda, baseLocalRotacaoClaviculaEsquerda, ref anguloAtualOmbroEsquerdo, inverterAvancoOmbroEsquerdo, true);
+                AplicarAvancoOmbro(claviculaDireita, alvoMaoDireita, baseLocalRotacaoClaviculaDireita, ref anguloAtualOmbroDireito, inverterAvancoOmbroDireito, false);
+            }
+            else
+            {
+                RestaurarOmbroNatural(claviculaEsquerda, baseLocalRotacaoClaviculaEsquerda, ref anguloAtualOmbroEsquerdo);
+                RestaurarOmbroNatural(claviculaDireita, baseLocalRotacaoClaviculaDireita, ref anguloAtualOmbroDireito);
+            }
+        }
 
         AtualizarStretchParaAnimationRigging(true);
         AtualizarStretchParaAnimationRigging(false);
@@ -1653,6 +1730,104 @@ public class AvatarVRIKController : MonoBehaviour
         return angulo;
     }
 
+    private void CapturarBaseRotacaoOmbros()
+    {
+        baseLocalRotacaoClaviculaEsquerda = claviculaEsquerda != null ? claviculaEsquerda.localRotation : Quaternion.identity;
+        baseLocalRotacaoClaviculaDireita = claviculaDireita != null ? claviculaDireita.localRotation : Quaternion.identity;
+        baseRotacaoOmbroCapturada = true;
+    }
+
+    private Vector3 ObterEixoLocalAvancoOmbro()
+    {
+        switch (eixoLocalAvancoOmbro)
+        {
+            case EixoLocalAvancoOmbro.X:
+                return Vector3.right;
+            case EixoLocalAvancoOmbro.Y:
+                return Vector3.up;
+            default:
+                return Vector3.forward;
+        }
+    }
+
+    // Calcula e aplica um pequeno avanço do ombro (clavícula) no eixo local selecionado, só quando a mão
+    // está claramente à frente do peito. Isso roda ANTES do Two Bone IK resolver o frame
+    // (chamado a partir de Update, na fase "false" de AtualizarAlvosAnimationRiggingBracos),
+    // então o IK sempre recalcula a mão em cima da nova posição do ombro e a mão nunca perde
+    // sincronia com o controle: o ombro só empurra a base do braço, quem manda na posição final
+    // da mão continua sendo o alvo/target do controle VR.
+    private void AplicarAvancoOmbro(Transform clavicula, Transform alvoMao, Quaternion baseLocal, ref float anguloAtual, bool inverter, bool esquerdo)
+    {
+        if (clavicula == null || alvoMao == null)
+        {
+            anguloAtual = Mathf.Lerp(anguloAtual, 0f, FatorSuavizacao(suavidadeAvancoOmbro));
+            return;
+        }
+
+        // Referência sempre a clavícula/ombro real, nunca o braço superior: o braço superior é a
+        // raiz (root) do Two Bone IK, e usá-lo como substituto deixaria o IK ainda mais instável.
+        Vector3 direcaoOmbroMao = alvoMao.position - clavicula.position;
+
+        Vector3 frente = ObterFrenteCorpo();
+        Vector3 direita = ObterDireitaCorpo();
+
+        float avancoFrontal = Vector3.Dot(direcaoOmbroMao, frente);
+        float lateral = Mathf.Abs(Vector3.Dot(direcaoOmbroMao, direita));
+
+        float distanciaMaxima = Mathf.Max(distanciaAvancoOmbroMaximo, limiarAvancoOmbro + 0.01f);
+
+        // 0 quando a mão ainda está perto do ombro/atrás dele, 1 quando já avançou bastante à frente.
+        float alpha = Mathf.InverseLerp(limiarAvancoOmbro, distanciaMaxima, avancoFrontal);
+        alpha = Mathf.Clamp01(alpha);
+
+        // Reduz o avanço do ombro quando o movimento é principalmente lateral, para não abrir
+        // o ombro quando a mão vai para o lado (só empurra quando a mão vai para frente do corpo).
+        float fatorFrontalidade = Mathf.Clamp01(1f - (lateral / distanciaMaxima));
+        alpha *= fatorFrontalidade;
+
+        float anguloAlvo = alpha * anguloMaximoAvancoOmbro;
+        if (inverter)
+            anguloAlvo *= -1f;
+
+        // Trava de segurança pública: nunca deixa o ângulo alvo passar do limite configurado,
+        // mesmo que anguloMaximoAvancoOmbro esteja configurado com um valor alto.
+        anguloAlvo = Mathf.Clamp(anguloAlvo, limiteMinimoOmbro, limiteMaximoOmbro);
+
+        anguloAtual = Mathf.Lerp(anguloAtual, anguloAlvo, FatorSuavizacao(suavidadeAvancoOmbro));
+
+        // Trava final: garante que o ângulo realmente aplicado no osso nunca ultrapasse o limite,
+        // mesmo durante a suavização (evita qualquer chance de o ombro "dar a volta" sozinho).
+        anguloAtual = Mathf.Clamp(anguloAtual, limiteMinimoOmbro, limiteMaximoOmbro);
+
+        clavicula.localRotation = baseLocal * Quaternion.AngleAxis(anguloAtual, ObterEixoLocalAvancoOmbro());
+
+        if (esquerdo)
+            avancoOmbroEsquerdoGraus = anguloAtual;
+        else
+            avancoOmbroDireitoGraus = anguloAtual;
+    }
+
+    // Devolve o ombro suavemente para a pose natural quando o avanço está desligado ou quando
+    // o Two Bone IK dos braços não está no controle (evita o ombro ficar "preso" rotacionado).
+    private void RestaurarOmbroNatural(Transform clavicula, Quaternion baseLocal, ref float anguloAtual)
+    {
+        if (clavicula == null)
+            return;
+
+        if (Mathf.Abs(anguloAtual) < 0.001f)
+        {
+            anguloAtual = 0f;
+            return;
+        }
+
+        anguloAtual = Mathf.Lerp(anguloAtual, 0f, FatorSuavizacao(suavidadeAvancoOmbro));
+
+        if (Mathf.Abs(anguloAtual) < 0.01f)
+            anguloAtual = 0f;
+
+        clavicula.localRotation = baseLocal * Quaternion.AngleAxis(anguloAtual, ObterEixoLocalAvancoOmbro());
+    }
+
     private void AplicarLookRotationDireto(Transform osso, Vector3 direcao, float peso)
     {
         if (osso == null || peso <= 0f || direcao.sqrMagnitude < 0.0001f)
@@ -1826,8 +2001,8 @@ public class AvatarVRIKController : MonoBehaviour
         AtribuirPorNome(ref bracoDireitoSuperior, sobrescrever, ossos, "braço direito", "braco direito", "rightupperarm", "upperarm_r", "arm_r");
         AtribuirPorNome(ref bracoDireitoInferior, sobrescrever, ossos, "antebraço direito", "antebraco direito", "rightlowerarm", "lowerarm_r", "forearm_r");
         AtribuirPorNome(ref maoDireitaOsso, sobrescrever, ossos, "mão direita", "mao direita", "righthand", "hand_r");
-        AtribuirPorNome(ref claviculaEsquerda, sobrescrever, ossos, "clavicula esquerda", "clavícula esquerda", "leftshoulder", "leftclavicle");
-        AtribuirPorNome(ref claviculaDireita, sobrescrever, ossos, "clavicula direita", "clavícula direita", "rightshoulder", "rightclavicle");
+        AtribuirPorNome(ref claviculaEsquerda, sobrescrever, ossos, "clavicula esquerda", "clavícula esquerda", "ombro esquerdo", "ombro_l", "ombrol", "leftshoulder", "leftclavicle");
+        AtribuirPorNome(ref claviculaDireita, sobrescrever, ossos, "clavicula direita", "clavícula direita", "ombro direito", "ombro_r", "ombror", "rightshoulder", "rightclavicle");
     }
 
     private void AtribuirPorNome(ref Transform campo, bool sobrescrever, Transform[] ossos, params string[] nomesPossiveis)
@@ -2012,6 +2187,16 @@ public class AvatarVRIKController : MonoBehaviour
         limiteAcompanhamentoAntebracoDireito = Mathf.Clamp(limiteAcompanhamentoAntebracoDireito, 0f, 120f);
         limiteAcompanhamentoAntebracoEsquerdo = Mathf.Clamp(limiteAcompanhamentoAntebracoEsquerdo, 0f, 120f);
         limiteStretch = Mathf.Max(1f, limiteStretch);
+        limiarAvancoOmbro = Mathf.Max(0f, limiarAvancoOmbro);
+        distanciaAvancoOmbroMaximo = Mathf.Max(limiarAvancoOmbro + 0.01f, distanciaAvancoOmbroMaximo);
+        suavidadeAvancoOmbro = Mathf.Max(0f, suavidadeAvancoOmbro);
+
+        // Garante que o limite mínimo nunca fique maior que o máximo (evita inverter o clamp por engano).
+        limiteMaximoOmbro = Mathf.Clamp(limiteMaximoOmbro, 0f, 179f);
+        limiteMinimoOmbro = Mathf.Clamp(limiteMinimoOmbro, -179f, 0f);
+
+        // O ângulo máximo de avanço não pode passar do limite de segurança público.
+        anguloMaximoAvancoOmbro = Mathf.Clamp(anguloMaximoAvancoOmbro, 0f, limiteMaximoOmbro);
     }
 
     private void AtualizarStatusConfiguracao()
@@ -2064,6 +2249,7 @@ public class AvatarVRIKController : MonoBehaviour
             maoDireitaOsso,
             alvoMaoDireita
         );
+        bool ombrosEncontrados = claviculaEsquerda != null && claviculaDireita != null;
 
         StringBuilder status = new StringBuilder(900);
         status.AppendLine(LinhaStatus("Animator encontrado", animatorEncontrado));
@@ -2085,6 +2271,7 @@ public class AvatarVRIKController : MonoBehaviour
         status.AppendLine(LinhaStatus("Bra\u00e7o direito encontrado", bracoDireitoEncontrado));
         status.AppendLine(LinhaStatus("Antebra\u00e7o direito encontrado", antebracoDireitoEncontrado));
         status.AppendLine(LinhaStatus("M\u00e3o direita encontrada", maoDireitaEncontrada));
+        status.AppendLine(LinhaStatus("Ombros/clav\u00edculas encontrados", ombrosEncontrados));
         status.AppendLine(LinhaStatus("Targets encontrados", targetsEncontrados));
         status.AppendLine(LinhaStatus("Hints encontrados", hintsEncontrados));
         status.AppendLine(LinhaStatus("Animation Rigging instalado", animationRiggingDisponivel));
@@ -2096,6 +2283,11 @@ public class AvatarVRIKController : MonoBehaviour
         status.AppendLine($"  Peso acompanhamento direito: {pesoAcompanhamentoAntebracoDireito:0.00} | esquerdo: {pesoAcompanhamentoAntebracoEsquerdo:0.00}");
         status.AppendLine($"  Twist mão direita: {twistMaoDireitaGraus:0.0}° -> antebraço {twistAplicadoAntebracoDireitoGraus:0.0}° | eixo válido: {eixoAcompanhamentoDireitoValido}");
         status.AppendLine($"  Twist mão esquerda: {twistMaoEsquerdaGraus:0.0}° -> antebraço {twistAplicadoAntebracoEsquerdoGraus:0.0}° | eixo válido: {eixoAcompanhamentoEsquerdoValido}");
+        status.AppendLine(LinhaStatus("Avanço do ombro ativo", usarAvancoDoOmbro));
+        status.AppendLine($"  Eixo local avanco ombro: {eixoLocalAvancoOmbro}");
+        status.AppendLine($"  Ângulo máximo: {anguloMaximoAvancoOmbro:0.0}° | limiar: {limiarAvancoOmbro:0.00}m | máximo em: {distanciaAvancoOmbroMaximo:0.00}m");
+        status.AppendLine($"  Limite público de segurança: {limiteMinimoOmbro:0.0}° a {limiteMaximoOmbro:0.0}°");
+        status.AppendLine($"  Ombro direito atual: {avancoOmbroDireitoGraus:0.0}° | esquerdo atual: {avancoOmbroEsquerdoGraus:0.0}°");
         status.AppendLine();
 
         if (!animatorEncontrado)
@@ -2140,6 +2332,9 @@ public class AvatarVRIKController : MonoBehaviour
 
         if (!targetsEncontrados || !hintsEncontrados)
             status.AppendLine("Use 'Configurar Avatar VR Automaticamente' para criar/preencher Targets e Hints. Isso n\u00e3o depende de Humanoid perfeito.");
+
+        if (usarAvancoDoOmbro && !ombrosEncontrados)
+            status.AppendLine("Avanço do ombro está ativo, mas os ossos de clavícula/ombro não foram encontrados. O avanço não terá efeito até que Ombro Esquerdo/Direito sejam preenchidos.");
 
         if (MovimentacaoDiretaDosBracos && animationRiggingBracosAtivo)
             status.AppendLine("Movimentacao direta dos bracos ativa com Animation Rigging: os targets seguem os controles VR e o Two Bone IK move os bracos. O fallback manual fica desligado.");

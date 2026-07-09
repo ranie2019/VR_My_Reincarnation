@@ -12,8 +12,8 @@ GameObject:
   - component: {fileID: 797939693695432636}
   - component: {fileID: 3239828270576206710}
   - component: {fileID: 8817118437207280341}
-  - component: {fileID: 5767415658532202532}
   - component: {fileID: 614373225204520255}
+  - component: {fileID: 5767415658532202532}
   m_Layer: 0
   m_Name: Arvore 3
   m_TagString: Tree
@@ -114,26 +114,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.9013977, y: 7.07427, z: 0.9140625}
   m_Center: {x: -0.017684937, y: 3.537135, z: 0.0026855469}
---- !u!114 &5767415658532202532
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4032642331417584291}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f12e3aea1c98b234e82c43f51a21b660, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VidaArvore
-  vidaMax: 5
-  vidaAtual: 5
-  tagMachado: Machado
-  danoPorHit: 1
-  cooldownHit: 0.25
-  prefabAoDestruir: {fileID: 1360994071702760, guid: 640e2e58c89e3714881006bd0c5eeabf, type: 3}
-  offsetSpawn: {x: 1, y: 1, z: 1}
-  respawnId: Arvore 3
 --- !u!54 &614373225204520255
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -161,3 +141,23 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 126
   m_CollisionDetection: 2
+--- !u!114 &5767415658532202532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4032642331417584291}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f12e3aea1c98b234e82c43f51a21b660, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VidaArvore
+  vidaMax: 5
+  vidaAtual: 5
+  tagMachado: Machado
+  danoPorHit: 1
+  cooldownHit: 0.1
+  prefabAoDestruir: {fileID: 1360994071702760, guid: 640e2e58c89e3714881006bd0c5eeabf, type: 3}
+  offsetSpawn: {x: 0, y: 1, z: 0}
+  respawnId: Arvore 3

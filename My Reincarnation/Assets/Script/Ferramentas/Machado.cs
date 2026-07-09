@@ -59,13 +59,24 @@ public class Machado : MonoBehaviour
     private float velocidadeAngularAudioSegurado;
     private float proximoAudioSeguradoPermitido;
     private bool temAmostraAudioSegurado;
-    private readonly HashSet<VidaArvore> arvoresDentroDoTrigger = new();
-    private readonly Dictionary<VidaArvore, int> contatosPorArvore = new();
+    private class BloqueioArvore
+    {
+        public VidaArvore arvore;
+        public Collider[] collidersArvore;
+        public int fixedUpdatesFora;
+        public bool aguardandoChecagemSaida;
+    }
+
+    private readonly HashSet<int> arvoresBloqueadasAteSairRealmente = new();
+    private readonly Dictionary<int, BloqueioArvore> bloqueiosArvores = new();
+    private readonly List<int> idsArvoresParaDesbloquear = new();
     private readonly HashSet<Collider> contatosAudioSeguradoAtivos = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
     private const float VelocidadeMinimaAudioSegurado = 0.25f;
     private const float VelocidadeAngularMinimaAudioSegurado = 45f;
     private const float CooldownMinimoAudioSegurado = 0.2f;
+    private const int FixedUpdatesForaArvoreParaDesbloquear = 3;
+    private const float MargemSeparacaoRealArvore = 0.02f;
 
     public int VidaAtual => vidaAtual;
     public int VidaMaxima => vidaMaxima;
@@ -109,9 +120,13 @@ public class Machado : MonoBehaviour
         }
 
         donoAtualPlayer = null;
-        arvoresDentroDoTrigger.Clear();
-        contatosPorArvore.Clear();
+        LimparContatosArvores();
         contatosAudioSeguradoAtivos.Clear();
+    }
+
+    private void OnDestroy()
+    {
+        LimparContatosArvores();
     }
 
     private void OnValidate()
@@ -135,19 +150,29 @@ public class Machado : MonoBehaviour
         AtualizarMovimentoAudioSegurado();
     }
 
+    private void FixedUpdate()
+    {
+        AtualizarBloqueiosArvoresPorSeparacaoReal();
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
         if (Quebrado || collision == null)
             return;
 
         Collider other = collision.collider;
-        bool podeTocarSom = AudioColisaoFiltro.PodeTocarSomDeColisao(collision);
-        if (podeTocarSom)
-            TentarTocarAudioColisao(other, "OnCollisionEnter", EstaSendoSegurado());
-        else
-            LogAudioFerramenta("OnCollisionEnter", other, "bloqueado pelo filtro", false, false);
+        bool colliderPertenceAArvore = ColliderPertenceAArvore(other);
+        bool colliderDeArvoreValida = EhColliderDeArvoreValida(other);
+        if (!colliderPertenceAArvore)
+        {
+            bool podeTocarSom = AudioColisaoFiltro.PodeTocarSomDeColisao(collision);
+            if (podeTocarSom)
+                TentarTocarAudioColisao(other, "OnCollisionEnter", EstaSendoSegurado());
+            else
+                LogAudioFerramenta("OnCollisionEnter", other, "bloqueado pelo filtro", false, false);
+        }
 
-        TentarAplicarDanoPorContato(other, false, false);
+        TentarAplicarDanoPorContato(other, colliderDeArvoreValida);
 
         if (impactForce > 0f && rb != null && TagPodeReceberDano(collision.collider))
             ApplyImpactForce(collision);
@@ -164,6 +189,9 @@ public class Machado : MonoBehaviour
             LogAudioFerramenta("OnCollisionStay", null, "collider nulo", false, false);
             return;
         }
+
+        if (ColliderPertenceAArvore(other))
+            return;
 
         bool jaEstavaEmContato = contatosAudioSeguradoAtivos.Contains(other);
         if (jaEstavaEmContato)
@@ -193,6 +221,7 @@ public class Machado : MonoBehaviour
         Collider other = collision != null ? collision.collider : null;
         bool estavaEmContato = other != null && contatosAudioSeguradoAtivos.Contains(other);
         RemoverContatoAudioSegurado(other);
+        MarcarArvoreParaChecagemDeSaidaReal(other);
         LogAudioFerramenta("OnCollisionExit", other, estavaEmContato ? "contato liberado" : "contato nao estava registrado", estavaEmContato, false);
     }
 
@@ -206,23 +235,7 @@ public class Machado : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
-        VidaArvore arvore = BuscarVidaArvore(other);
-        if (arvore == null)
-            return;
-
-        if (!contatosPorArvore.TryGetValue(arvore, out int contatos))
-            return;
-
-        contatos--;
-
-        if (contatos > 0)
-        {
-            contatosPorArvore[arvore] = contatos;
-            return;
-        }
-
-        contatosPorArvore.Remove(arvore);
-        arvoresDentroDoTrigger.Remove(arvore);
+        MarcarArvoreParaChecagemDeSaidaReal(other);
     }
 
     private void OnSelectEntered(SelectEnterEventArgs args)
@@ -249,11 +262,14 @@ public class Machado : MonoBehaviour
 
     private void TentarAplicarDanoPorEntradaTrigger(Collider other)
     {
-        TentarAplicarDanoPorContato(other, true, false);
+        TentarAplicarDanoPorContato(other, EhColliderDeArvoreValida(other));
     }
 
     private void TocarSomContatoSeguradoUmaVez(Collider other)
     {
+        if (ColliderPertenceAArvore(other))
+            return;
+
         TentarTocarAudioColisao(other, "OnCollisionStay", true);
     }
 
@@ -264,6 +280,9 @@ public class Machado : MonoBehaviour
             LogAudioFerramenta(origem, null, "collider nulo", false, false);
             return;
         }
+
+        if (ColliderPertenceAArvore(other))
+            return;
 
         bool jaEstavaEmContato = contatosAudioSeguradoAtivos.Contains(other);
         if (controlarContatoAtivo && jaEstavaEmContato)
@@ -315,7 +334,7 @@ public class Machado : MonoBehaviour
             contatosAudioSeguradoAtivos.Remove(other);
     }
 
-    private void TentarAplicarDanoPorContato(Collider other, bool controlarEntradaTrigger = false, bool podeTocarSom = true)
+    private void TentarAplicarDanoPorContato(Collider other, bool podeTocarSom = true)
     {
         if (other == null || DeveIgnorarObjeto(other))
             return;
@@ -335,27 +354,185 @@ public class Machado : MonoBehaviour
             return;
         }
 
-        if (controlarEntradaTrigger)
-        {
-            if (contatosPorArvore.TryGetValue(arvore, out int contatos))
-                contatosPorArvore[arvore] = contatos + 1;
-            else
-                contatosPorArvore.Add(arvore, 1);
-
-            if (!arvoresDentroDoTrigger.Add(arvore))
-                return;
-        }
+        if (!BloquearArvoreAteSairRealmente(arvore))
+            return;
 
         if (!arvore.ReceberDanoDeMachado(gameObject))
         {
-            if (podeTocarSom)
-                TocarSomOutros();
             return;
         }
 
         if (podeTocarSom)
             TocarSomCorte();
         ReduzirVidaDoMachado();
+    }
+
+    private bool BloquearArvoreAteSairRealmente(VidaArvore arvore)
+    {
+        if (arvore == null)
+            return false;
+
+        int id = arvore.GetInstanceID();
+        if (!arvoresBloqueadasAteSairRealmente.Add(id))
+            return false;
+
+        bloqueiosArvores[id] = new BloqueioArvore
+        {
+            arvore = arvore,
+            collidersArvore = arvore.GetComponentsInChildren<Collider>(true),
+            fixedUpdatesFora = 0,
+            aguardandoChecagemSaida = false
+        };
+
+        return true;
+    }
+
+    private void MarcarArvoreParaChecagemDeSaidaReal(Collider colliderContato)
+    {
+        VidaArvore arvore = BuscarVidaArvore(colliderContato);
+        if (arvore == null)
+            return;
+
+        int id = arvore.GetInstanceID();
+        if (bloqueiosArvores.TryGetValue(id, out BloqueioArvore bloqueio))
+            bloqueio.aguardandoChecagemSaida = true;
+    }
+
+    private void AtualizarBloqueiosArvoresPorSeparacaoReal()
+    {
+        if (arvoresBloqueadasAteSairRealmente.Count == 0)
+            return;
+
+        idsArvoresParaDesbloquear.Clear();
+        Collider[] collidersMachado = GetComponentsInChildren<Collider>(true);
+
+        foreach (KeyValuePair<int, BloqueioArvore> par in bloqueiosArvores)
+        {
+            int id = par.Key;
+            BloqueioArvore bloqueio = par.Value;
+
+            if (bloqueio == null || bloqueio.arvore == null)
+            {
+                idsArvoresParaDesbloquear.Add(id);
+                continue;
+            }
+
+            if (ExisteSobreposicaoRealComArvore(collidersMachado, bloqueio))
+            {
+                bloqueio.fixedUpdatesFora = 0;
+                bloqueio.aguardandoChecagemSaida = false;
+                continue;
+            }
+
+            bloqueio.fixedUpdatesFora++;
+            bloqueio.aguardandoChecagemSaida = true;
+
+            if (bloqueio.fixedUpdatesFora >= FixedUpdatesForaArvoreParaDesbloquear)
+                idsArvoresParaDesbloquear.Add(id);
+        }
+
+        for (int i = 0; i < idsArvoresParaDesbloquear.Count; i++)
+            DesbloquearArvore(idsArvoresParaDesbloquear[i]);
+    }
+
+    private bool ExisteSobreposicaoRealComArvore(Collider[] collidersMachado, BloqueioArvore bloqueio)
+    {
+        if (collidersMachado == null || bloqueio == null || bloqueio.arvore == null)
+            return false;
+
+        if (bloqueio.collidersArvore == null || bloqueio.collidersArvore.Length == 0)
+            bloqueio.collidersArvore = bloqueio.arvore.GetComponentsInChildren<Collider>(true);
+
+        Collider[] collidersArvore = bloqueio.collidersArvore;
+        if (collidersArvore == null || collidersArvore.Length == 0)
+            return false;
+
+        for (int i = 0; i < collidersMachado.Length; i++)
+        {
+            Collider colliderMachado = collidersMachado[i];
+            if (!ColliderValidoParaSeparacao(colliderMachado))
+                continue;
+
+            for (int j = 0; j < collidersArvore.Length; j++)
+            {
+                Collider colliderArvore = collidersArvore[j];
+                if (!ColliderValidoParaSeparacao(colliderArvore))
+                    continue;
+
+                if (CollidersAindaSeTocamOuSobrepoem(colliderMachado, colliderArvore))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool CollidersAindaSeTocamOuSobrepoem(Collider colliderMachado, Collider colliderArvore)
+    {
+        Bounds boundsMachado = colliderMachado.bounds;
+        Bounds boundsArvore = colliderArvore.bounds;
+        boundsMachado.Expand(MargemSeparacaoRealArvore * 2f);
+        boundsArvore.Expand(MargemSeparacaoRealArvore * 2f);
+
+        if (!boundsMachado.Intersects(boundsArvore))
+            return false;
+
+        if (Physics.ComputePenetration(
+            colliderMachado,
+            colliderMachado.transform.position,
+            colliderMachado.transform.rotation,
+            colliderArvore,
+            colliderArvore.transform.position,
+            colliderArvore.transform.rotation,
+            out _,
+            out _))
+        {
+            return true;
+        }
+
+        float margemQuadrada = MargemSeparacaoRealArvore * MargemSeparacaoRealArvore;
+        Vector3 pontoMachado = colliderMachado.ClosestPoint(colliderArvore.bounds.center);
+        Vector3 pontoArvore = colliderArvore.ClosestPoint(pontoMachado);
+        if ((pontoMachado - pontoArvore).sqrMagnitude <= margemQuadrada)
+            return true;
+
+        pontoArvore = colliderArvore.ClosestPoint(colliderMachado.bounds.center);
+        pontoMachado = colliderMachado.ClosestPoint(pontoArvore);
+        return (pontoMachado - pontoArvore).sqrMagnitude <= margemQuadrada;
+    }
+
+    private static bool ColliderValidoParaSeparacao(Collider collider)
+    {
+        return collider != null && collider.enabled && collider.gameObject.activeInHierarchy;
+    }
+
+    private void DesbloquearArvore(int id)
+    {
+        arvoresBloqueadasAteSairRealmente.Remove(id);
+        bloqueiosArvores.Remove(id);
+    }
+
+    private bool EhColliderDeArvoreValida(Collider other)
+    {
+        if (!ColliderPertenceAArvore(other))
+            return false;
+
+        return TagPodeReceberDano(other);
+    }
+
+    private bool ColliderPertenceAArvore(Collider other)
+    {
+        if (other == null || DeveIgnorarObjeto(other))
+            return false;
+
+        return BuscarVidaArvore(other) != null;
+    }
+
+    private void LimparContatosArvores()
+    {
+        arvoresBloqueadasAteSairRealmente.Clear();
+        bloqueiosArvores.Clear();
+        idsArvoresParaDesbloquear.Clear();
     }
 
     private void NormalizarVida()

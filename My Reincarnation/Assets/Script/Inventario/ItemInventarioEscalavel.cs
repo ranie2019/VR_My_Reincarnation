@@ -4,6 +4,8 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 [DisallowMultipleComponent]
 public class ItemInventarioEscalavel : MonoBehaviour
 {
+    private const float TamanhoMinimoBounds = 0.0001f;
+
     [HideInInspector] public bool escalaOriginalSalva = false;
     [HideInInspector] public Vector3 escalaOriginalMundo;
 
@@ -22,16 +24,34 @@ public class ItemInventarioEscalavel : MonoBehaviour
         if (!EscalaValida(escalaOriginal))
             return;
 
+        var escalaComp = GetComponent<EscalaOriginalItem>();
+        if (escalaComp != null && escalaComp.inicializado && EscalaValida(escalaComp.escalaOriginal))
+        {
+            escalaOriginalMundo = escalaComp.escalaOriginal;
+            escalaOriginalSalva = true;
+            return;
+        }
+
         if (PossuiEscalaOriginalMundoValida())
         {
-            SincronizarComEscalaOriginalItem();
+            if (escalaComp == null)
+                escalaComp = gameObject.AddComponent<EscalaOriginalItem>();
+
+            if (!escalaComp.inicializado || !EscalaValida(escalaComp.escalaOriginal))
+            {
+                escalaComp.escalaOriginal = escalaOriginalMundo;
+                escalaComp.inicializado = true;
+            }
+
             return;
         }
 
         escalaOriginalMundo = escalaOriginal;
         escalaOriginalSalva = true;
 
-        var escalaComp = GetComponent<EscalaOriginalItem>();
+        if (escalaComp == null)
+            escalaComp = gameObject.AddComponent<EscalaOriginalItem>();
+
         if (escalaComp != null)
         {
             escalaComp.escalaOriginal = escalaOriginal;
@@ -105,10 +125,34 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     public bool AjustarRenderersParaSlotVisual(Transform slotTransform, Bounds boundsPermitido)
     {
+        GarantirEscalaOriginal();
+        if (!PossuiEscalaOriginalMundoValida())
+            return false;
+
+        return AjustarRenderersParaSlotVisual(slotTransform, boundsPermitido, escalaOriginalMundo);
+    }
+
+    public bool AjustarRenderersParaSlotVisual(Transform slotTransform, Bounds boundsPermitido, Vector3 escalaBaseMundo)
+    {
         if (slotTransform == null || !TamanhoValido(boundsPermitido.size))
             return false;
 
+        if (EscalaValida(escalaBaseMundo))
+            DefinirEscalaOriginalMundo(escalaBaseMundo);
+
+        GarantirEscalaOriginal();
+        if (!PossuiEscalaOriginalMundoValida())
+            return false;
+
+        Vector3 escalaLocalBase = ConverterEscalaMundoParaLocal(escalaOriginalMundo);
+
+        if (!EscalaValida(escalaLocalBase))
+            return false;
+
+        AplicarEscalaLocal(escalaLocalBase);
+
         bool coube = false;
+        float fatorAplicado = 1f;
 
         for (int i = 0; i < 10; i++)
         {
@@ -129,7 +173,8 @@ public class ItemInventarioEscalavel : MonoBehaviour
             if (ajuste >= 1f)
                 break;
 
-            AplicarEscalaLocal(transform.localScale * ajuste);
+            fatorAplicado *= ajuste;
+            AplicarEscalaLocal(escalaLocalBase * fatorAplicado);
         }
 
         if (!coube && TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsFinais))
@@ -159,6 +204,9 @@ public class ItemInventarioEscalavel : MonoBehaviour
         if (PossuiEscalaOriginalMundoValida())
             return;
 
+        if (!gameObject.activeInHierarchy || !EscalaValida(transform.lossyScale))
+            return;
+
         escalaOriginalMundo = transform.lossyScale;
         escalaOriginalSalva = true;
 
@@ -167,16 +215,6 @@ public class ItemInventarioEscalavel : MonoBehaviour
             escalaComp.escalaOriginal = escalaOriginalMundo;
             escalaComp.inicializado = true;
         }
-    }
-
-    private void SincronizarComEscalaOriginalItem()
-    {
-        var escalaComp = GetComponent<EscalaOriginalItem>();
-        if (escalaComp == null || escalaComp.inicializado)
-            return;
-
-        escalaComp.escalaOriginal = escalaOriginalMundo;
-        escalaComp.inicializado = true;
     }
 
     private Vector3 ConverterEscalaMundoParaLocal(Vector3 escalaMundo)
@@ -220,7 +258,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
         foreach (Renderer r in renderers)
         {
-            if (r == null || !r.transform.IsChildOf(transform)) continue;
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy || !r.transform.IsChildOf(transform)) continue;
             if (!BoundsValido(r.bounds)) continue;
 
             EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
@@ -237,7 +275,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
         foreach (Renderer r in renderers)
         {
-            if (r == null || !r.transform.IsChildOf(transform)) continue;
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy || !r.transform.IsChildOf(transform)) continue;
             if (!BoundsValido(r.bounds)) continue;
 
             EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
@@ -323,7 +361,10 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     private static bool TamanhoValido(Vector3 tamanho)
     {
-        return VetorFinito(tamanho) && tamanho.x > 0f && tamanho.y > 0f && tamanho.z > 0f;
+        return VetorFinito(tamanho) &&
+               tamanho.x > TamanhoMinimoBounds &&
+               tamanho.y > TamanhoMinimoBounds &&
+               tamanho.z > TamanhoMinimoBounds;
     }
 
     private static bool EscalaValida(Vector3 escala)
@@ -349,8 +390,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     private static bool BoundsValido(Bounds bounds)
     {
-        return VetorFinito(bounds.center) && VetorFinito(bounds.size) &&
-               bounds.size.x >= 0f && bounds.size.y >= 0f && bounds.size.z >= 0f;
+        return VetorFinito(bounds.center) && TamanhoValido(bounds.size);
     }
 
     private static bool VetorFinito(Vector3 valor)

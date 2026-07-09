@@ -5,7 +5,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 public class ArmaAttachPorMao : XRGrabInteractable
 {
-    [Header("Pontos de Attach por MÃ£o")]
+    [Header("Pontos de Attach por Mão")]
     [SerializeField] private Transform pontoMaoDireita;
     [SerializeField] private Transform pontoMaoEsquerda;
 

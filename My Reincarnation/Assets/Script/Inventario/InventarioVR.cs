@@ -280,13 +280,37 @@ public class InventarioVR : MonoBehaviour
             return;
 
         foreach (var canvas in painelInventario.GetComponentsInChildren<Canvas>(true))
+        {
+            if (ComponentePertenceAItemInventario(canvas))
+                continue;
+
             canvas.enabled = visivel;
+        }
 
         foreach (var graphic in painelInventario.GetComponentsInChildren<Graphic>(true))
+        {
+            if (ComponentePertenceAItemInventario(graphic))
+                continue;
+
             graphic.enabled = visivel;
+        }
 
         foreach (var renderer in painelInventario.GetComponentsInChildren<Renderer>(true))
+        {
+            if (ComponentePertenceAItemInventario(renderer))
+                continue;
+
             renderer.enabled = visivel;
+        }
+    }
+
+    private static bool ComponentePertenceAItemInventario(Component componente)
+    {
+        if (componente == null)
+            return false;
+
+        EstadoItemInventario estado = componente.GetComponentInParent<EstadoItemInventario>(true);
+        return estado != null && estado.estaNoInventario;
     }
 
     private void AtualizarSlots(bool inventarioAberto)
@@ -299,6 +323,14 @@ public class InventarioVR : MonoBehaviour
             if (slot != null)
                 slot.SetInventarioAberto(inventarioAberto);
         }
+    }
+
+    public SlotInventario[] ObterSlotsParaSave()
+    {
+        if (slots != null && slots.Length > 0)
+            return slots;
+
+        return GetComponentsInChildren<SlotInventario>(true);
     }
 
     private void AtualizarBotoesRolagem(bool ativo)

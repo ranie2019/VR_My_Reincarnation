@@ -95,23 +95,8 @@ public class VidaArvore : MonoBehaviour
 
     private void ReceberHitPorCollision(Collision collision, string origemEvento)
     {
-        if (collision == null)
-            return;
-
-        bool colliderEhMachado = ColliderEhMachado(collision.collider);
-        bool transformEhMachado = TransformEhMachado(collision.transform);
-
-        if (morreu)
-            return;
-
-        if (emCooldown)
-            return;
-
-        if (colliderEhMachado || transformEhMachado)
-        {
-            TomarDano(danoPorHit);
-            return;
-        }
+        // A arvore nao aplica dano diretamente por evento fisico.
+        // O Machado e o dono do controle "1 colisao real = 1 dano", incluindo bloqueio ate sair da arvore.
     }
 
     private void ReceberHitPorTrigger(Collider other, string origemEvento)
@@ -171,7 +156,7 @@ public class VidaArvore : MonoBehaviour
 
     public bool ReceberDanoDeMachado(int dano, GameObject origem)
     {
-        if (morreu || emCooldown)
+        if (morreu)
             return false;
 
         TomarDano(Mathf.Max(1, dano));
