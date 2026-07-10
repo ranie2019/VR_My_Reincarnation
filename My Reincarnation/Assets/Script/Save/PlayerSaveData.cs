@@ -16,6 +16,7 @@ public class PlayerSaveData
     public int vidaMaxima;
     public int manaAtual;
     public int manaMaxima;
+    public long reinUnidades;
     public bool statusDetalhadoSalvo;
     public int pontosStatusDisponiveis;
     public int forca;

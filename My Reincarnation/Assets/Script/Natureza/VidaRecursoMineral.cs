@@ -20,6 +20,9 @@ public class VidaRecursoMineral : MonoBehaviour
     [SerializeField] private GameObject prefabAoDestruir;
     [SerializeField] private Vector3 offsetSpawn = Vector3.zero;
 
+    [Header("Respawn")]
+    [SerializeField] private string respawnId = "";
+
     private bool emCooldown;
     private bool morreu;
 
@@ -267,6 +270,22 @@ public class VidaRecursoMineral : MonoBehaviour
 
         if (prefabAoDestruir != null)
             Instantiate(prefabAoDestruir, transform.position + offsetSpawn, transform.rotation);
+
+        if (RespawnNatureza.Instancia != null && !string.IsNullOrWhiteSpace(respawnId))
+        {
+            RespawnNatureza.Instancia.AgendarRespawn(
+                respawnId,
+                transform.position,
+                transform.rotation);
+        }
+        else if (RespawnNatureza.Instancia == null)
+        {
+            { }
+        }
+        else if (string.IsNullOrWhiteSpace(respawnId))
+        {
+            { }
+        }
 
         Destroy(gameObject);
     }

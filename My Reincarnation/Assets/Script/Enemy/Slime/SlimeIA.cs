@@ -1,6 +1,7 @@
 using System.Collections;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.AI;
@@ -118,6 +119,12 @@ public class SlimeIA : MonoBehaviour, IDano
     [Header("Spawn de missao ao morrer")]
     [SerializeField] private SpawnMissaoConfig[] prefabsSpawnMissao;
 
+    [Header("Recompensa REIN")]
+    [SerializeField] private bool darReinAoMorrer = true;
+    [SerializeField] private string reinMinimo = "0.01";
+    [SerializeField] private string reinMaximo = "0.05";
+    [SerializeField, Range(0, 5)] private int casasDecimaisSorteioRein = 5;
+
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip somAndar;
@@ -184,6 +191,7 @@ public class SlimeIA : MonoBehaviour, IDano
     private bool temDie;
     private bool morto;
     private bool experienciaJaEntregue;
+    private bool recompensaReinJaPaga;
     private Transform ultimoPlayerResponsavel;
     private ExperienciaInimigo experienciaInimigo;
     private static readonly string[] NomesMembrosDano =
@@ -351,6 +359,7 @@ public class SlimeIA : MonoBehaviour, IDano
         tempoParaMorrer = Mathf.Max(0f, tempoParaMorrer);
         quantidadePontosAuto = Mathf.Max(1, quantidadePontosAuto);
         raioPatrulhaAuto = Mathf.Max(0.1f, raioPatrulhaAuto);
+        casasDecimaisSorteioRein = Mathf.Clamp(casasDecimaisSorteioRein, 0, 5);
         NormalizarSpawnsNormais();
         NormalizarSpawnsMissao();
         volumeAndar = Mathf.Clamp01(volumeAndar);
@@ -1793,6 +1802,7 @@ public class SlimeIA : MonoBehaviour, IDano
         MudarEstado(EstadoSlime.Morto);
         TocarSomMorrer();
         EntregarExperienciaAoMorrer();
+        PagarRecompensaReinAoPrimeiroAtacante();
         SpawnarPrefabsNormais();
         SpawnarPrefabsMissao();
         if (RespawnMonstro.Instancia != null)
@@ -1826,6 +1836,139 @@ public class SlimeIA : MonoBehaviour, IDano
 
         if (experienciaInimigo != null)
             experienciaInimigo.EntregarExperiencia();
+    }
+
+    private void PagarRecompensaReinAoPrimeiroAtacante()
+    {
+        if (!darReinAoMorrer || recompensaReinJaPaga)
+            return;
+
+        recompensaReinJaPaga = true;
+
+        CarteiraReinPlayer carteira = EncontrarCarteiraReinDoPrimeiroAtacante();
+        if (carteira == null)
+            return;
+
+        long unidades = SortearReinUnidades();
+        if (unidades <= 0)
+            return;
+
+        carteira.AdicionarReinUnidades(unidades);
+    }
+
+    private CarteiraReinPlayer EncontrarCarteiraReinDoPrimeiroAtacante()
+    {
+        if (experienciaInimigo == null)
+            experienciaInimigo = GetComponent<ExperienciaInimigo>();
+
+        StatusPlayer status = experienciaInimigo != null ? experienciaInimigo.PrimeiroAtacante : null;
+        if (status == null)
+            status = ObterStatusPlayerEmTransform(ultimoPlayerResponsavel);
+        if (status == null)
+            status = ObterStatusPlayerEmTransform(alvoPlayer);
+        if (status == null)
+            status = EncontrarStatusPlayerFallbackRein();
+
+        return status != null ? status.ObterCarteiraRein() : null;
+    }
+
+    private long SortearReinUnidades()
+    {
+        TentarConverterReinParaUnidades(reinMinimo, out long minimo);
+        TentarConverterReinParaUnidades(reinMaximo, out long maximo);
+
+        minimo = Math.Max(0L, minimo);
+        maximo = Math.Max(0L, maximo);
+
+        if (maximo < minimo)
+        {
+            long temporario = minimo;
+            minimo = maximo;
+            maximo = temporario;
+        }
+
+        int casas = Mathf.Clamp(casasDecimaisSorteioRein, 0, 5);
+        long passo = CalcularPassoUnidadesRein(casas);
+        minimo = ArredondarParaPasso(minimo, passo, true);
+        maximo = ArredondarParaPasso(maximo, passo, false);
+
+        if (maximo < minimo)
+            maximo = minimo;
+
+        return RandomLongInclusivo(minimo, maximo, passo);
+    }
+
+    private static bool TentarConverterReinParaUnidades(string texto, out long unidades)
+    {
+        unidades = 0L;
+        if (string.IsNullOrWhiteSpace(texto))
+            return false;
+
+        string normalizado = texto.Trim().Replace(',', '.');
+        if (!decimal.TryParse(normalizado, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal valor))
+            return false;
+
+        if (valor <= 0m)
+            return true;
+
+        unidades = CarteiraReinPlayer.ConverterDecimalParaUnidades(valor);
+        return true;
+    }
+
+    private static long CalcularPassoUnidadesRein(int casasDecimais)
+    {
+        int casas = Mathf.Clamp(casasDecimais, 0, 5);
+        long passo = 1L;
+        for (int i = casas; i < 5; i++)
+            passo *= 10L;
+
+        return Math.Max(1L, passo);
+    }
+
+    private static long ArredondarParaPasso(long valor, long passo, bool paraCima)
+    {
+        passo = Math.Max(1L, passo);
+        long resto = valor % passo;
+        if (resto == 0L)
+            return valor;
+
+        return paraCima ? valor + (passo - resto) : valor - resto;
+    }
+
+    private static long RandomLongInclusivo(long minimo, long maximo, long passo)
+    {
+        if (maximo <= minimo)
+            return minimo;
+
+        passo = Math.Max(1L, passo);
+        long quantidadePassos = ((maximo - minimo) / passo) + 1L;
+        double sorteio = UnityEngine.Random.value * quantidadePassos;
+        long indice = Math.Min(quantidadePassos - 1L, (long)Math.Floor(sorteio));
+        return minimo + indice * passo;
+    }
+
+    private static StatusPlayer ObterStatusPlayerEmTransform(Transform alvo)
+    {
+        if (alvo == null)
+            return null;
+
+        StatusPlayer status = alvo.GetComponent<StatusPlayer>();
+        if (status != null)
+            return status;
+
+        status = alvo.GetComponentInParent<StatusPlayer>();
+        if (status != null)
+            return status;
+
+        Transform raiz = alvo.root;
+        return raiz != null ? raiz.GetComponentInChildren<StatusPlayer>(true) : null;
+    }
+
+    private StatusPlayer EncontrarStatusPlayerFallbackRein()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag(tagPlayer);
+        StatusPlayer status = player != null ? ObterStatusPlayerEmTransform(player.transform) : null;
+        return status != null ? status : FindFirstObjectByType<StatusPlayer>();
     }
 
     private void SpawnarPrefabsNormais()
@@ -2083,6 +2226,7 @@ public class SlimeIA : MonoBehaviour, IDano
     {
         morto = false;
         experienciaJaEntregue = false;
+        recompensaReinJaPaga = false;
         somMorteTocado = false;
         impactoAtaqueResolvido = false;
         investidaAtaqueEmAndamento = false;

@@ -821,6 +821,7 @@ public class SaveManager : MonoBehaviour
         data.vidaMaxima = ObterInteiroStatus(status, "GetVidaMaxima", "vidaMaxima");
         data.manaAtual = ObterInteiroStatus(status, "GetManaAtual", "manaAtual");
         data.manaMaxima = ObterInteiroStatus(status, "GetManaMaxima", "manaMaxima");
+        data.reinUnidades = ObterReinUnidadesStatus(status);
         data.statusDetalhadoSalvo = true;
         data.pontosStatusDisponiveis = ObterInteiroStatus(status, "GetPontosStatusDisponiveis", "pontosStatusDisponiveis");
         data.forca = ObterInteiroStatus(status, "GetForca", "forca");
@@ -850,6 +851,7 @@ public class SaveManager : MonoBehaviour
         DefinirInteiroStatus(status, "vidaMaxima", data.vidaMaxima);
         DefinirInteiroStatus(status, "manaAtual", data.manaAtual);
         DefinirInteiroStatus(status, "manaMaxima", data.manaMaxima);
+        DefinirReinUnidadesStatus(status, data.reinUnidades);
         DefinirInteiroStatus(status, "forca", data.forca);
         DefinirInteiroStatus(status, "constituicao", data.constituicao);
         DefinirInteiroStatus(status, "agilidade", data.agilidade);
@@ -889,6 +891,25 @@ public class SaveManager : MonoBehaviour
             return (int)campo.GetValue(status);
 
         return 0;
+    }
+
+    private long ObterReinUnidadesStatus(StatusPlayer status)
+    {
+        if (status == null)
+            return 0L;
+
+        CarteiraReinPlayer carteira = status.ObterCarteiraRein();
+        return carteira != null ? carteira.ReinUnidades : 0L;
+    }
+
+    private void DefinirReinUnidadesStatus(StatusPlayer status, long reinUnidades)
+    {
+        if (status == null)
+            return;
+
+        CarteiraReinPlayer carteira = status.ObterCarteiraRein();
+        if (carteira != null)
+            carteira.DefinirSaldoPorUnidades(reinUnidades);
     }
 
     private void DefinirInteiroStatus(StatusPlayer status, string nomeCampo, int valor)

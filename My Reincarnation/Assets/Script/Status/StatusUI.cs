@@ -34,6 +34,10 @@ public class StatusUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI textoExperienciaAtualValor;
     [SerializeField] private TextMeshProUGUI textoExperienciaMaximaValor;
 
+    [Header("Textos Moeda")]
+    [SerializeField] private TextMeshProUGUI textoReinRotulo;
+    [SerializeField] private TextMeshProUGUI textoReinValor;
+
     [Header("Textos Atributos Base")]
     [SerializeField] private TextMeshProUGUI textoForcaBaseValor;
     [SerializeField] private TextMeshProUGUI textoForcaBonusValor;
@@ -153,6 +157,8 @@ public class StatusUI : MonoBehaviour
 
         DefinirTexto(textoExperienciaAtualValor, statusPlayer.GetExperienciaAtual().ToString());
         DefinirTexto(textoExperienciaMaximaValor, statusPlayer.GetExperienciaParaProximoNivel().ToString());
+        DefinirTexto(textoReinRotulo, "REIN");
+        DefinirTexto(textoReinValor, statusPlayer.ObterReinFormatado());
 
         DefinirTexto(textoForcaBaseValor, statusPlayer.GetForca().ToString());
         DefinirTexto(textoForcaBonusValor, FormatarBonus(statusPlayer.GetBonusForca()));
@@ -450,6 +456,8 @@ public class StatusUI : MonoBehaviour
         textoManaMaximaValor = EncontrarTexto(textoManaMaximaValor, textos, "MANNA (3)", "MANA (3)");
         textoExperienciaAtualValor = EncontrarTexto(textoExperienciaAtualValor, textos, "EXPERIENCE (1)");
         textoExperienciaMaximaValor = EncontrarTexto(textoExperienciaMaximaValor, textos, "EXPERIENCE (3)");
+        textoReinRotulo = EncontrarTexto(textoReinRotulo, textos, "REIN", "GOLD", "MOEDA", "CURRENCY");
+        textoReinValor = EncontrarTexto(textoReinValor, textos, "REIN (1)", "GOLD (1)", "MOEDA (1)", "CURRENCY (1)");
 
         textoForcaBaseValor = EncontrarTexto(textoForcaBaseValor, textos, "STRENGTH (1)");
         textoForcaBonusValor = EncontrarTexto(textoForcaBonusValor, textos, "STRENGTH (2)");

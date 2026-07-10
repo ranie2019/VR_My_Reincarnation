@@ -260,6 +260,10 @@ MonoBehaviour:
     quantidadeMaxima: 1
     offsetSpawn: {x: 0, y: 1, z: 0}
   prefabsSpawnMissao: []
+  darReinAoMorrer: 1
+  reinMinimo: 0.01
+  reinMaximo: 0.1
+  casasDecimaisSorteioRein: 5
   audioSource: {fileID: 384598592461434145}
   somAndar: {fileID: 8300000, guid: 9da28b7e8602dad4a8943c44cb74a618, type: 3}
   somAtacar: {fileID: 8300000, guid: 22dc16cac1ca9f645994320ae5f1cf7d, type: 3}
@@ -284,7 +288,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9322d2d170d4fca97052ac0cfca6720, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
-  experienciaAoMorrer: 5
+  experienciaAoMorrer: 3
 --- !u!82 &384598592461434145
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1032,7 +1036,13 @@ PrefabInstance:
       propertyPath: m_Name
       value: nucleo
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 6402333203934341271, guid: 954e56c8a1d07c54a996b8b7ad496d2b, type: 3}
+    - {fileID: 8791412714660537475, guid: 954e56c8a1d07c54a996b8b7ad496d2b, type: 3}
+    - {fileID: 6765675810466809742, guid: 954e56c8a1d07c54a996b8b7ad496d2b, type: 3}
+    - {fileID: 2092593686114936158, guid: 954e56c8a1d07c54a996b8b7ad496d2b, type: 3}
+    - {fileID: 5956970898240187239, guid: 954e56c8a1d07c54a996b8b7ad496d2b, type: 3}
+    - {fileID: 746060890920985209, guid: 954e56c8a1d07c54a996b8b7ad496d2b, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

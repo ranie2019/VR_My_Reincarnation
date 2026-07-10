@@ -26,6 +26,9 @@ public class StatusPlayer : MonoBehaviour
     [SerializeField] private int pontosStatusDisponiveis;
     [SerializeField] private int pontosStatusPorNivel = 10;
 
+    [Header("Moeda REIN")]
+    [SerializeField] private CarteiraReinPlayer carteiraRein;
+
     [Header("Level Up")]
     public AudioSource audioSource;
     public AudioClip somLevelUp;
@@ -93,6 +96,7 @@ public class StatusPlayer : MonoBehaviour
     private float vidaAtualReal;
     private bool vidaAtualRealInicializada;
     private bool playerMorto;
+    private CarteiraReinPlayer carteiraReinInscrita;
 
     private void Awake()
     {
@@ -102,12 +106,20 @@ public class StatusPlayer : MonoBehaviour
         if (playerRoot == null)
             playerRoot = transform.root;
 
+        GarantirCarteiraRein();
         GarantirAtributosIniciais();
     }
 
     private void Start()
     {
+        GarantirCarteiraRein();
         SincronizarVidaAtualReal();
+    }
+
+    private void OnDestroy()
+    {
+        if (carteiraReinInscrita != null)
+            carteiraReinInscrita.AoSaldoReinAlterado -= AoSaldoReinAlterado;
     }
 
     private void OnValidate()
@@ -667,6 +679,52 @@ public class StatusPlayer : MonoBehaviour
     private void NotificarStatusAlterado()
     {
         StatusAlterado?.Invoke();
+    }
+
+    private void GarantirCarteiraRein()
+    {
+        CarteiraReinPlayer encontrada = carteiraRein;
+        if (encontrada == null)
+            encontrada = GetComponent<CarteiraReinPlayer>();
+        if (encontrada == null)
+            encontrada = GetComponentInParent<CarteiraReinPlayer>();
+        if (encontrada == null)
+            encontrada = GetComponentInChildren<CarteiraReinPlayer>(true);
+        if (encontrada == null)
+            encontrada = gameObject.AddComponent<CarteiraReinPlayer>();
+
+        if (carteiraRein == encontrada && carteiraReinInscrita == encontrada)
+            return;
+
+        if (carteiraReinInscrita != null)
+            carteiraReinInscrita.AoSaldoReinAlterado -= AoSaldoReinAlterado;
+
+        carteiraRein = encontrada;
+        carteiraRein.AoSaldoReinAlterado -= AoSaldoReinAlterado;
+        carteiraRein.AoSaldoReinAlterado += AoSaldoReinAlterado;
+        carteiraReinInscrita = carteiraRein;
+    }
+
+    private void AoSaldoReinAlterado(long reinUnidades)
+    {
+        NotificarStatusAlterado();
+    }
+
+    public CarteiraReinPlayer ObterCarteiraRein()
+    {
+        GarantirCarteiraRein();
+        return carteiraRein;
+    }
+
+    public long GetReinUnidades()
+    {
+        return ObterCarteiraRein() != null ? carteiraRein.ReinUnidades : 0L;
+    }
+
+    public string ObterReinFormatado()
+    {
+        CarteiraReinPlayer carteira = ObterCarteiraRein();
+        return carteira != null ? carteira.ObterSaldoFormatado() : "0";
     }
 
     private static string NormalizarNomeAtributo(string nomeAtributo)

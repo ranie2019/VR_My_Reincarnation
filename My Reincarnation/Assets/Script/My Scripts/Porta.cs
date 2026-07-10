@@ -23,6 +23,11 @@ public class Porta : MonoBehaviour
     public float tempoParaFechar = 3f;
     public float velocidadeRetorno = 90f;
 
+    [Header("Audio da Porta")]
+    [SerializeField] private AudioClip somAbrirPorta;
+    [SerializeField] private AudioSource audioSourcePorta;
+    [SerializeField] private bool tocarSomAoAbrir = true;
+
     [Header("Estado")]
     public float anguloAtual;
 
@@ -55,11 +60,14 @@ public class Porta : MonoBehaviour
     float velocidadeAngularSuave;
     float tempoSemColisao;
     bool direcaoTravada;
+    bool somAberturaJaTocouNestaAbertura;
 
     void Awake()
     {
         posicaoInicial = transform.position;
         rotacaoInicial = transform.rotation;
+
+        ConfigurarAudioSourcePorta();
 
         rb = GetComponent<Rigidbody>();
         if (rb != null)
@@ -80,6 +88,11 @@ public class Porta : MonoBehaviour
         {
             CorrigirPosicaoFisica();
         }
+    }
+
+    void Reset()
+    {
+        ConfigurarAudioSourcePorta();
     }
 
     void OnValidate()
@@ -157,6 +170,7 @@ public class Porta : MonoBehaviour
             anguloAlvo = 0f;
             velocidadeAngularSuave = 0f;
             direcaoTravada = false;
+            somAberturaJaTocouNestaAbertura = false;
         }
 
         AplicarPoseDaPorta(anguloAtual);
@@ -429,7 +443,13 @@ public class Porta : MonoBehaviour
             sinalAlvo = -sinalAlvo;
         }
 
-        anguloAlvo = sinalAlvo > 0f ? anguloMaximo : anguloMinimo;
+        float novoAnguloAlvo = sinalAlvo > 0f ? anguloMaximo : anguloMinimo;
+        bool vaiComecarAbrir = PortaFechadaParaAudio() && Mathf.Abs(novoAnguloAlvo) > SnapAnguloFechado;
+
+        if (vaiComecarAbrir)
+            TocarSomAberturaSeNecessario();
+
+        anguloAlvo = novoAnguloAlvo;
         tempoSemColisao = 0f;
 
         string ladoDetectado = colliderNoLadoExterno ? "externo" : "interno";
@@ -448,6 +468,35 @@ public class Porta : MonoBehaviour
         {
             { }
         }
+    }
+
+    void ConfigurarAudioSourcePorta()
+    {
+        if (audioSourcePorta == null)
+            audioSourcePorta = GetComponent<AudioSource>();
+
+        if (audioSourcePorta == null)
+            audioSourcePorta = gameObject.AddComponent<AudioSource>();
+
+        audioSourcePorta.playOnAwake = false;
+    }
+
+    void TocarSomAberturaSeNecessario()
+    {
+        if (!tocarSomAoAbrir || somAbrirPorta == null || audioSourcePorta == null)
+            return;
+
+        if (somAberturaJaTocouNestaAbertura)
+            return;
+
+        audioSourcePorta.PlayOneShot(somAbrirPorta);
+        somAberturaJaTocouNestaAbertura = true;
+    }
+
+    bool PortaFechadaParaAudio()
+    {
+        return Mathf.Abs(anguloAtual) <= SnapAnguloFechado &&
+               Mathf.Abs(anguloAlvo) <= SnapAnguloFechado;
     }
 
     void AtualizarDadosDasDobradicas()
