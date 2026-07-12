@@ -373,6 +373,7 @@ public class ItemPersistente : MonoBehaviour
         return GetComponent("Espada") ??
                GetComponent("Machado") ??
                GetComponent("Picareta") ??
+               GetComponent("Arco") ??
                GetComponent("Escudo");
     }
 
