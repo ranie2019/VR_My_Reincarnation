@@ -8,12 +8,17 @@ public class Flecha : MonoBehaviour, IDano
 {
     [Header("Dano da Flecha")]
     [SerializeField] private float dano = 10f;
-    [SerializeField] private string[] tagsQueRecebemDano = { "Enemy" };
+    [SerializeField] private string[] tagsQueRecebemDano = { "Enemy", "Player" };
     [SerializeField] private bool causarDanoUmaVez = true;
 
     [Header("Ignorar Colisao")]
     [SerializeField] private string[] tagsIgnoradasColisao = { "Arch" };
     [SerializeField] private bool ignorarDonoDaFlecha = true;
+    [SerializeField] private bool ignorarTerrain = true;
+
+    [Header("Tempo de Vida")]
+    [SerializeField] private float tempoDeVidaAposLancada = 10f;
+    [SerializeField] private bool destruirDepoisDoTempoDeVida = true;
 
     [Header("Audio")]
     [SerializeField] private AudioClip somColisao;
@@ -32,8 +37,12 @@ public class Flecha : MonoBehaviour, IDano
     private bool jaCausouDano;
     private bool colisaoProcessada;
     private bool efeitoCriacaoInstanciado;
+    private bool foiLancada;
+    private bool tempoDeVidaAtivo;
+    private float tempoLancamento;
     private float multiplicadorDano = 1f;
     private GameObject dono;
+    private Transform raizDono;
 
     public float ObterDano()
     {
@@ -48,6 +57,7 @@ public class Flecha : MonoBehaviour, IDano
     public void DefinirDono(GameObject novoDono)
     {
         dono = novoDono;
+        raizDono = dono != null && dono.transform != null ? dono.transform.root : null;
     }
 
     public void DefinirMultiplicadorDano(float valor)
@@ -55,9 +65,39 @@ public class Flecha : MonoBehaviour, IDano
         multiplicadorDano = Mathf.Max(0f, valor);
     }
 
+    public void MarcarComoLancada(GameObject donoDaFlecha)
+    {
+        DefinirDono(donoDaFlecha);
+        foiLancada = true;
+        tempoDeVidaAtivo = true;
+        tempoLancamento = Time.time;
+        jaCausouDano = false;
+        colisaoProcessada = false;
+    }
+
+    public void ResetarEstadoParaInventarioOuPrefab()
+    {
+        foiLancada = false;
+        tempoDeVidaAtivo = false;
+        tempoLancamento = 0f;
+        jaCausouDano = false;
+        colisaoProcessada = false;
+        dono = null;
+        raizDono = null;
+    }
+
     private void Awake()
     {
         InstanciarEfeitoCriacao();
+    }
+
+    private void Update()
+    {
+        if (!foiLancada || !tempoDeVidaAtivo || !destruirDepoisDoTempoDeVida)
+            return;
+
+        if (Time.time - tempoLancamento >= tempoDeVidaAposLancada)
+            Destroy(gameObject);
     }
 
     public bool Disparar(Vector3 direcao, float forca)
@@ -77,6 +117,10 @@ public class Flecha : MonoBehaviour, IDano
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         rb.AddForce(direcao.normalized * Mathf.Max(0f, forca), ForceMode.Impulse);
+
+        if (!foiLancada)
+            MarcarComoLancada(dono);
+
         return true;
     }
 
@@ -87,6 +131,7 @@ public class Flecha : MonoBehaviour, IDano
         volumeSomColisao = Mathf.Max(0f, volumeSomColisao);
         tempoDestruirEfeitoColisao = Mathf.Max(0f, tempoDestruirEfeitoColisao);
         atrasoDestruirAposColisao = Mathf.Max(0f, atrasoDestruirAposColisao);
+        tempoDeVidaAposLancada = Mathf.Max(0f, tempoDeVidaAposLancada);
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -117,6 +162,9 @@ public class Flecha : MonoBehaviour, IDano
     private void ProcessarColisao(Collider outroCollider, Vector3 pontoColisao, Vector3 normalColisao)
     {
         if (outroCollider == null)
+            return;
+
+        if (!foiLancada)
             return;
 
         if (colisaoProcessada)
@@ -289,10 +337,31 @@ public class Flecha : MonoBehaviour, IDano
         if (ColliderPertenceAPropriaFlecha(outroCollider))
             return true;
 
+        if (EhTerrain(outroCollider))
+            return true;
+
         if (ColliderTemTagIgnorada(outroCollider))
             return true;
 
         return ignorarDonoDaFlecha && ColliderPertenceAoDono(outroCollider);
+    }
+
+    private bool EhTerrain(Collider outroCollider)
+    {
+        if (!ignorarTerrain || outroCollider == null)
+            return false;
+
+        if (outroCollider is TerrainCollider)
+            return true;
+
+        if (outroCollider.GetComponent<Terrain>() != null ||
+            outroCollider.GetComponentInParent<Terrain>() != null)
+        {
+            return true;
+        }
+
+        return outroCollider.attachedRigidbody != null &&
+               outroCollider.attachedRigidbody.GetComponentInParent<Terrain>() != null;
     }
 
     private bool ColliderTemTagIgnorada(Collider outroCollider)
@@ -315,7 +384,7 @@ public class Flecha : MonoBehaviour, IDano
 
     private bool ColliderPertenceAoDono(Collider outroCollider)
     {
-        if (outroCollider == null || dono == null)
+        if (outroCollider == null || (dono == null && raizDono == null))
             return false;
 
         if (TransformPertenceAoDono(outroCollider.transform))
@@ -327,16 +396,18 @@ public class Flecha : MonoBehaviour, IDano
 
     private bool TransformPertenceAoDono(Transform origem)
     {
-        if (origem == null || dono == null)
+        if (origem == null || (dono == null && raizDono == null))
             return false;
 
-        Transform donoTransform = dono.transform;
-        if (origem == donoTransform || origem.IsChildOf(donoTransform))
-            return true;
+        if (dono != null)
+        {
+            Transform donoTransform = dono.transform;
+            if (origem == donoTransform || origem.IsChildOf(donoTransform))
+                return true;
+        }
 
-        Transform rootDono = donoTransform.root;
         Transform rootOrigem = origem.root;
-        return rootDono != null && rootOrigem != null && rootOrigem == rootDono;
+        return raizDono != null && rootOrigem != null && rootOrigem == raizDono;
     }
 
     private bool ColliderPertenceAPropriaFlecha(Collider outroCollider)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using TMPro;
@@ -20,6 +21,42 @@ public class Arco : MonoBehaviour
     [Header("Attach Duas Maos")]
     [SerializeField] private ArmaAttachDuasMao attachDuasMao;
 
+    [Header("Modo Inventario")]
+    [SerializeField] private bool estaNoInventario;
+    [SerializeField] private bool detectarModoInventarioPorParent = true;
+
+    [Header("Visual Seguro de Inventario")]
+    [SerializeField] private bool usarVisualDedicadoNoInventario = true;
+    [SerializeField] private GameObject visualDedicadoInventario;
+    [SerializeField] private bool esconderVisualFuncionalNoInventario = false;
+
+    [Header("Visual Principal do Arco - Nunca Ocultar")]
+    [SerializeField] private Renderer[] renderersPrincipaisDoArco;
+    [SerializeField] private GameObject[] objetosPrincipaisDoArco;
+
+    [Header("Efeitos que Podem Sumir no Inventario")]
+    [SerializeField] private LineRenderer[] linhasParaOcultarNoInventario;
+    [SerializeField] private GameObject[] objetosEfeitoParaOcultarNoInventario;
+    [SerializeField] private Renderer[] renderersEfeitoParaOcultarNoInventario;
+
+    [Header("Corda no Inventario")]
+    [SerializeField] private bool ocultarCordaRealNoInventario = false;
+    [SerializeField] private Renderer[] renderersCordaReal;
+    [SerializeField] private Transform[] pontosOuBonesCorda;
+    [SerializeField] private bool resetarCordaAoEntrarNoInventario = true;
+
+    [Header("Diagnostico Inventario Arco")]
+    [SerializeField] private bool diagnosticoEstaNoInventario;
+    [SerializeField] private int diagnosticoQuantidadeRenderersPrincipais;
+    [SerializeField] private bool diagnosticoRenderPrincipalVisivel;
+    [SerializeField] private bool diagnosticoTodosRenderersPrincipaisVisiveis;
+    [SerializeField] private bool diagnosticoCordaRealVisivel;
+    [SerializeField] private bool diagnosticoLinhaAzulVisivel;
+    [SerializeField] private bool diagnosticoVisualDedicadoInventarioAtivo;
+    [SerializeField] private bool diagnosticoMiraVisivel;
+    [SerializeField] private bool diagnosticoFlechaPreparadaExiste;
+    [SerializeField] private bool diagnosticoAreaCordaAtiva;
+
     [Header("Pontos da Corda")]
     [SerializeField] private Transform pontoCordaTopo;
     [SerializeField] private Transform pontoCordaRepouso;
@@ -40,6 +77,12 @@ public class Arco : MonoBehaviour
     [SerializeField, HideInInspector] private Transform pontoFlecha;
     [SerializeField] private Transform pontoDirecaoDisparo;
     [SerializeField] private bool criarFlechaAutomaticamente = true;
+
+    [Header("Pose da Flecha no Arco")]
+    [SerializeField] private bool usarOffsetFlechaNoArco = true;
+    [SerializeField] private Transform pontoVisualFlechaNoArco;
+    [SerializeField] private Vector3 offsetLocalPosicaoFlechaNoArco = Vector3.zero;
+    [SerializeField] private Vector3 offsetLocalRotacaoFlechaNoArco = new Vector3(90f, 0f, 0f);
 
     [Header("Pontos de Disparo por Mao")]
     [SerializeField] private bool usarPontosDisparoPorMao = true;
@@ -120,6 +163,17 @@ public class Arco : MonoBehaviour
     [SerializeField] private float larguraLinhaCorda = 0.012f;
     [SerializeField] private bool ocultarMalhaCordaOriginalQuandoUsarLinha = true;
 
+    [Header("Corda Azul / Corda Visual")]
+    [SerializeField] private LineRenderer linhaCordaVisual;
+    [SerializeField] private bool controlarLinhaCordaVisual = true;
+    [SerializeField] private bool ocultarLinhaCordaVisualNoInventario = false;
+    [SerializeField] private bool manterLinhaCordaVisualSempreVisivel = true;
+
+    [Header("Diagnostico Corda Visual")]
+    [SerializeField] private bool diagnosticoLinhaCordaVisualExiste;
+    [SerializeField] private bool diagnosticoLinhaCordaVisualVisivel;
+    [SerializeField] private bool diagnosticoLinhaCordaVisualOcultaPorInventario;
+
     [Header("Deteccao")]
     [SerializeField] private Collider areaPuxarCorda;
 
@@ -199,6 +253,10 @@ public class Arco : MonoBehaviour
     private Quaternion rotacaoLocalBaseBoneCordaMeio;
     private Quaternion rotacaoLocalBaseBoneCordaBaixo;
     private bool basesCordaRealCapturadas;
+    private bool visualModoInventarioAplicado;
+    private bool visualPrincipalProtegidoCapturado;
+    private readonly List<Renderer> renderersPrincipaisProtegidos = new List<Renderer>();
+    private readonly List<GameObject> objetosPrincipaisProtegidos = new List<GameObject>();
     private readonly Vector3[] pontosCalculadosMira = new Vector3[64];
     private readonly RaycastHit[] resultadosRaycastMira = new RaycastHit[16];
 
@@ -208,6 +266,8 @@ public class Arco : MonoBehaviour
 
     private void Awake()
     {
+        InvalidarCapturaVisualPrincipalProtegido();
+
         if (attachDuasMao == null)
             attachDuasMao = GetComponent<ArmaAttachDuasMao>();
 
@@ -230,20 +290,36 @@ public class Arco : MonoBehaviour
         ConfigurarCordaRealComBonesSeNecessario();
         ConfigurarVisualizacaoLinhaCorda();
         GarantirMiraCriada();
+        GarantirConfiguracaoVisualPrincipal();
         CapturarRotacoesBaseCurvatura();
         CapturarBaseCordaReal();
         ResetarCorda();
         AtualizarLinhaCorda();
+
+        if (estaNoInventario)
+            DefinirModoInventario(true);
+        else
+            SincronizarModoInventarioPorParent();
     }
 
     private void OnValidate()
     {
+        InvalidarCapturaVisualPrincipalProtegido();
         NormalizarValores();
+        GarantirConfiguracaoVisualPrincipal();
         AtualizarTextoDurabilidade(false);
     }
 
     private void Update()
     {
+        SincronizarModoInventarioPorParent();
+
+        if (estaNoInventario)
+        {
+            GarantirEstadoVisualInventario();
+            return;
+        }
+
         AtualizarEntradaPuxada();
 
         if (!cordaSendoPuxada)
@@ -254,6 +330,12 @@ public class Arco : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (estaNoInventario)
+        {
+            GarantirEstadoVisualInventario();
+            return;
+        }
+
         if (!cordaSendoPuxada)
         {
             GarantirCordaNoRepousoSeNaoPuxando();
@@ -277,6 +359,715 @@ public class Arco : MonoBehaviour
         CancelarPuxada();
     }
 
+    public void DefinirModoInventario(bool noInventario)
+    {
+        estaNoInventario = noInventario;
+        diagnosticoEstaNoInventario = estaNoInventario;
+
+        if (estaNoInventario)
+        {
+            CancelarPuxadaSemDisparar();
+            AplicarVisualModoInventario(true);
+
+            if (areaPuxarCorda != null)
+                areaPuxarCorda.enabled = false;
+
+            AtualizarDiagnosticoInventarioArco();
+            return;
+        }
+
+        visualModoInventarioAplicado = false;
+        CancelarPuxadaSemDisparar();
+        AplicarVisualModoInventario(false);
+
+        if (areaPuxarCorda != null)
+        {
+            areaPuxarCorda.enabled = !Quebrado;
+            areaPuxarCorda.isTrigger = true;
+        }
+
+        EsconderMiraArco();
+        AtualizarDiagnosticoInventarioArco();
+    }
+
+    private void LimparEstadoInteracaoArco()
+    {
+        CancelarPuxadaSemDisparar();
+    }
+
+    private void CancelarPuxadaSemDisparar()
+    {
+        LimparFlechaPreparada(true);
+        EsconderMiraArco();
+
+        cordaSendoPuxada = false;
+        cordaSeguradaPeloGrip = false;
+        maoPuxando = null;
+        maoCandidataPuxar = null;
+        maoCandidataDentroDaArea = false;
+        gripPuxarPressionado = false;
+        percentualPuxada = 0f;
+        distanciaPuxadaAtual = 0f;
+        energiaAcumulada = 0f;
+        disparoJaProcessado = false;
+
+        ResetarCordaParaRepousoImediato();
+        EsconderMiraArco();
+    }
+
+    private void GarantirEstadoVisualInventario()
+    {
+        if (flechaPreparada != null || cordaSendoPuxada || cordaSeguradaPeloGrip || percentualPuxada > 0f || energiaAcumulada > 0f)
+            CancelarPuxadaSemDisparar();
+        else
+            EsconderMiraArco();
+
+        if (!visualModoInventarioAplicado || !diagnosticoTodosRenderersPrincipaisVisiveis)
+            AplicarVisualModoInventario(true);
+        else
+        {
+            AplicarLinhaCordaVisualModoInventario(true);
+            ForcarVisualPrincipalDoArcoVisivel();
+        }
+
+        if (areaPuxarCorda != null && areaPuxarCorda.enabled)
+            areaPuxarCorda.enabled = false;
+
+        AtualizarDiagnosticoInventarioArco();
+    }
+
+    private void AplicarVisualModoInventario(bool noInventario)
+    {
+        GarantirConfiguracaoVisualPrincipal();
+
+        if (resetarCordaAoEntrarNoInventario || !noInventario)
+            ResetarCordaParaRepousoImediato();
+
+        AplicarEfeitosInventario(false);
+        AplicarLinhasInventario(false);
+        AplicarRenderersCordaReal(!noInventario || !ocultarCordaRealNoInventario);
+        AplicarLinhaCordaVisualModoInventario(noInventario);
+
+        if (!noInventario)
+            EsconderMiraArco();
+
+        ForcarVisualPrincipalDoArcoVisivel();
+        visualModoInventarioAplicado = noInventario;
+        AtualizarDiagnosticoInventarioArco();
+    }
+
+    private void GarantirVisualPrincipalDoArcoVisivel()
+    {
+        ForcarVisualPrincipalDoArcoVisivel();
+    }
+
+    private void ForcarVisualPrincipalDoArcoVisivel()
+    {
+        CapturarVisualPrincipalProtegidoSeNecessario();
+        AplicarVisualDedicadoInventarioSeNecessario();
+
+        bool podeMostrarVisualFuncional = !estaNoInventario ||
+                                          visualDedicadoInventario == null ||
+                                          !usarVisualDedicadoNoInventario ||
+                                          !esconderVisualFuncionalNoInventario;
+
+        if (!podeMostrarVisualFuncional)
+        {
+            AplicarRenderersPrincipaisFuncionais(false);
+            return;
+        }
+
+        if (objetosPrincipaisProtegidos != null)
+        {
+            for (int i = 0; i < objetosPrincipaisProtegidos.Count; i++)
+            {
+                if (objetosPrincipaisProtegidos[i] != null)
+                    objetosPrincipaisProtegidos[i].SetActive(true);
+            }
+        }
+
+        AplicarRenderersPrincipaisFuncionais(true);
+    }
+
+    private void AplicarRenderersPrincipaisFuncionais(bool visivel)
+    {
+        for (int i = 0; i < renderersPrincipaisProtegidos.Count; i++)
+        {
+            Renderer renderer = renderersPrincipaisProtegidos[i];
+            if (renderer == null)
+                continue;
+
+            AtivarHierarquiaVisualPrincipal(renderer.transform);
+            renderer.enabled = visivel;
+        }
+    }
+
+    private void AplicarVisualDedicadoInventarioSeNecessario()
+    {
+        diagnosticoVisualDedicadoInventarioAtivo = false;
+
+        if (!usarVisualDedicadoNoInventario || visualDedicadoInventario == null)
+            return;
+
+        if (estaNoInventario && !visualDedicadoInventario.activeSelf)
+            visualDedicadoInventario.SetActive(true);
+
+        if (!estaNoInventario)
+            return;
+
+        Renderer[] renderers = visualDedicadoInventario.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+                renderers[i].enabled = true;
+        }
+
+        diagnosticoVisualDedicadoInventarioAtivo = visualDedicadoInventario.activeInHierarchy;
+    }
+
+    private void AtivarHierarquiaVisualPrincipal(Transform alvo)
+    {
+        Transform atual = alvo;
+        while (atual != null)
+        {
+            atual.gameObject.SetActive(true);
+
+            if (atual == transform)
+                break;
+
+            atual = atual.parent;
+        }
+    }
+
+    private void GarantirConfiguracaoVisualPrincipal()
+    {
+        if (linhaCordaVisual == null && linhaCorda != null)
+            linhaCordaVisual = linhaCorda;
+
+        CapturarVisualPrincipalProtegidoSeNecessario();
+    }
+
+    private void PreencherRenderersPrincipaisAutomaticamenteSeNecessario()
+    {
+        CapturarVisualPrincipalProtegidoSeNecessario();
+    }
+
+    private void CapturarVisualPrincipalProtegidoSeNecessario()
+    {
+        if (visualPrincipalProtegidoCapturado)
+            return;
+
+        renderersPrincipaisProtegidos.Clear();
+        objetosPrincipaisProtegidos.Clear();
+
+        AdicionarObjetosPrincipaisProtegidos(objetosPrincipaisDoArco);
+        AdicionarRenderersPrincipaisProtegidos(renderersPrincipaisDoArco);
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (RendererEhVisualPrincipalPorEstadoInicial(renderer))
+                AdicionarRendererPrincipalProtegido(renderer);
+        }
+
+        if (renderersPrincipaisProtegidos.Count > 0)
+            renderersPrincipaisDoArco = renderersPrincipaisProtegidos.ToArray();
+
+        if (objetosPrincipaisProtegidos.Count > 0)
+            objetosPrincipaisDoArco = objetosPrincipaisProtegidos.ToArray();
+
+        visualPrincipalProtegidoCapturado = true;
+    }
+
+    private void InvalidarCapturaVisualPrincipalProtegido()
+    {
+        visualPrincipalProtegidoCapturado = false;
+        renderersPrincipaisProtegidos.Clear();
+        objetosPrincipaisProtegidos.Clear();
+    }
+
+    private void AdicionarRenderersPrincipaisProtegidos(Renderer[] renderers)
+    {
+        if (renderers == null)
+            return;
+
+        for (int i = 0; i < renderers.Length; i++)
+            AdicionarRendererPrincipalProtegido(renderers[i]);
+    }
+
+    private void AdicionarRendererPrincipalProtegido(Renderer renderer)
+    {
+        if (renderer == null || renderersPrincipaisProtegidos.Contains(renderer))
+            return;
+
+        renderersPrincipaisProtegidos.Add(renderer);
+        AdicionarObjetoPrincipalProtegido(renderer.gameObject);
+    }
+
+    private void AdicionarObjetosPrincipaisProtegidos(GameObject[] objetos)
+    {
+        if (objetos == null)
+            return;
+
+        for (int i = 0; i < objetos.Length; i++)
+            AdicionarObjetoPrincipalProtegido(objetos[i]);
+    }
+
+    private void AdicionarObjetoPrincipalProtegido(GameObject objeto)
+    {
+        if (objeto == null || objetosPrincipaisProtegidos.Contains(objeto))
+            return;
+
+        objetosPrincipaisProtegidos.Add(objeto);
+    }
+
+    private bool RendererEhVisualPrincipalPorEstadoInicial(Renderer renderer)
+    {
+        if (renderer == null || renderer is LineRenderer || !renderer.transform.IsChildOf(transform))
+            return false;
+
+        if (!renderer.enabled || !renderer.gameObject.activeSelf)
+            return false;
+
+        if (renderer == linhaMiraTrajetoria || renderer == linhaCorda || renderer == linhaCordaVisual)
+            return false;
+
+        if (visualDedicadoInventario != null && renderer.transform.IsChildOf(visualDedicadoInventario.transform))
+            return false;
+
+        if (RendererEstaEmLista(renderer, renderersEfeitoParaOcultarNoInventario))
+            return false;
+
+        if (ocultarCordaRealNoInventario && RendererEstaEmLista(renderer, renderersCordaReal))
+            return false;
+
+        if (pontoVisualImpacto != null && renderer.transform.IsChildOf(pontoVisualImpacto))
+            return false;
+
+        if (flechaPreparada != null && renderer.transform.IsChildOf(flechaPreparada.transform))
+            return false;
+
+        return true;
+    }
+
+    private static bool RendererEstaEmLista(Renderer renderer, Renderer[] lista)
+    {
+        if (renderer == null || lista == null)
+            return false;
+
+        for (int i = 0; i < lista.Length; i++)
+        {
+            if (lista[i] == renderer)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool RendererPertenceACordaReal(Renderer renderer)
+    {
+        if (renderer == null)
+            return false;
+
+        if (renderersCordaReal != null)
+        {
+            for (int i = 0; i < renderersCordaReal.Length; i++)
+            {
+                if (renderersCordaReal[i] == renderer)
+                    return true;
+            }
+        }
+
+        Transform rendererTransform = renderer.transform;
+
+        if (pontosOuBonesCorda != null)
+        {
+            for (int i = 0; i < pontosOuBonesCorda.Length; i++)
+            {
+                Transform ponto = pontosOuBonesCorda[i];
+                if (ponto != null && (rendererTransform == ponto || rendererTransform.IsChildOf(ponto)))
+                    return true;
+            }
+        }
+
+        if (RendererEstaEmTransform(renderer, boneCordaTopo) ||
+            RendererEstaEmTransform(renderer, boneCordaMeio) ||
+            RendererEstaEmTransform(renderer, boneCordaBaixo) ||
+            RendererEstaEmTransform(renderer, pontoCordaTopo) ||
+            RendererEstaEmTransform(renderer, pontoCordaAtual) ||
+            RendererEstaEmTransform(renderer, pontoCordaBaixo))
+        {
+            return true;
+        }
+
+        return NomeEhCordaReal(renderer.name) || NomeEhCordaReal(rendererTransform.name);
+    }
+
+    private static bool RendererEstaEmTransform(Renderer renderer, Transform alvo)
+    {
+        if (renderer == null || alvo == null)
+            return false;
+
+        Transform rendererTransform = renderer.transform;
+        return rendererTransform == alvo || rendererTransform.IsChildOf(alvo);
+    }
+
+    private static bool NomeEhCordaReal(string nome)
+    {
+        string normalizado = NormalizarNomeCompleto(nome);
+
+        if (string.IsNullOrWhiteSpace(normalizado))
+            return false;
+
+        return normalizado == "corda" ||
+               normalizado == "cordabaixo" ||
+               normalizado == "cordacima" ||
+               normalizado == "cordameio" ||
+               normalizado.StartsWith("cordatrava") ||
+               normalizado.StartsWith("cordareal");
+    }
+
+    private void AplicarLinhasInventario(bool visivel)
+    {
+        AplicarLineRenderer(linhaMiraTrajetoria, visivel);
+
+        if (linhasParaOcultarNoInventario == null)
+            return;
+
+        LineRenderer cordaVisual = ObterLinhaCordaVisual();
+        for (int i = 0; i < linhasParaOcultarNoInventario.Length; i++)
+        {
+            LineRenderer linha = linhasParaOcultarNoInventario[i];
+            if (linha == null || linha == cordaVisual || linha == linhaCorda)
+                continue;
+
+            AplicarLineRenderer(linha, visivel);
+        }
+    }
+
+    private void AplicarLinhaCordaVisualModoInventario(bool noInventario)
+    {
+        if (!controlarLinhaCordaVisual)
+            return;
+
+        LineRenderer cordaVisual = ObterLinhaCordaVisual();
+        diagnosticoLinhaCordaVisualExiste = cordaVisual != null;
+
+        if (cordaVisual == null)
+            return;
+
+        bool deveFicarVisivel = manterLinhaCordaVisualSempreVisivel ||
+                                !noInventario ||
+                                !ocultarLinhaCordaVisualNoInventario;
+
+        cordaVisual.enabled = deveFicarVisivel;
+        diagnosticoLinhaCordaVisualOcultaPorInventario = noInventario && !deveFicarVisivel;
+
+        if (deveFicarVisivel)
+        {
+            GarantirLinhaCordaVisualComPontos(cordaVisual);
+            AtualizarLinhaCorda();
+        }
+        else
+        {
+            cordaVisual.positionCount = 0;
+        }
+    }
+
+    private LineRenderer ObterLinhaCordaVisual()
+    {
+        if (linhaCordaVisual != null)
+            return linhaCordaVisual;
+
+        linhaCordaVisual = linhaCorda;
+        return linhaCordaVisual;
+    }
+
+    private void GarantirLinhaCordaVisualComPontos(LineRenderer linha)
+    {
+        if (linha == null)
+            return;
+
+        linha.widthMultiplier = larguraLinhaCorda;
+        DefinirPontosLocaisLinhaCorda(linha);
+    }
+
+    private static void AplicarLineRenderer(LineRenderer linha, bool visivel)
+    {
+        if (linha == null)
+            return;
+
+        linha.enabled = visivel;
+        if (!visivel)
+            linha.positionCount = 0;
+    }
+
+    private void AplicarEfeitosInventario(bool visivel)
+    {
+        // IMPORTANTE: nao esconder renderers principais do arco aqui.
+        // Modo inventario deve esconder apenas efeitos, mira e flecha.
+        if (pontoVisualImpacto != null && !GameObjectEhVisualPrincipalProtegido(pontoVisualImpacto.gameObject))
+            pontoVisualImpacto.gameObject.SetActive(visivel);
+
+        if (objetosEfeitoParaOcultarNoInventario != null)
+        {
+            for (int i = 0; i < objetosEfeitoParaOcultarNoInventario.Length; i++)
+            {
+                GameObject objeto = objetosEfeitoParaOcultarNoInventario[i];
+                if (objeto != null && !GameObjectEhVisualPrincipalProtegido(objeto))
+                    objeto.SetActive(visivel);
+            }
+        }
+
+        if (renderersEfeitoParaOcultarNoInventario == null)
+            return;
+
+        for (int i = 0; i < renderersEfeitoParaOcultarNoInventario.Length; i++)
+        {
+            Renderer renderer = renderersEfeitoParaOcultarNoInventario[i];
+            if (renderer != null && !RendererEhVisualPrincipalProtegido(renderer))
+                renderer.enabled = visivel;
+        }
+    }
+
+    private void AplicarRenderersCordaReal(bool visivel)
+    {
+        if (renderersCordaReal == null)
+            return;
+
+        for (int i = 0; i < renderersCordaReal.Length; i++)
+        {
+            Renderer renderer = renderersCordaReal[i];
+            if (renderer != null && !RendererEhVisualPrincipalProtegido(renderer))
+                renderer.enabled = visivel;
+        }
+    }
+
+    private bool RendererEhVisualPrincipalProtegido(Renderer renderer)
+    {
+        if (renderer == null)
+            return false;
+
+        CapturarVisualPrincipalProtegidoSeNecessario();
+
+        for (int i = 0; i < renderersPrincipaisProtegidos.Count; i++)
+        {
+            Renderer principal = renderersPrincipaisProtegidos[i];
+            if (principal == null)
+                continue;
+
+            if (renderer == principal)
+                return true;
+
+            if (renderer.transform == principal.transform ||
+                renderer.transform.IsChildOf(principal.transform) ||
+                principal.transform.IsChildOf(renderer.transform))
+                return true;
+        }
+
+        for (int i = 0; i < objetosPrincipaisProtegidos.Count; i++)
+        {
+            GameObject objeto = objetosPrincipaisProtegidos[i];
+            if (objeto == null)
+                continue;
+
+            Transform alvo = objeto.transform;
+            if (renderer.transform == alvo || renderer.transform.IsChildOf(alvo) || alvo.IsChildOf(renderer.transform))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool GameObjectEhVisualPrincipalProtegido(GameObject objeto)
+    {
+        if (objeto == null)
+            return false;
+
+        CapturarVisualPrincipalProtegidoSeNecessario();
+        Transform transformObjeto = objeto.transform;
+
+        for (int i = 0; i < objetosPrincipaisProtegidos.Count; i++)
+        {
+            GameObject principal = objetosPrincipaisProtegidos[i];
+            if (principal == null)
+                continue;
+
+            Transform transformPrincipal = principal.transform;
+            if (transformObjeto == transformPrincipal ||
+                transformObjeto.IsChildOf(transformPrincipal) ||
+                transformPrincipal.IsChildOf(transformObjeto))
+                return true;
+        }
+
+        for (int i = 0; i < renderersPrincipaisProtegidos.Count; i++)
+        {
+            Renderer renderer = renderersPrincipaisProtegidos[i];
+            if (renderer == null)
+                continue;
+
+            Transform transformRenderer = renderer.transform;
+            if (transformRenderer == transformObjeto ||
+                transformRenderer.IsChildOf(transformObjeto) ||
+                transformObjeto.IsChildOf(transformRenderer))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ResetarCordaParaRepousoImediato()
+    {
+        if (pontoCordaAtual != null && pontoCordaRepouso != null)
+        {
+            pontoCordaAtual.position = pontoCordaRepouso.position;
+            pontoCordaAtual.rotation = pontoCordaRepouso.rotation;
+        }
+
+        if (usarCordaRealComBones)
+        {
+            if (boneCordaMeio != null)
+            {
+                Transform repouso = pontoRepousoCordaMeio != null ? pontoRepousoCordaMeio : pontoCordaRepouso;
+                if (repouso != null && !TransformPareceContainerArmacaoCorda(boneCordaMeio))
+                {
+                    boneCordaMeio.position = repouso.position;
+                    boneCordaMeio.rotation = repouso.rotation;
+                }
+
+                if (basesCordaRealCapturadas)
+                    boneCordaMeio.localRotation = rotacaoLocalBaseBoneCordaMeio;
+            }
+
+            FixarPontasCordaReal();
+        }
+
+        AplicarCurvaturaVisualImediata(0f);
+
+        if (linhaCorda != null && linhaCorda.enabled)
+            AtualizarLinhaCorda();
+    }
+
+    private static bool TransformPareceContainerArmacaoCorda(Transform alvo)
+    {
+        if (alvo == null)
+            return false;
+
+        string nome = NormalizarNomeCompleto(alvo.name);
+        return nome.Contains("armacao") && nome.Contains("corda");
+    }
+
+    private void AtualizarDiagnosticoInventarioArco()
+    {
+        diagnosticoEstaNoInventario = estaNoInventario;
+        diagnosticoQuantidadeRenderersPrincipais = ContarRenderersPrincipaisValidos();
+        diagnosticoRenderPrincipalVisivel = ExisteRendererPrincipalVisivel();
+        diagnosticoTodosRenderersPrincipaisVisiveis = TodosRenderersPrincipaisVisiveis();
+        diagnosticoCordaRealVisivel = ExisteCordaRealVisivel();
+        LineRenderer cordaVisual = ObterLinhaCordaVisual();
+        diagnosticoLinhaAzulVisivel = cordaVisual != null && cordaVisual.enabled;
+        diagnosticoMiraVisivel = linhaMiraTrajetoria != null && linhaMiraTrajetoria.enabled;
+        diagnosticoFlechaPreparadaExiste = flechaPreparada != null;
+        diagnosticoAreaCordaAtiva = areaPuxarCorda != null && areaPuxarCorda.enabled;
+
+        diagnosticoLinhaCordaVisualExiste = cordaVisual != null;
+        diagnosticoLinhaCordaVisualVisivel = cordaVisual != null && cordaVisual.enabled;
+    }
+
+    private bool ExisteRendererPrincipalVisivel()
+    {
+        PreencherRenderersPrincipaisAutomaticamenteSeNecessario();
+
+        if (renderersPrincipaisDoArco != null)
+        {
+            for (int i = 0; i < renderersPrincipaisDoArco.Length; i++)
+            {
+                Renderer renderer = renderersPrincipaisDoArco[i];
+                if (renderer != null && renderer.enabled)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int ContarRenderersPrincipaisValidos()
+    {
+        PreencherRenderersPrincipaisAutomaticamenteSeNecessario();
+
+        int quantidade = 0;
+        if (renderersPrincipaisDoArco == null)
+            return quantidade;
+
+        for (int i = 0; i < renderersPrincipaisDoArco.Length; i++)
+        {
+            if (renderersPrincipaisDoArco[i] != null)
+                quantidade++;
+        }
+
+        return quantidade;
+    }
+
+    private bool TodosRenderersPrincipaisVisiveis()
+    {
+        PreencherRenderersPrincipaisAutomaticamenteSeNecessario();
+
+        bool encontrouRenderer = false;
+        if (renderersPrincipaisDoArco == null)
+            return false;
+
+        for (int i = 0; i < renderersPrincipaisDoArco.Length; i++)
+        {
+            Renderer renderer = renderersPrincipaisDoArco[i];
+            if (renderer == null)
+                continue;
+
+            encontrouRenderer = true;
+            if (!renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                return false;
+        }
+
+        return encontrouRenderer;
+    }
+
+    private bool ExisteCordaRealVisivel()
+    {
+        if (renderersCordaReal != null)
+        {
+            for (int i = 0; i < renderersCordaReal.Length; i++)
+            {
+                Renderer renderer = renderersCordaReal[i];
+                if (renderer != null && renderer.enabled)
+                    return true;
+            }
+        }
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer != null && !(renderer is LineRenderer) && RendererPertenceACordaReal(renderer) && renderer.enabled)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void SincronizarModoInventarioPorParent()
+    {
+        if (!detectarModoInventarioPorParent || estaNoInventario)
+            return;
+
+        if (attachDuasMao != null && attachDuasMao.ArcoEstaSegurado())
+            return;
+
+        if (TransformEstaDentroDeInventario(transform))
+            DefinirModoInventario(true);
+    }
+
     private void CapturarRotacoesBaseCurvatura()
     {
         rotacaoBaseCima1 = arcoCima1 != null ? arcoCima1.localRotation : Quaternion.identity;
@@ -290,6 +1081,9 @@ public class Arco : MonoBehaviour
 
     private void IniciarPuxada(Transform mao)
     {
+        if (estaNoInventario)
+            return;
+
         if (Quebrado || cordaSendoPuxada || mao == null)
             return;
 
@@ -313,6 +1107,9 @@ public class Arco : MonoBehaviour
 
     private void AtualizarEntradaPuxada()
     {
+        if (estaNoInventario)
+            return;
+
         if (Quebrado)
         {
             if (cordaSendoPuxada)
@@ -359,6 +1156,9 @@ public class Arco : MonoBehaviour
 
     private void AtualizarPuxada()
     {
+        if (estaNoInventario)
+            return;
+
         if (maoPuxando == null || pontoCordaRepouso == null || pontoCordaAtual == null)
         {
             CancelarPuxada();
@@ -408,6 +1208,9 @@ public class Arco : MonoBehaviour
 
     private void SoltarCorda()
     {
+        if (estaNoInventario)
+            return;
+
         if (disparoJaProcessado)
             return;
 
@@ -435,6 +1238,9 @@ public class Arco : MonoBehaviour
 
     private bool DispararFlecha()
     {
+        if (estaNoInventario)
+            return false;
+
         if (Quebrado)
             return false;
 
@@ -451,14 +1257,14 @@ public class Arco : MonoBehaviour
         }
 
         Transform flechaTransform = flecha.transform;
+        Vector3 direcao = CalcularDirecaoDisparo();
         flechaTransform.SetParent(null, true);
         flechaTransform.position = pontoFlechaAtual != null ? pontoFlechaAtual.position : flechaTransform.position;
-        flechaTransform.rotation = pontoFlechaAtual != null ? pontoFlechaAtual.rotation : flechaTransform.rotation;
+        AplicarRotacaoFlechaLancada(flechaTransform, direcao, pontoFlechaAtual);
 
         GarantirComponenteFlecha(flecha);
         ConfigurarDonoFlecha(flecha);
 
-        Vector3 direcao = CalcularDirecaoDisparo();
         float forcaBase = Mathf.Lerp(forcaMinimaDisparo, forcaMaximaDisparo, percentualPuxada);
         float forcaFinal = forcaBase + energiaAcumulada;
         float multiplicadorDano = CalcularMultiplicadorDano();
@@ -476,6 +1282,7 @@ public class Arco : MonoBehaviour
             return false;
         }
 
+        MarcarFlechaComoLancada(flecha);
         TocarSom(somSoltarFlecha);
         flechaPreparada = null;
         return true;
@@ -574,6 +1381,12 @@ public class Arco : MonoBehaviour
 
     private void AtualizarMiraArco()
     {
+        if (estaNoInventario)
+        {
+            EsconderMiraArco();
+            return;
+        }
+
         diagnosticoPercentualPuxadaMira = percentualPuxada;
         GarantirMiraCriada();
 
@@ -765,6 +1578,30 @@ public class Arco : MonoBehaviour
         return origem == alvo || origem.IsChildOf(alvo);
     }
 
+    private static bool TransformEstaDentroDeInventario(Transform origem)
+    {
+        Transform atual = origem != null ? origem.parent : null;
+
+        while (atual != null)
+        {
+            string nome = NormalizarNomeCompleto(atual.name);
+
+            if (nome.Contains("slot") ||
+                nome.Contains("socket") ||
+                nome.Contains("inventario") ||
+                nome.Contains("inventário") ||
+                nome.Contains("inventory") ||
+                nome.Contains("pontoencaixe"))
+            {
+                return true;
+            }
+
+            atual = atual.parent;
+        }
+
+        return false;
+    }
+
     private static bool VetorValido(Vector3 valor)
     {
         return !float.IsNaN(valor.x) &&
@@ -854,11 +1691,20 @@ public class Arco : MonoBehaviour
         if (!linhaCorda.enabled)
             return;
 
-        linhaCorda.useWorldSpace = true;
-        linhaCorda.positionCount = 3;
-        linhaCorda.SetPosition(0, pontoCordaTopo.position);
-        linhaCorda.SetPosition(1, pontoCordaAtual.position);
-        linhaCorda.SetPosition(2, pontoCordaBaixo.position);
+        DefinirPontosLocaisLinhaCorda(linhaCorda);
+    }
+
+    private void DefinirPontosLocaisLinhaCorda(LineRenderer linha)
+    {
+        if (linha == null || pontoCordaTopo == null || pontoCordaAtual == null || pontoCordaBaixo == null)
+            return;
+
+        Transform linhaTransform = linha.transform;
+        linha.useWorldSpace = false;
+        linha.positionCount = 3;
+        linha.SetPosition(0, linhaTransform.InverseTransformPoint(pontoCordaTopo.position));
+        linha.SetPosition(1, linhaTransform.InverseTransformPoint(pontoCordaAtual.position));
+        linha.SetPosition(2, linhaTransform.InverseTransformPoint(pontoCordaBaixo.position));
     }
 
     private void DefinirPosicaoCordaAtual(Vector3 posicaoMundo)
@@ -1012,6 +1858,7 @@ public class Arco : MonoBehaviour
     private void ConfigurarVisualizacaoLinhaCorda()
     {
         bool linhaProceduralAtiva = usarLinhaCordaProcedural ||
+                                    manterLinhaCordaVisualSempreVisivel ||
                                     !usarCordaRealComBones ||
                                     (mostrarLinhaDebugCorda && !esconderLineRendererCorda);
 
@@ -1319,7 +2166,10 @@ public class Arco : MonoBehaviour
         if (linhaCorda == null)
             return;
 
-        linhaCorda.useWorldSpace = true;
+        if (linhaCordaVisual == null)
+            linhaCordaVisual = linhaCorda;
+
+        linhaCorda.useWorldSpace = false;
         linhaCorda.positionCount = 3;
         linhaCorda.widthMultiplier = larguraLinhaCorda;
         linhaCorda.numCapVertices = 2;
@@ -1341,7 +2191,7 @@ public class Arco : MonoBehaviour
             return;
 
         Renderer renderer = referencia.GetComponent<Renderer>();
-        if (renderer != null && !(renderer is LineRenderer))
+        if (renderer != null && !(renderer is LineRenderer) && RendererPertenceACordaReal(renderer))
             renderer.enabled = false;
     }
 
@@ -1365,8 +2215,7 @@ public class Arco : MonoBehaviour
             if (rendererAtual == null || rendererAtual is LineRenderer)
                 continue;
 
-            string nome = NormalizarNome(rendererAtual.name);
-            if (nome == "corda" || nome.Contains("corda"))
+            if (RendererPertenceACordaReal(rendererAtual))
                 return rendererAtual;
         }
 
@@ -1407,6 +2256,9 @@ public class Arco : MonoBehaviour
 
     public void AoMaoEntrouNaAreaDaCorda(Collider other)
     {
+        if (estaNoInventario)
+            return;
+
         if (ColliderPertenceAoProprioArco(other))
             return;
 
@@ -1420,6 +2272,9 @@ public class Arco : MonoBehaviour
 
     public void AoMaoSaiuDaAreaDaCorda(Collider other)
     {
+        if (estaNoInventario)
+            return;
+
         if (ColliderPertenceAoProprioArco(other))
             return;
 
@@ -1469,18 +2324,27 @@ public class Arco : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        if (estaNoInventario)
+            return;
+
         ProcessarPossivelDanoRecebido(other);
         AoMaoEntrouNaAreaDaCorda(other);
     }
 
     private void OnTriggerExit(Collider other)
     {
+        if (estaNoInventario)
+            return;
+
         AoMaoSaiuDaAreaDaCorda(other);
     }
 
     private void OnCollisionEnter(Collision collision)
     {
         if (collision == null)
+            return;
+
+        if (estaNoInventario)
             return;
 
         ProcessarPossivelDanoRecebido(collision.collider);
@@ -1980,13 +2844,15 @@ public class Arco : MonoBehaviour
 
     private void PrepararFlecha()
     {
+        if (estaNoInventario)
+            return;
+
         Transform pontoFlechaAtual = ObterPontoFlechaAtual();
         if (flechaPreparada != null || prefabFlecha == null || pontoFlechaAtual == null)
             return;
 
         flechaPreparada = Instantiate(prefabFlecha, pontoFlechaAtual.position, pontoFlechaAtual.rotation, pontoFlechaAtual);
-        flechaPreparada.transform.localPosition = Vector3.zero;
-        flechaPreparada.transform.localRotation = Quaternion.identity;
+        AplicarPoseFlechaNoArco(flechaPreparada, pontoFlechaAtual);
 
         GarantirComponenteFlecha(flechaPreparada);
         ConfigurarDonoFlecha(flechaPreparada);
@@ -2020,13 +2886,52 @@ public class Arco : MonoBehaviour
 
     private void ManterFlechaPreparadaNoPonto()
     {
+        if (estaNoInventario)
+            return;
+
         Transform pontoFlechaAtual = ObterPontoFlechaAtual();
         if (flechaPreparada == null || pontoFlechaAtual == null)
             return;
 
-        flechaPreparada.transform.SetParent(pontoFlechaAtual, true);
-        flechaPreparada.transform.position = pontoFlechaAtual.position;
-        flechaPreparada.transform.rotation = pontoFlechaAtual.rotation;
+        AplicarPoseFlechaNoArco(flechaPreparada, pontoFlechaAtual);
+    }
+
+    private void AplicarPoseFlechaNoArco(GameObject flecha, Transform pontoFlechaAtual)
+    {
+        if (flecha == null || pontoFlechaAtual == null)
+            return;
+
+        Transform pontoPose = pontoVisualFlechaNoArco != null ? pontoVisualFlechaNoArco : pontoFlechaAtual;
+        Transform flechaTransform = flecha.transform;
+
+        flechaTransform.SetParent(pontoPose, false);
+        flechaTransform.localPosition = usarOffsetFlechaNoArco ? offsetLocalPosicaoFlechaNoArco : Vector3.zero;
+        flechaTransform.localRotation = usarOffsetFlechaNoArco
+            ? Quaternion.Euler(offsetLocalRotacaoFlechaNoArco)
+            : Quaternion.identity;
+    }
+
+    private void AplicarRotacaoFlechaLancada(Transform flechaTransform, Vector3 direcao, Transform pontoFlechaAtual)
+    {
+        if (flechaTransform == null)
+            return;
+
+        Quaternion offsetRotacao = usarOffsetFlechaNoArco
+            ? Quaternion.Euler(offsetLocalRotacaoFlechaNoArco)
+            : Quaternion.identity;
+
+        if (VetorValido(direcao) && direcao.sqrMagnitude > 0.0001f)
+        {
+            Vector3 eixoCima = pontoFlechaAtual != null ? pontoFlechaAtual.up : transform.up;
+            if (!VetorValido(eixoCima) || eixoCima.sqrMagnitude <= 0.0001f)
+                eixoCima = Vector3.up;
+
+            flechaTransform.rotation = Quaternion.LookRotation(direcao.normalized, eixoCima.normalized) * offsetRotacao;
+            return;
+        }
+
+        if (pontoFlechaAtual != null)
+            flechaTransform.rotation = pontoFlechaAtual.rotation * offsetRotacao;
     }
 
     private void LimparFlechaPreparada(bool destruir)
@@ -2314,6 +3219,23 @@ public class Arco : MonoBehaviour
         {
             if (componentesFlecha[i] != null)
                 componentesFlecha[i].DefinirDono(donoFlecha);
+        }
+    }
+
+    private void MarcarFlechaComoLancada(GameObject flecha)
+    {
+        if (flecha == null)
+            return;
+
+        GameObject donoFlecha = ObterDonoFlecha();
+        if (donoFlecha == null)
+            donoFlecha = gameObject;
+
+        Flecha[] componentesFlecha = flecha.GetComponentsInChildren<Flecha>(true);
+        for (int i = 0; i < componentesFlecha.Length; i++)
+        {
+            if (componentesFlecha[i] != null)
+                componentesFlecha[i].MarcarComoLancada(donoFlecha);
         }
     }
 

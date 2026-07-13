@@ -15,6 +15,14 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
     [SerializeField] private bool limparInventarioAntesCarregar = true;
     [SerializeField] private bool destruirOriginaisSalvosNoInventario = true;
 
+    [Header("Diagnostico Load Inventario")]
+    [SerializeField] private string ultimoItemIdCarregado;
+    [SerializeField] private bool ultimoPrefabEncontrado;
+    [SerializeField] private int ultimaQuantidadeCarregada;
+    [SerializeField] private bool ultimaFalhaPrefabAusente;
+    [SerializeField] private bool ultimaFalhaItemIdVazio;
+    [SerializeField] private bool ultimoLoadDiretoPorPrefab;
+
     private void Awake()
     {
         AtualizarReferencias();
@@ -111,7 +119,10 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         {
             InventorySaveData data = itens[i];
             if (data == null || string.IsNullOrWhiteSpace(data.itemId))
+            {
+                RegistrarFalhaItemIdVazio();
                 continue;
+            }
 
             if (data.slot < 0 || slots == null || data.slot >= slots.Length || slots[data.slot] == null)
             {
@@ -121,6 +132,10 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
             SlotInventario slotDestino = slots[data.slot];
             int quantidade = Mathf.Max(1, data.quantidade);
+            GameObject prefabParaRestaurar = ObterPrefabParaRestaurar(data);
+            bool restaurarDiretoPorPrefab = DeveRestaurarDiretoPorPrefab(data, prefabParaRestaurar);
+            AtualizarDiagnosticoLoad(data, prefabParaRestaurar, quantidade, restaurarDiretoPorPrefab);
+
             List<string> instanciaIds = ObterInstanciaIdsParaRestaurar(data);
             int quantidadeComIdSalvo = instanciaIds.Count;
 
@@ -142,6 +157,14 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 bool esconderNaPilha = quantidadeIndex < quantidade - 1;
                 bool instanciaTinhaIdSalvo = quantidadeIndex < quantidadeComIdSalvo;
                 int candidatosRuntime = 0;
+
+                if (restaurarDiretoPorPrefab)
+                {
+                    if (CriarERestaurarItemNoInventario(dataInstancia, slotDestino, esconderNaPilha))
+                        slotsRestaurados.Add(slotDestino);
+
+                    continue;
+                }
 
                 ItemPersistente originalCena = instanciaTinhaIdSalvo
                     ? EncontrarOriginalParaRestaurarNoInventario(
@@ -603,6 +626,53 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             : FindFirstObjectByType<ItemDatabaseLocal>();
 
         return database != null ? database.ObterPrefab(data.itemId) : null;
+    }
+
+    private bool DeveRestaurarDiretoPorPrefab(InventorySaveData data, GameObject prefab)
+    {
+        if (data == null)
+            return false;
+
+        if (prefab == null)
+        {
+            if (ItemIdPareceFlecha(data.itemId))
+                ultimaFalhaPrefabAusente = true;
+
+            return false;
+        }
+
+        return prefab.GetComponent<Flecha>() != null ||
+               prefab.GetComponentInChildren<Flecha>(true) != null;
+    }
+
+    private static bool ItemIdPareceFlecha(string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(itemId))
+            return false;
+
+        return itemId.IndexOf("Flexa", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+               itemId.IndexOf("Flecha", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+               itemId.IndexOf("Arrow", System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private void AtualizarDiagnosticoLoad(InventorySaveData data, GameObject prefab, int quantidade, bool loadDiretoPorPrefab)
+    {
+        ultimoItemIdCarregado = data != null ? data.itemId : string.Empty;
+        ultimoPrefabEncontrado = prefab != null;
+        ultimaQuantidadeCarregada = Mathf.Max(0, quantidade);
+        ultimaFalhaPrefabAusente = prefab == null && data != null && ItemIdPareceFlecha(data.itemId);
+        ultimaFalhaItemIdVazio = data == null || string.IsNullOrWhiteSpace(data.itemId);
+        ultimoLoadDiretoPorPrefab = loadDiretoPorPrefab;
+    }
+
+    private void RegistrarFalhaItemIdVazio()
+    {
+        ultimoItemIdCarregado = string.Empty;
+        ultimoPrefabEncontrado = false;
+        ultimaQuantidadeCarregada = 0;
+        ultimaFalhaPrefabAusente = false;
+        ultimaFalhaItemIdVazio = true;
+        ultimoLoadDiretoPorPrefab = false;
     }
 
     private void AdicionarInstanciaIdUnico(List<string> ids, string instanciaId)

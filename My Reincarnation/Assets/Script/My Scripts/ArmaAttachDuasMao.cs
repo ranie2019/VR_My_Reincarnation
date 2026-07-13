@@ -47,9 +47,11 @@ public class ArmaAttachDuasMao : XRGrabInteractable
         if (InteractorEhSocketOuInventario(args.interactorObject))
         {
             LimparEstadoDuasMaos();
+            DefinirModoInventarioArco(true);
             return;
         }
 
+        DefinirModoInventarioArco(false);
         RegistrarMaoQueSegura(args.interactorObject);
     }
 
@@ -62,13 +64,25 @@ public class ArmaAttachDuasMao : XRGrabInteractable
         if (InteractorEhSocketOuInventario(args.interactorObject))
         {
             if (!ExisteMaoSelecionando())
+            {
                 LimparEstadoDuasMaos();
+                DefinirModoInventarioArco(true);
+            }
+            else
+            {
+                DefinirModoInventarioArco(false);
+            }
 
             return;
         }
 
         if (interactorMaoSegurando == null || InteractorEhMaoSegurando(interactorSaindo))
             LimparEstadoDuasMaos();
+
+        if (ExisteSocketOuInventarioSelecionando())
+            DefinirModoInventarioArco(true);
+        else
+            DefinirModoInventarioArco(false);
     }
 
     protected override void OnDisable()
@@ -216,6 +230,13 @@ public class ArmaAttachDuasMao : XRGrabInteractable
         throwOnDetach = false;
     }
 
+    private void DefinirModoInventarioArco(bool noInventario)
+    {
+        Arco arco = GetComponent<Arco>();
+        if (arco != null)
+            arco.DefinirModoInventario(noInventario);
+    }
+
     private bool InteractorEhMao(IXRInteractor interactor)
     {
         if (interactor == null || InteractorEhSocketOuInventario(interactor))
@@ -261,6 +282,17 @@ public class ArmaAttachDuasMao : XRGrabInteractable
         for (int i = 0; i < interactorsSelecting.Count; i++)
         {
             if (InteractorEhMao(interactorsSelecting[i]))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool ExisteSocketOuInventarioSelecionando()
+    {
+        for (int i = 0; i < interactorsSelecting.Count; i++)
+        {
+            if (InteractorEhSocketOuInventario(interactorsSelecting[i]))
                 return true;
         }
 
