@@ -48657,7 +48657,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &6714776263341038915
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -52591,6 +52591,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 354069027298475675, guid: 87a7691b577e73842977fe43683577b1, type: 3}
+      propertyPath: m_ParentInteractableObject
+      value: 
+      objectReference: {fileID: 8002606533554826015}
     - target: {fileID: 8264137675185652934, guid: 87a7691b577e73842977fe43683577b1, type: 3}
       propertyPath: m_Name
       value: Flexa de Gelo
@@ -53348,6 +53352,17 @@ RectTransform:
   m_AnchoredPosition: {x: -0.06107902, y: -0.17340003}
   m_SizeDelta: {x: 0.073505, y: 0.029}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &8002606533554826015 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 354069027298475675, guid: 87a7691b577e73842977fe43683577b1, type: 3}
+  m_PrefabInstance: {fileID: 7758727016857292699}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 226e7b567933781438504575d3548b47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ArmaAttachPorMao
 --- !u!224 &8027927115218515606
 RectTransform:
   m_ObjectHideFlags: 0
@@ -58530,26 +58545,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 700502744311173391, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_SizeDelta.y
-      value: 70.67
-      objectReference: {fileID: 0}
-    - target: {fileID: 700502744311173391, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -10.78
-      objectReference: {fileID: 0}
-    - target: {fileID: 1795859144245686078, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_Name
-      value: Button Activate
-      objectReference: {fileID: 0}
     - target: {fileID: 2278367452084361748, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
       propertyPath: acaoAbrirInventarioArco
       value: 
       objectReference: {fileID: -5982496924579745919, guid: c348712bda248c246b8c49b3db54643f, type: 3}
-    - target: {fileID: 2278367452084361748, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: intervaloMinimoAlternarUI
-      value: 0.1
-      objectReference: {fileID: 0}
     - target: {fileID: 3595557804323297469, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
       propertyPath: m_LocalPosition.x
       value: 518.847
@@ -58594,38 +58593,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Arco Barbaro
       objectReference: {fileID: 0}
-    - target: {fileID: 4841075374634445917, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_SizeDelta.y
-      value: 70.92
-      objectReference: {fileID: 0}
-    - target: {fileID: 4841075374634445917, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -10.68
-      objectReference: {fileID: 0}
-    - target: {fileID: 5488804442129439247, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5488804442129439247, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5488804442129439247, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 6053061601012282044, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_Name
-      value: Button Activate
-      objectReference: {fileID: 0}
-    - target: {fileID: 6284973998100518680, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -28
-      objectReference: {fileID: 0}
-    - target: {fileID: 6461257403807846036, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -47.4
-      objectReference: {fileID: 0}
     - target: {fileID: 7128731888510957751, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
       propertyPath: referenciaMaoDireita
       value: 
@@ -58634,14 +58601,6 @@ PrefabInstance:
       propertyPath: referenciaMaoEsquerda
       value: 
       objectReference: {fileID: 274905796251222248}
-    - target: {fileID: 7398086815366854979, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -47.4
-      objectReference: {fileID: 0}
-    - target: {fileID: 8999882495353026348, guid: a289b446aad1c354c849ab51a03a78ab, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -28.2
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

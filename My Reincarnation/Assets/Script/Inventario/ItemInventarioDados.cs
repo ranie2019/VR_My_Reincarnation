@@ -6,11 +6,12 @@ public class ItemInventarioDados : MonoBehaviour
     [SerializeField] private string nomeItem;
     [SerializeField] private GameObject prefabParaStack;
 
-    [Header("Flecha")]
+    [Header("Flecha / Municao")]
     [SerializeField] private bool ehFlecha;
     [SerializeField] private string idTipoFlecha;
     [SerializeField] private GameObject prefabFlechaParaDisparo;
     [SerializeField] private Sprite iconeFlecha;
+    [SerializeField] private string nomeExibicaoFlecha;
 
     public string NomeItem => string.IsNullOrWhiteSpace(nomeItem)
         ? SlotInventario.LimparNomeItem(gameObject.name)
@@ -45,5 +46,12 @@ public class ItemInventarioDados : MonoBehaviour
     public Sprite ObterIconeFlecha()
     {
         return iconeFlecha;
+    }
+
+    public string ObterNomeExibicaoFlecha()
+    {
+        return string.IsNullOrWhiteSpace(nomeExibicaoFlecha)
+            ? NomeItem
+            : nomeExibicaoFlecha.Trim();
     }
 }

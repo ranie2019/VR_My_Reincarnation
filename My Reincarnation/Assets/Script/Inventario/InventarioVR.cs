@@ -62,16 +62,14 @@ public class InventarioVR : MonoBehaviour
 
     private void Update()
     {
-        if (botaoInventario.ReadWasPerformedThisFrame())
-        {
-            SetEstado(!aberto);
-        }
+        bool botaoPressionado = botaoInventario.ReadWasPerformedThisFrame();
 
-        // Apenas para testar no Editor com teclado
+        // Apenas para testar no Editor com teclado.
         if (Keyboard.current != null && Keyboard.current.xKey.wasPressedThisFrame)
-        {
+            botaoPressionado = true;
+
+        if (botaoPressionado)
             SetEstado(!aberto);
-        }
     }
 
     private void SetEstado(bool estado)

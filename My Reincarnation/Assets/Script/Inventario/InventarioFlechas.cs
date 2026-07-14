@@ -11,6 +11,7 @@ public class InventarioFlechas : MonoBehaviour
     {
         public string idTipoFlecha;
         public string nomeExibicao;
+        public int quantidadeTotal;
         public int quantidade;
         public GameObject prefabFlecha;
         public Sprite icone;
@@ -30,9 +31,15 @@ public class InventarioFlechas : MonoBehaviour
     [SerializeField] private string ultimaFlechaConsumida;
     [SerializeField] private int quantidadeUltimaFlechaConsumida;
     [SerializeField] private int tiposFlechaDisponiveis;
+    [SerializeField] private int diagnosticoTotalTiposFlecha;
+    [SerializeField] private string diagnosticoUltimoIdConsultado;
+    [SerializeField] private int diagnosticoUltimaQuantidadeConsultada;
+    [SerializeField] private bool diagnosticoUltimoConsumoSucesso;
 
     private readonly List<FlechaInventarioInfo> cacheFlechas = new List<FlechaInventarioInfo>();
     private readonly List<SlotInventario> cacheSlotsComFlechas = new List<SlotInventario>();
+
+    public bool DiagnosticoUltimoConsumoSucesso => diagnosticoUltimoConsumoSucesso;
 
     private void Awake()
     {
@@ -98,6 +105,7 @@ public class InventarioFlechas : MonoBehaviour
                 {
                     idTipoFlecha = id,
                     nomeExibicao = ObterNomeExibicaoFlecha(item, dados),
+                    quantidadeTotal = 0,
                     quantidade = 0,
                     prefabFlecha = ObterPrefabFlecha(item, dados),
                     icone = dados != null ? dados.ObterIconeFlecha() : null,
@@ -109,6 +117,7 @@ public class InventarioFlechas : MonoBehaviour
             }
 
             info.quantidade += quantidade;
+            info.quantidadeTotal = info.quantidade;
 
             if (info.prefabFlecha == null)
                 info.prefabFlecha = ObterPrefabFlecha(item, dados);
@@ -120,22 +129,32 @@ public class InventarioFlechas : MonoBehaviour
         slotsComFlechas = cacheSlotsComFlechas.ToArray();
         quantidadeSlotsComFlechas = slotsComFlechas.Length;
         tiposFlechaDisponiveis = cacheFlechas.Count;
+        diagnosticoTotalTiposFlecha = cacheFlechas.Count;
         return cacheFlechas;
     }
 
     public int ObterQuantidadeTotal(string idTipoFlecha)
     {
         string id = NormalizarId(idTipoFlecha);
+        diagnosticoUltimoIdConsultado = id;
+
         if (string.IsNullOrWhiteSpace(id))
+        {
+            diagnosticoUltimaQuantidadeConsultada = 0;
             return 0;
+        }
 
         List<FlechaInventarioInfo> flechas = ObterFlechasDisponiveis();
         for (int i = 0; i < flechas.Count; i++)
         {
             if (string.Equals(flechas[i].idTipoFlecha, id, StringComparison.Ordinal))
-                return flechas[i].quantidade;
+            {
+                diagnosticoUltimaQuantidadeConsultada = flechas[i].quantidadeTotal;
+                return flechas[i].quantidadeTotal;
+            }
         }
 
+        diagnosticoUltimaQuantidadeConsultada = 0;
         return 0;
     }
 
@@ -185,6 +204,9 @@ public class InventarioFlechas : MonoBehaviour
         AtualizarReferencias();
 
         string id = NormalizarId(idTipoFlecha);
+        diagnosticoUltimoIdConsultado = id;
+        diagnosticoUltimoConsumoSucesso = false;
+
         if (string.IsNullOrWhiteSpace(id) || slots == null)
             return false;
 
@@ -220,6 +242,7 @@ public class InventarioFlechas : MonoBehaviour
 
         ultimaFlechaConsumida = itemConsumido != null ? itemConsumido.NomeItem : id;
         quantidadeUltimaFlechaConsumida = Mathf.Max(0, menorQuantidade - 1);
+        diagnosticoUltimoConsumoSucesso = true;
         ObterFlechasDisponiveis();
         return true;
     }
@@ -284,8 +307,12 @@ public class InventarioFlechas : MonoBehaviour
 
     private static string ObterNomeExibicaoFlecha(XRGrabInteractable item, ItemInventarioDados dados)
     {
-        if (dados != null && !string.IsNullOrWhiteSpace(dados.NomeItem))
-            return dados.NomeItem;
+        if (dados != null)
+        {
+            string nomeExibicao = dados.ObterNomeExibicaoFlecha();
+            if (!string.IsNullOrWhiteSpace(nomeExibicao))
+                return nomeExibicao;
+        }
 
         return item != null ? LimparNomeFlecha(item.gameObject.name) : "Flecha";
     }

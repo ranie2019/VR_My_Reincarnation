@@ -98,12 +98,18 @@ public class Arco : MonoBehaviour
     [SerializeField] private InputActionReference acaoAbrirSeletorFlechas;
     [SerializeField] private bool abrirSeletorSomenteSegurandoArco = true;
 
+    [Header("UI Inventario Arco")]
+    [SerializeField] private InventarioArcoUI inventarioArcoUI;
+
     [Header("Diagnostico Flechas")]
     [SerializeField] private string diagnosticoFlechaEquipada;
     [SerializeField] private int diagnosticoQuantidadeFlechaEquipada;
     [SerializeField] private bool diagnosticoTemFlechaEquipada;
     [SerializeField] private int diagnosticoRenderersFlechaDisparo;
     [SerializeField] private bool diagnosticoMalhaFlechaDisparoVisivel;
+    [SerializeField] private string diagnosticoIdFlechaAtiva;
+    [SerializeField] private int diagnosticoQuantidadeFlechaAtiva;
+    [SerializeField] private bool diagnosticoPodeDispararFlechaAtiva;
 
     [Header("Pose da Flecha no Arco")]
     [SerializeField] private bool usarOffsetFlechaNoArco = true;
@@ -303,6 +309,7 @@ public class Arco : MonoBehaviour
 
         EncontrarInventarioFlechasSeNecessario();
         EncontrarSelecionadorFlechasSeNecessario();
+        EncontrarInventarioArcoUISeNecessario();
 
         if (areaPuxarCorda == null)
             areaPuxarCorda = EncontrarAreaPuxarCorda();
@@ -2991,6 +2998,11 @@ public class Arco : MonoBehaviour
 
     public void EquiparTipoFlecha(string idTipoFlecha)
     {
+        AtivarTipoFlecha(idTipoFlecha);
+    }
+
+    public void AtivarTipoFlecha(string idTipoFlecha)
+    {
         string id = NormalizarIdFlecha(idTipoFlecha);
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -3002,6 +3014,9 @@ public class Arco : MonoBehaviour
 
         EncontrarInventarioFlechasSeNecessario();
 
+        if (inventarioFlechas == null || !inventarioFlechas.TemFlecha(id))
+            return;
+
         GameObject prefabEncontrado = ObterPrefabConfiguradoPorId(id);
         if (prefabEncontrado == null && inventarioFlechas != null)
             inventarioFlechas.TentarObterPrefabFlecha(id, out prefabEncontrado);
@@ -3012,9 +3027,15 @@ public class Arco : MonoBehaviour
         idTipoFlechaEquipada = id;
         prefabFlechaEquipada = prefabEncontrado;
         AtualizarDiagnosticoFlechaEquipada();
+        AtualizarInventarioArcoUI();
     }
 
     public string ObterIdTipoFlechaEquipada()
+    {
+        return idTipoFlechaEquipada;
+    }
+
+    public string ObterIdTipoFlechaAtiva()
     {
         return idTipoFlechaEquipada;
     }
@@ -3025,7 +3046,17 @@ public class Arco : MonoBehaviour
         return inventarioFlechas != null ? inventarioFlechas.ObterQuantidadeTotal(idTipoFlechaEquipada) : 0;
     }
 
+    public int ObterQuantidadeFlechaAtiva()
+    {
+        return ObterQuantidadeFlechaEquipada();
+    }
+
     public bool TemFlechaParaDisparar()
+    {
+        return TentarPrepararPrefabFlechaParaDisparo(out _);
+    }
+
+    public bool TemFlechaAtivaDisponivel()
     {
         return TentarPrepararPrefabFlechaParaDisparo(out _);
     }
@@ -3046,29 +3077,21 @@ public class Arco : MonoBehaviour
             return false;
 
         string id = NormalizarIdFlecha(idTipoFlechaEquipada);
-        bool precisaEscolherOutra = string.IsNullOrWhiteSpace(id) || !inventarioFlechas.TemFlecha(id);
-        if (precisaEscolherOutra)
-        {
-            if (!inventarioFlechas.TentarEquiparPrimeiraFlechaDisponivel(out id, out GameObject prefabEncontrado))
-                return false;
-
-            idTipoFlechaEquipada = id;
-            GameObject prefabConfigurado = ObterPrefabConfiguradoPorId(id);
-            prefabFlechaEquipada = prefabConfigurado != null ? prefabConfigurado : prefabEncontrado;
-        }
-
-        if (!inventarioFlechas.TemFlecha(idTipoFlechaEquipada))
+        if (string.IsNullOrWhiteSpace(id))
             return false;
 
-        prefabParaDisparo = ObterPrefabConfiguradoPorId(idTipoFlechaEquipada);
+        if (!inventarioFlechas.TemFlecha(id))
+            return false;
+
+        prefabParaDisparo = ObterPrefabConfiguradoPorId(id);
         if (prefabParaDisparo == null)
             prefabParaDisparo = prefabFlechaEquipada;
 
         if (prefabParaDisparo == null)
-            inventarioFlechas.TentarObterPrefabFlecha(idTipoFlechaEquipada, out prefabParaDisparo);
+            inventarioFlechas.TentarObterPrefabFlecha(id, out prefabParaDisparo);
 
         if (prefabParaDisparo == null)
-            prefabParaDisparo = ObterPrefabConfiguradoPorId(idTipoFlechaEquipada);
+            prefabParaDisparo = ObterPrefabConfiguradoPorId(id);
 
         if (prefabParaDisparo != null)
             prefabFlechaEquipada = prefabParaDisparo;
@@ -3088,6 +3111,7 @@ public class Arco : MonoBehaviour
 
         bool consumiu = inventarioFlechas.ConsumirUmaFlecha(idTipoFlechaEquipada);
         AtualizarDiagnosticoFlechaEquipada();
+        AtualizarInventarioArcoUI();
         return consumiu;
     }
 
@@ -3127,6 +3151,11 @@ public class Arco : MonoBehaviour
         }
     }
 
+    public void AtualizarDiagnosticoFlechaAtiva()
+    {
+        AtualizarDiagnosticoFlechaEquipada();
+    }
+
     private void AtualizarDiagnosticoFlechaEquipada()
     {
         diagnosticoFlechaEquipada = string.IsNullOrWhiteSpace(idTipoFlechaEquipada)
@@ -3141,6 +3170,10 @@ public class Arco : MonoBehaviour
         diagnosticoTemFlechaEquipada = permitirDisparoSemFlechaParaTeste
             ? (prefabFlechaEquipada != null || prefabFlecha != null)
             : prefabFlechaEquipada != null && diagnosticoQuantidadeFlechaEquipada > 0;
+
+        diagnosticoIdFlechaAtiva = idTipoFlechaEquipada;
+        diagnosticoQuantidadeFlechaAtiva = diagnosticoQuantidadeFlechaEquipada;
+        diagnosticoPodeDispararFlechaAtiva = diagnosticoTemFlechaEquipada;
     }
 
     private void EncontrarInventarioFlechasSeNecessario(bool criarSeFaltar = true)
@@ -3173,6 +3206,27 @@ public class Arco : MonoBehaviour
 
         if (seletores != null && seletores.Length > 0)
             selecionadorFlechasUI = seletores[0];
+    }
+
+    private void EncontrarInventarioArcoUISeNecessario()
+    {
+        if (inventarioArcoUI != null)
+            return;
+
+        InventarioArcoUI[] uis = FindObjectsByType<InventarioArcoUI>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None
+        );
+
+        if (uis != null && uis.Length > 0)
+            inventarioArcoUI = uis[0];
+    }
+
+    private void AtualizarInventarioArcoUI()
+    {
+        EncontrarInventarioArcoUISeNecessario();
+        if (inventarioArcoUI != null)
+            inventarioArcoUI.AtualizarUI(this);
     }
 
     private GameObject ObterPrefabConfiguradoPorId(string idTipoFlecha)
