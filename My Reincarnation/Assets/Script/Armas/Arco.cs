@@ -18,6 +18,13 @@ public class Arco : MonoBehaviour
         TrajetoriaCurva
     }
 
+    [Serializable]
+    private class FlechaPrefabConfigurada
+    {
+        public string idTipoFlecha;
+        public GameObject prefabFlecha;
+    }
+
     [Header("Attach Duas Maos")]
     [SerializeField] private ArmaAttachDuasMao attachDuasMao;
 
@@ -77,6 +84,26 @@ public class Arco : MonoBehaviour
     [SerializeField, HideInInspector] private Transform pontoFlecha;
     [SerializeField] private Transform pontoDirecaoDisparo;
     [SerializeField] private bool criarFlechaAutomaticamente = true;
+
+    [Header("Municao / Flechas")]
+    [SerializeField] private InventarioFlechas inventarioFlechas;
+    [SerializeField] private string idTipoFlechaEquipada;
+    [SerializeField] private GameObject prefabFlechaEquipada;
+    [SerializeField] private bool consumirFlechaDoInventario = true;
+    [SerializeField] private bool permitirDisparoSemFlechaParaTeste;
+    [SerializeField] private List<FlechaPrefabConfigurada> prefabsFlechasDisponiveis = new List<FlechaPrefabConfigurada>();
+
+    [Header("UI Flechas")]
+    [SerializeField] private SelecionadorFlechasUI selecionadorFlechasUI;
+    [SerializeField] private InputActionReference acaoAbrirSeletorFlechas;
+    [SerializeField] private bool abrirSeletorSomenteSegurandoArco = true;
+
+    [Header("Diagnostico Flechas")]
+    [SerializeField] private string diagnosticoFlechaEquipada;
+    [SerializeField] private int diagnosticoQuantidadeFlechaEquipada;
+    [SerializeField] private bool diagnosticoTemFlechaEquipada;
+    [SerializeField] private int diagnosticoRenderersFlechaDisparo;
+    [SerializeField] private bool diagnosticoMalhaFlechaDisparoVisivel;
 
     [Header("Pose da Flecha no Arco")]
     [SerializeField] private bool usarOffsetFlechaNoArco = true;
@@ -274,6 +301,9 @@ public class Arco : MonoBehaviour
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
+        EncontrarInventarioFlechasSeNecessario();
+        EncontrarSelecionadorFlechasSeNecessario();
+
         if (areaPuxarCorda == null)
             areaPuxarCorda = EncontrarAreaPuxarCorda();
 
@@ -300,6 +330,8 @@ public class Arco : MonoBehaviour
             DefinirModoInventario(true);
         else
             SincronizarModoInventarioPorParent();
+
+        AtualizarDiagnosticoFlechaEquipada();
     }
 
     private void OnValidate()
@@ -313,6 +345,8 @@ public class Arco : MonoBehaviour
     private void Update()
     {
         SincronizarModoInventarioPorParent();
+        AtualizarEntradaSeletorFlechas();
+        AtualizarDiagnosticoFlechaEquipada();
 
         if (estaNoInventario)
         {
@@ -1245,16 +1279,25 @@ public class Arco : MonoBehaviour
             return false;
 
         Transform pontoFlechaAtual = ObterPontoFlechaAtual();
+        if (!TentarPrepararPrefabFlechaParaDisparo(out GameObject prefabParaDisparo))
+        {
+            flechaPreparada = null;
+            AtualizarDiagnosticoFlechaEquipada();
+            return false;
+        }
+
         GameObject flecha = flechaPreparada;
 
-        if (flecha == null && prefabFlecha != null && pontoFlechaAtual != null)
-            flecha = Instantiate(prefabFlecha, pontoFlechaAtual.position, pontoFlechaAtual.rotation);
+        if (flecha == null && prefabParaDisparo != null && pontoFlechaAtual != null)
+            flecha = Instantiate(prefabParaDisparo, pontoFlechaAtual.position, pontoFlechaAtual.rotation);
 
         if (flecha == null)
         {
             flechaPreparada = null;
             return false;
         }
+
+        GarantirMalhaFlechaVisivel(flecha);
 
         Transform flechaTransform = flecha.transform;
         Vector3 direcao = CalcularDirecaoDisparo();
@@ -1282,9 +1325,17 @@ public class Arco : MonoBehaviour
             return false;
         }
 
+        if (!ConsumirFlechaEquipadaAposDisparo())
+        {
+            Destroy(flecha);
+            flechaPreparada = null;
+            return false;
+        }
+
         MarcarFlechaComoLancada(flecha);
         TocarSom(somSoltarFlecha);
         flechaPreparada = null;
+        AtualizarDiagnosticoFlechaEquipada();
         return true;
     }
 
@@ -2848,10 +2899,14 @@ public class Arco : MonoBehaviour
             return;
 
         Transform pontoFlechaAtual = ObterPontoFlechaAtual();
-        if (flechaPreparada != null || prefabFlecha == null || pontoFlechaAtual == null)
+        if (flechaPreparada != null || pontoFlechaAtual == null)
             return;
 
-        flechaPreparada = Instantiate(prefabFlecha, pontoFlechaAtual.position, pontoFlechaAtual.rotation, pontoFlechaAtual);
+        if (!TentarPrepararPrefabFlechaParaDisparo(out GameObject prefabParaPreparar) || prefabParaPreparar == null)
+            return;
+
+        flechaPreparada = Instantiate(prefabParaPreparar, pontoFlechaAtual.position, pontoFlechaAtual.rotation, pontoFlechaAtual);
+        GarantirMalhaFlechaVisivel(flechaPreparada);
         AplicarPoseFlechaNoArco(flechaPreparada, pontoFlechaAtual);
 
         GarantirComponenteFlecha(flechaPreparada);
@@ -2932,6 +2987,260 @@ public class Arco : MonoBehaviour
 
         if (pontoFlechaAtual != null)
             flechaTransform.rotation = pontoFlechaAtual.rotation * offsetRotacao;
+    }
+
+    public void EquiparTipoFlecha(string idTipoFlecha)
+    {
+        string id = NormalizarIdFlecha(idTipoFlecha);
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            idTipoFlechaEquipada = string.Empty;
+            prefabFlechaEquipada = null;
+            AtualizarDiagnosticoFlechaEquipada();
+            return;
+        }
+
+        EncontrarInventarioFlechasSeNecessario();
+
+        GameObject prefabEncontrado = ObterPrefabConfiguradoPorId(id);
+        if (prefabEncontrado == null && inventarioFlechas != null)
+            inventarioFlechas.TentarObterPrefabFlecha(id, out prefabEncontrado);
+
+        if (prefabEncontrado == null)
+            return;
+
+        idTipoFlechaEquipada = id;
+        prefabFlechaEquipada = prefabEncontrado;
+        AtualizarDiagnosticoFlechaEquipada();
+    }
+
+    public string ObterIdTipoFlechaEquipada()
+    {
+        return idTipoFlechaEquipada;
+    }
+
+    public int ObterQuantidadeFlechaEquipada()
+    {
+        EncontrarInventarioFlechasSeNecessario(false);
+        return inventarioFlechas != null ? inventarioFlechas.ObterQuantidadeTotal(idTipoFlechaEquipada) : 0;
+    }
+
+    public bool TemFlechaParaDisparar()
+    {
+        return TentarPrepararPrefabFlechaParaDisparo(out _);
+    }
+
+    private bool TentarPrepararPrefabFlechaParaDisparo(out GameObject prefabParaDisparo)
+    {
+        prefabParaDisparo = null;
+
+        if (permitirDisparoSemFlechaParaTeste)
+        {
+            prefabParaDisparo = prefabFlechaEquipada != null ? prefabFlechaEquipada : prefabFlecha;
+            return prefabParaDisparo != null;
+        }
+
+        EncontrarInventarioFlechasSeNecessario();
+
+        if (inventarioFlechas == null)
+            return false;
+
+        string id = NormalizarIdFlecha(idTipoFlechaEquipada);
+        bool precisaEscolherOutra = string.IsNullOrWhiteSpace(id) || !inventarioFlechas.TemFlecha(id);
+        if (precisaEscolherOutra)
+        {
+            if (!inventarioFlechas.TentarEquiparPrimeiraFlechaDisponivel(out id, out GameObject prefabEncontrado))
+                return false;
+
+            idTipoFlechaEquipada = id;
+            GameObject prefabConfigurado = ObterPrefabConfiguradoPorId(id);
+            prefabFlechaEquipada = prefabConfigurado != null ? prefabConfigurado : prefabEncontrado;
+        }
+
+        if (!inventarioFlechas.TemFlecha(idTipoFlechaEquipada))
+            return false;
+
+        prefabParaDisparo = ObterPrefabConfiguradoPorId(idTipoFlechaEquipada);
+        if (prefabParaDisparo == null)
+            prefabParaDisparo = prefabFlechaEquipada;
+
+        if (prefabParaDisparo == null)
+            inventarioFlechas.TentarObterPrefabFlecha(idTipoFlechaEquipada, out prefabParaDisparo);
+
+        if (prefabParaDisparo == null)
+            prefabParaDisparo = ObterPrefabConfiguradoPorId(idTipoFlechaEquipada);
+
+        if (prefabParaDisparo != null)
+            prefabFlechaEquipada = prefabParaDisparo;
+
+        AtualizarDiagnosticoFlechaEquipada();
+        return prefabParaDisparo != null;
+    }
+
+    private bool ConsumirFlechaEquipadaAposDisparo()
+    {
+        if (permitirDisparoSemFlechaParaTeste || !consumirFlechaDoInventario)
+            return true;
+
+        EncontrarInventarioFlechasSeNecessario();
+        if (inventarioFlechas == null)
+            return false;
+
+        bool consumiu = inventarioFlechas.ConsumirUmaFlecha(idTipoFlechaEquipada);
+        AtualizarDiagnosticoFlechaEquipada();
+        return consumiu;
+    }
+
+    private void AtualizarEntradaSeletorFlechas()
+    {
+        if (!BotaoAbrirSeletorPressionado() || !PodeAbrirSeletorFlechas())
+            return;
+
+        EncontrarSelecionadorFlechasSeNecessario();
+        if (selecionadorFlechasUI != null)
+            selecionadorFlechasUI.Alternar(this, inventarioFlechas);
+    }
+
+    private bool PodeAbrirSeletorFlechas()
+    {
+        if (estaNoInventario || Quebrado)
+            return false;
+
+        if (!abrirSeletorSomenteSegurandoArco)
+            return true;
+
+        return attachDuasMao != null && attachDuasMao.ArcoEstaSegurado();
+    }
+
+    private bool BotaoAbrirSeletorPressionado()
+    {
+        if (acaoAbrirSeletorFlechas == null || acaoAbrirSeletorFlechas.action == null)
+            return false;
+
+        try
+        {
+            return acaoAbrirSeletorFlechas.action.WasPressedThisFrame();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void AtualizarDiagnosticoFlechaEquipada()
+    {
+        diagnosticoFlechaEquipada = string.IsNullOrWhiteSpace(idTipoFlechaEquipada)
+            ? "Nenhuma"
+            : idTipoFlechaEquipada;
+
+        EncontrarInventarioFlechasSeNecessario(false);
+        diagnosticoQuantidadeFlechaEquipada = inventarioFlechas != null
+            ? inventarioFlechas.ObterQuantidadeTotal(idTipoFlechaEquipada)
+            : 0;
+
+        diagnosticoTemFlechaEquipada = permitirDisparoSemFlechaParaTeste
+            ? (prefabFlechaEquipada != null || prefabFlecha != null)
+            : prefabFlechaEquipada != null && diagnosticoQuantidadeFlechaEquipada > 0;
+    }
+
+    private void EncontrarInventarioFlechasSeNecessario(bool criarSeFaltar = true)
+    {
+        if (inventarioFlechas != null)
+            return;
+
+        inventarioFlechas = FindFirstObjectByType<InventarioFlechas>();
+        if (inventarioFlechas != null)
+            return;
+
+        InventarioVR inventario = FindFirstObjectByType<InventarioVR>();
+        if (inventario == null)
+            return;
+
+        inventarioFlechas = inventario.GetComponent<InventarioFlechas>();
+        if (inventarioFlechas == null && criarSeFaltar && Application.isPlaying)
+            inventarioFlechas = inventario.gameObject.AddComponent<InventarioFlechas>();
+    }
+
+    private void EncontrarSelecionadorFlechasSeNecessario()
+    {
+        if (selecionadorFlechasUI != null)
+            return;
+
+        SelecionadorFlechasUI[] seletores = FindObjectsByType<SelecionadorFlechasUI>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None
+        );
+
+        if (seletores != null && seletores.Length > 0)
+            selecionadorFlechasUI = seletores[0];
+    }
+
+    private GameObject ObterPrefabConfiguradoPorId(string idTipoFlecha)
+    {
+        string id = NormalizarIdFlecha(idTipoFlecha);
+        if (string.IsNullOrWhiteSpace(id) || prefabsFlechasDisponiveis == null)
+            return null;
+
+        for (int i = 0; i < prefabsFlechasDisponiveis.Count; i++)
+        {
+            FlechaPrefabConfigurada configuracao = prefabsFlechasDisponiveis[i];
+            if (configuracao == null || configuracao.prefabFlecha == null)
+                continue;
+
+            if (string.Equals(NormalizarIdFlecha(configuracao.idTipoFlecha), id, StringComparison.Ordinal))
+                return configuracao.prefabFlecha;
+        }
+
+        return null;
+    }
+
+    private static string NormalizarIdFlecha(string id)
+    {
+        return string.IsNullOrWhiteSpace(id) ? string.Empty : id.Trim();
+    }
+
+    private void GarantirMalhaFlechaVisivel(GameObject flecha)
+    {
+        diagnosticoRenderersFlechaDisparo = 0;
+        diagnosticoMalhaFlechaDisparoVisivel = false;
+
+        if (flecha == null)
+            return;
+
+        flecha.SetActive(true);
+
+        Renderer[] renderers = flecha.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !RendererEhMalhaFlecha(renderer))
+                continue;
+
+            AtivarHierarquiaAte(flecha.transform, renderer.transform);
+            renderer.enabled = true;
+            diagnosticoRenderersFlechaDisparo++;
+        }
+
+        diagnosticoMalhaFlechaDisparoVisivel = diagnosticoRenderersFlechaDisparo > 0;
+    }
+
+    private static bool RendererEhMalhaFlecha(Renderer renderer)
+    {
+        return renderer is MeshRenderer || renderer is SkinnedMeshRenderer;
+    }
+
+    private static void AtivarHierarquiaAte(Transform raiz, Transform alvo)
+    {
+        Transform atual = alvo;
+        while (atual != null)
+        {
+            atual.gameObject.SetActive(true);
+
+            if (atual == raiz)
+                return;
+
+            atual = atual.parent;
+        }
     }
 
     private void LimparFlechaPreparada(bool destruir)

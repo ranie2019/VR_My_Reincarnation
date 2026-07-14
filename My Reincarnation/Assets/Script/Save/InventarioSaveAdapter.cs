@@ -161,7 +161,13 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 if (restaurarDiretoPorPrefab)
                 {
                     if (CriarERestaurarItemNoInventario(dataInstancia, slotDestino, esconderNaPilha))
+                    {
                         slotsRestaurados.Add(slotDestino);
+                        RemoverOriginalSoltoCorrespondenteAoItemRestauradoDireto(
+                            originaisCena,
+                            dataInstancia,
+                            originaisUsados);
+                    }
 
                     continue;
                 }
@@ -312,6 +318,115 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
         persistente.MarcarComoNoInventario();
         return true;
+    }
+
+    private void RemoverOriginalSoltoCorrespondenteAoItemRestauradoDireto(
+        List<ItemPersistente> originaisCena,
+        InventorySaveData data,
+        HashSet<ItemPersistente> originaisUsados)
+    {
+        if (!destruirOriginaisSalvosNoInventario || originaisCena == null || data == null)
+            return;
+
+        ItemPersistente original = EncontrarOriginalSoltoPorInstanciaId(
+            originaisCena,
+            data.instanciaId,
+            originaisUsados);
+
+        if (original == null)
+        {
+            original = EncontrarOriginalSoltoPorItemIdParaRestauracaoDireta(
+                originaisCena,
+                data.itemId,
+                originaisUsados);
+        }
+
+        if (original == null)
+            return;
+
+        originaisUsados?.Add(original);
+        originaisCena.Remove(original);
+
+        if (original.gameObject != null)
+        {
+            original.gameObject.SetActive(false);
+            Destroy(original.gameObject);
+        }
+    }
+
+    private ItemPersistente EncontrarOriginalSoltoPorInstanciaId(
+        List<ItemPersistente> originaisCena,
+        string instanciaId,
+        HashSet<ItemPersistente> originaisUsados)
+    {
+        if (originaisCena == null || string.IsNullOrWhiteSpace(instanciaId))
+            return null;
+
+        string instanciaIdNormalizado = instanciaId.Trim();
+        for (int i = 0; i < originaisCena.Count; i++)
+        {
+            ItemPersistente item = originaisCena[i];
+            if (item == null || (originaisUsados != null && originaisUsados.Contains(item)))
+                continue;
+
+            if (item.EstaNoInventario() || item.GetComponentInParent<SlotInventario>(true) != null)
+                continue;
+
+            if (string.Equals(item.ObterInstanciaIdSemGerar(), instanciaIdNormalizado, System.StringComparison.Ordinal))
+                return item;
+        }
+
+        return null;
+    }
+
+    private ItemPersistente EncontrarOriginalSoltoPorItemIdParaRestauracaoDireta(
+        List<ItemPersistente> originaisCena,
+        string itemId,
+        HashSet<ItemPersistente> originaisUsados)
+    {
+        ItemPersistente originalComIdPersistente = EncontrarOriginalSoltoPorItemId(
+            originaisCena,
+            itemId,
+            originaisUsados,
+            true);
+
+        if (originalComIdPersistente != null)
+            return originalComIdPersistente;
+
+        return EncontrarOriginalSoltoPorItemId(
+            originaisCena,
+            itemId,
+            originaisUsados,
+            false);
+    }
+
+    private ItemPersistente EncontrarOriginalSoltoPorItemId(
+        List<ItemPersistente> originaisCena,
+        string itemId,
+        HashSet<ItemPersistente> originaisUsados,
+        bool apenasIdRuntime)
+    {
+        if (originaisCena == null || string.IsNullOrWhiteSpace(itemId))
+            return null;
+
+        string itemIdNormalizado = itemId.Trim();
+        for (int i = 0; i < originaisCena.Count; i++)
+        {
+            ItemPersistente item = originaisCena[i];
+            if (item == null || (originaisUsados != null && originaisUsados.Contains(item)))
+                continue;
+
+            if (item.EstaNoInventario() || item.GetComponentInParent<SlotInventario>(true) != null)
+                continue;
+
+            if (apenasIdRuntime && !item.InstanciaIdFoiGeradoEmRuntime())
+                continue;
+
+            if (string.Equals(item.ObterItemIdSemFallback(), itemIdNormalizado, System.StringComparison.Ordinal))
+                return item;
+        }
+
+        return null;
     }
 
     private List<ItemPersistente> ObterItensPersistentesSoltosCena()

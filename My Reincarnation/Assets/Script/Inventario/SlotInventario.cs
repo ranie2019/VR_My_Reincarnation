@@ -1019,6 +1019,69 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         return TopoDaPilha();
     }
 
+    public bool PossuiItem()
+    {
+        RemoverItensNulosDaPilha();
+        return pilhaItens.Count > 0;
+    }
+
+    public int ObterQuantidadeAtual()
+    {
+        return ObterQuantidadeRealParaSave();
+    }
+
+    public ItemInventarioDados ObterItemRepresentante()
+    {
+        XRGrabInteractable item = ObterItemRepresentanteParaSave();
+        return item != null ? item.GetComponent<ItemInventarioDados>() : null;
+    }
+
+    public bool ConsumirUmaUnidade(out ItemInventarioDados itemConsumido)
+    {
+        itemConsumido = null;
+        RemoverItensNulosDaPilha();
+
+        XRGrabInteractable consumido = TopoDaPilha();
+        if (consumido == null)
+        {
+            AtualizarContadorTMP();
+            AtualizarVisibilidadeVisual();
+            return false;
+        }
+
+        itemConsumido = consumido.GetComponent<ItemInventarioDados>();
+        RemoverFiltroDoItemGuardado();
+
+        pilhaItens.RemoveAt(pilhaItens.Count - 1);
+        itensRestauradosDoSave.Remove(consumido);
+        itensComEscalaVisualPendente.Remove(consumido);
+        escalasVisuaisInventario.Remove(consumido);
+        estadosOriginais.Remove(consumido);
+        consumido.selectFilters.Remove(this);
+
+        if (itemGuardado == consumido)
+            itemGuardado = null;
+
+        Destroy(consumido.gameObject);
+
+        if (pilhaItens.Count == 0)
+        {
+            nomeItemAtual = string.Empty;
+            ignorarProximoExited = false;
+            AtualizarContadorTMP();
+            AtualizarVisibilidadeVisual();
+            Physics.SyncTransforms();
+            return true;
+        }
+
+        PromoverNovoTopoAposRetirada();
+        nomeItemAtual = ObterNomeItem(TopoDaPilha());
+        AtualizarContadorTMP();
+        AtualizarVisibilidadeVisual();
+        Physics.SyncTransforms();
+        return true;
+    }
+
     public void LimparItensSalvosDoSlot(bool destruirItens)
     {
         RemoverFiltroDoItemGuardado();
