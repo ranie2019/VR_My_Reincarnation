@@ -178,6 +178,7 @@ public class Arco : MonoBehaviour
     [SerializeField] private Transform arcoBaixo3;
 
     [SerializeField] private Vector3 eixoLocalCurvatura = Vector3.forward;
+    [SerializeField] private Vector3 eixoLocalCurvaturaInferior = Vector3.right;
 
     [SerializeField] private float anguloCima1 = 3f;
     [SerializeField] private float anguloCima2 = 6f;
@@ -188,6 +189,10 @@ public class Arco : MonoBehaviour
     [SerializeField] private float anguloBaixo3 = -9f;
 
     [SerializeField] private bool inverterCurvatura = false;
+    [SerializeField] private bool inverterCurvaturaInferior = false;
+    [SerializeField] private bool inverterCurvaturaBaixo1 = false;
+    [SerializeField] private bool inverterCurvaturaBaixo2 = false;
+    [SerializeField] private bool inverterCurvaturaBaixo3 = false;
     [SerializeField] private float suavidadeCurvatura = 20f;
 
     [Header("Corda Visual")]
@@ -1718,19 +1723,29 @@ public class Arco : MonoBehaviour
 
     private void AplicarRotacoesCurvatura(float tensao)
     {
-        Vector3 eixoNormalizado = eixoLocalCurvatura.sqrMagnitude > 0.0001f
-            ? eixoLocalCurvatura.normalized
-            : Vector3.forward;
+        Vector3 eixoSuperior = ObterEixoCurvaturaNormalizado(eixoLocalCurvatura, Vector3.forward);
+        Vector3 eixoInferior = ObterEixoCurvaturaNormalizado(eixoLocalCurvaturaInferior, Vector3.right);
 
         float sinal = inverterCurvatura ? -1f : 1f;
+        float sinalInferior = inverterCurvaturaInferior ? -sinal : sinal;
 
-        AplicarRotacaoLocal(arcoCima1, rotacaoBaseCima1, eixoNormalizado, anguloCima1 * sinal, tensao);
-        AplicarRotacaoLocal(arcoCima2, rotacaoBaseCima2, eixoNormalizado, anguloCima2 * sinal, tensao);
-        AplicarRotacaoLocal(arcoCima3, rotacaoBaseCima3, eixoNormalizado, anguloCima3 * sinal, tensao);
+        AplicarRotacaoLocal(arcoCima1, rotacaoBaseCima1, eixoSuperior, anguloCima1 * sinal, tensao);
+        AplicarRotacaoLocal(arcoCima2, rotacaoBaseCima2, eixoSuperior, anguloCima2 * sinal, tensao);
+        AplicarRotacaoLocal(arcoCima3, rotacaoBaseCima3, eixoSuperior, anguloCima3 * sinal, tensao);
 
-        AplicarRotacaoLocal(arcoBaixo1, rotacaoBaseBaixo1, eixoNormalizado, anguloBaixo1 * sinal, tensao);
-        AplicarRotacaoLocal(arcoBaixo2, rotacaoBaseBaixo2, eixoNormalizado, anguloBaixo2 * sinal, tensao);
-        AplicarRotacaoLocal(arcoBaixo3, rotacaoBaseBaixo3, eixoNormalizado, anguloBaixo3 * sinal, tensao);
+        AplicarRotacaoLocal(arcoBaixo1, rotacaoBaseBaixo1, eixoInferior, anguloBaixo1 * SinalSegmentoInferior(sinalInferior, inverterCurvaturaBaixo1), tensao);
+        AplicarRotacaoLocal(arcoBaixo2, rotacaoBaseBaixo2, eixoInferior, anguloBaixo2 * SinalSegmentoInferior(sinalInferior, inverterCurvaturaBaixo2), tensao);
+        AplicarRotacaoLocal(arcoBaixo3, rotacaoBaseBaixo3, eixoInferior, anguloBaixo3 * SinalSegmentoInferior(sinalInferior, inverterCurvaturaBaixo3), tensao);
+    }
+
+    private static Vector3 ObterEixoCurvaturaNormalizado(Vector3 eixo, Vector3 fallback)
+    {
+        return eixo.sqrMagnitude > 0.0001f ? eixo.normalized : fallback.normalized;
+    }
+
+    private static float SinalSegmentoInferior(float sinalBase, bool inverterSegmento)
+    {
+        return inverterSegmento ? -sinalBase : sinalBase;
     }
 
     private static void AplicarRotacaoLocal(Transform alvo, Quaternion rotacaoBase, Vector3 eixo, float angulo, float tensao)

@@ -29,7 +29,7 @@ RectTransform:
   m_GameObject: {fileID: 248853842125669452}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.012, y: 0.012, z: 0.012}
+  m_LocalScale: {x: 0.013555201, y: 0.013555201, z: 0.013555201}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 372628602692258365}
@@ -38,7 +38,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 1.58}
+  m_AnchoredPosition: {x: -0.36, y: 1.88}
   m_SizeDelta: {x: 1, y: 1}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &2485707925531124759
@@ -58,7 +58,7 @@ Canvas:
   m_OverrideSorting: 0
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
-  m_VertexColorAlwaysGammaSpace: 0
+  m_VertexColorAlwaysGammaSpace: 1
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -259,7 +259,12 @@ MonoBehaviour:
     chance: 52
     quantidadeMinima: 1
     quantidadeMaxima: 1
-    offsetSpawn: {x: 0, y: 1, z: 0}
+    offsetSpawn: {x: 1, y: 1, z: 0}
+  - prefab: {fileID: 299104432121230754, guid: 96711372ac71aa94d8ef04b40e9445f9, type: 3}
+    chance: 52
+    quantidadeMinima: 1
+    quantidadeMaxima: 1
+    offsetSpawn: {x: -1, y: 1, z: 0}
   prefabsSpawnMissao: []
   darReinAoMorrer: 1
   reinMinimo: 0.01
@@ -937,14 +942,14 @@ RectTransform:
   m_GameObject: {fileID: 8710417501216312659}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.1414, y: 1.1414, z: 1.1414}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 6886625778045462341}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -96, y: -10}
+  m_AnchoredPosition: {x: -100.5, y: -10}
   m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2089182772223664368
