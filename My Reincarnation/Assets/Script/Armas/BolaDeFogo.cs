@@ -113,6 +113,11 @@ public class BolaDeFogo : MonoBehaviour, IDano
         return donoDaMagia;
     }
 
+    public bool ColliderIgnoradoPelaMagia(Collider col)
+    {
+        return DeveIgnorarCollider(col);
+    }
+
     private void Awake()
     {
         escalaOriginalLocal = transform.localScale;

@@ -802,6 +802,35 @@ public class StatusPlayer : MonoBehaviour
         return manaMaxima;
     }
 
+    public bool TentarConsumirMana(int quantidade)
+    {
+        if (quantidade <= 0)
+            return true;
+
+        manaMaxima = Mathf.Max(1, manaMaxima);
+        manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+
+        if (manaAtual < quantidade)
+            return false;
+
+        manaAtual = Mathf.Max(0, manaAtual - quantidade);
+        NotificarStatusAlterado();
+        return true;
+    }
+
+    public void RecuperarMana(int quantidade)
+    {
+        if (quantidade <= 0)
+            return;
+
+        manaMaxima = Mathf.Max(1, manaMaxima);
+        int manaAnterior = Mathf.Clamp(manaAtual, 0, manaMaxima);
+        manaAtual = Mathf.Clamp(manaAnterior + quantidade, 0, manaMaxima);
+
+        if (manaAtual != manaAnterior)
+            NotificarStatusAlterado();
+    }
+
     public int GetForca()
     {
         return forca;

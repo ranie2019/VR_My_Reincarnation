@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
@@ -54,10 +55,25 @@ public class CajadoMagico : MonoBehaviour
     [SerializeField] private BolaDeFogo prefabBolaDeFogo;
     [SerializeField] private bool procurarPontoMagiaPreparadaAutomaticamente = true;
 
+    [Header("Consumo de Mana")]
+    [SerializeField, Min(0)] private int custoManaBolaDeFogo = 10;
+
     [Header("Direcao de Lancamento")]
     [SerializeField] private Transform pontoDirecaoMagia;
     [SerializeField] private bool procurarPontoDirecaoAutomaticamente = true;
     [SerializeField] private EixoLocalDirecaoMagia eixoLocalDirecaoMagia = EixoLocalDirecaoMagia.FrenteZ;
+
+    [Header("Mira da Magia")]
+    [SerializeField] private bool usarMiraLaser = true;
+    [SerializeField] private LineRenderer linhaMiraLaser;
+    [SerializeField] private Material materialMiraLaser;
+    [SerializeField] private Color corMiraLaser = Color.red;
+    [SerializeField, Min(0.001f)] private float larguraMiraLaser = 0.008f;
+    [SerializeField, Min(0.1f)] private float distanciaMaximaMiraLaser = 50f;
+    [SerializeField] private LayerMask camadasDetectadasPelaMira = ~0;
+    [SerializeField] private QueryTriggerInteraction detectarTriggersNaMira = QueryTriggerInteraction.Ignore;
+    [SerializeField] private bool limitarMiraNoPrimeiroImpacto = true;
+    [SerializeField, Min(1)] private int capacidadeImpactosMira = 32;
 
     [Header("Diagnostico")]
     [SerializeField] private bool cajadoSegurado;
@@ -88,6 +104,24 @@ public class CajadoMagico : MonoBehaviour
     [SerializeField] private string statusLancamentoMagia;
     [SerializeField] private string statusDirecaoLancamento;
 
+    [Header("Diagnostico Mana Magia")]
+    [SerializeField] private StatusPlayer statusPlayerDonoAtual;
+    [SerializeField] private int manaAtualDoDono;
+    [SerializeField] private int manaNecessariaBolaDeFogo;
+    [SerializeField] private bool ultimoConsumoManaSucesso;
+    [SerializeField] private int manaConsumidaNaUltimaPreparacao;
+    [SerializeField] private bool preparacaoBloqueadaPorFaltaDeMana;
+    [SerializeField] private string statusManaDaMagia;
+
+    [Header("Diagnostico Mira")]
+    [SerializeField] private bool miraLaserVisivel;
+    [SerializeField] private Vector3 origemAtualMira;
+    [SerializeField] private Vector3 direcaoAtualMira;
+    [SerializeField] private Vector3 pontoFinalAtualMira;
+    [SerializeField] private float distanciaAtualMira;
+    [SerializeField] private GameObject ultimoObjetoDetectadoPelaMira;
+    [SerializeField] private string statusMiraLaser;
+
     private readonly List<LineRenderer> tracosDaRuna = new();
     private readonly List<List<Vector3>> pontosPorTraco = new();
     private readonly ReconhecedorRunas reconhecedorRunas = new();
@@ -104,6 +138,9 @@ public class CajadoMagico : MonoBehaviour
     private bool avisoSemPontoLancamentoMostrado;
     private bool manterRunaAposFalhaPreparacao;
     private bool activateFoiUsadoParaLancar;
+    private bool preparandoBolaDeFogo;
+    private RaycastHit[] bufferImpactosMira;
+    private Material materialMiraLaserRuntime;
 
     public Transform PontoLancamento => pontoLancamento;
     public Transform PontoMagiaPreparada => pontoMagiaPreparada;
@@ -119,7 +156,9 @@ public class CajadoMagico : MonoBehaviour
         EncontrarPontoMagiaPreparadaSeNecessario();
         EncontrarPontoDirecaoMagiaSeNecessario();
         EncontrarInteragivelXRSeNecessario();
+        GarantirMiraLaser();
         AtualizarEstadoSelecao();
+        EsconderMiraLaser();
         AtualizarDiagnostico();
     }
 
@@ -129,8 +168,10 @@ public class CajadoMagico : MonoBehaviour
         EncontrarPontoMagiaPreparadaSeNecessario();
         EncontrarPontoDirecaoMagiaSeNecessario();
         EncontrarInteragivelXRSeNecessario();
+        GarantirMiraLaser();
         RegistrarEventosXR();
         AtualizarEstadoSelecao();
+        EsconderMiraLaser();
         AtualizarDiagnostico();
     }
 
@@ -142,6 +183,8 @@ public class CajadoMagico : MonoBehaviour
         RemoverEventosXR();
         cajadoSegurado = false;
         ultimoInteractor = null;
+        statusPlayerDonoAtual = null;
+        EsconderMiraLaser();
         AtualizarDiagnostico();
     }
 
@@ -149,9 +192,13 @@ public class CajadoMagico : MonoBehaviour
     {
         RemoverEventosXR();
         DestruirRunaVisual();
+        EsconderMiraLaser();
 
         if (materialTracoRuntime != null)
             Destroy(materialTracoRuntime);
+
+        if (materialMiraLaserRuntime != null)
+            Destroy(materialMiraLaserRuntime);
     }
 
     private void OnValidate()
@@ -174,10 +221,15 @@ public class CajadoMagico : MonoBehaviour
         margemMinimaAbsoluta = Mathf.Max(0.001f, margemMinimaAbsoluta);
         comprimentoMinimoElementoRelativo = Mathf.Max(0.001f, comprimentoMinimoElementoRelativo);
         pontuacaoMinima = Mathf.Clamp01(pontuacaoMinima);
+        custoManaBolaDeFogo = Mathf.Max(0, custoManaBolaDeFogo);
+        larguraMiraLaser = Mathf.Max(0.001f, larguraMiraLaser);
+        distanciaMaximaMiraLaser = Mathf.Max(0.1f, distanciaMaximaMiraLaser);
+        capacidadeImpactosMira = Mathf.Max(1, capacidadeImpactosMira);
         EncontrarPontoLancamentoSeNecessario();
         EncontrarPontoMagiaPreparadaSeNecessario();
         EncontrarPontoDirecaoMagiaSeNecessario();
         EncontrarInteragivelXRSeNecessario();
+        ConfigurarLinhaMiraLaserSeExistir();
         AtualizarDiagnostico();
     }
 
@@ -192,6 +244,11 @@ public class CajadoMagico : MonoBehaviour
 
         if (mostrarDiagnostico)
             AtualizarDiagnostico();
+    }
+
+    private void LateUpdate()
+    {
+        AtualizarMiraLaser();
     }
 
     private void RegistrarEventosXR()
@@ -230,6 +287,7 @@ public class CajadoMagico : MonoBehaviour
     {
         cajadoSegurado = true;
         ultimoInteractor = ObterTransformInteractor(args != null ? args.interactorObject : null);
+        AtualizarStatusPlayerDonoAtual();
         AtualizarDiagnostico();
 
         if (mostrarDiagnostico)
@@ -242,6 +300,7 @@ public class CajadoMagico : MonoBehaviour
             FinalizarTracoAtual();
 
         AtualizarEstadoSelecao();
+        statusPlayerDonoAtual = null;
         AtualizarDiagnostico();
 
         if (mostrarDiagnostico)
@@ -257,6 +316,8 @@ public class CajadoMagico : MonoBehaviour
 
         if (interactorAtivacao != null)
             ultimoInteractor = interactorAtivacao;
+
+        AtualizarStatusPlayerDonoAtual();
 
         if (bolaDeFogoPreparadaAtual != null)
         {
@@ -539,57 +600,138 @@ public class CajadoMagico : MonoBehaviour
     {
         manterRunaAposFalhaPreparacao = false;
 
+        if (preparandoBolaDeFogo)
+        {
+            statusPreparacaoMagia = "Preparacao de Bola de Fogo ja esta em andamento.";
+            AtualizarDiagnosticoManaMagia();
+            AtualizarDiagnosticoMagiaPreparada();
+            return false;
+        }
+
         if (bolaDeFogoPreparadaAtual != null)
         {
             statusPreparacaoMagia = "Ja existe uma Bola de Fogo preparada.";
+            statusManaDaMagia = "Mana nao consumida: ja existe uma Bola de Fogo preparada.";
+            ultimoConsumoManaSucesso = false;
+            manaConsumidaNaUltimaPreparacao = 0;
+            preparacaoBloqueadaPorFaltaDeMana = false;
+            AtualizarDiagnosticoManaMagia();
             AtualizarDiagnosticoMagiaPreparada();
             return false;
         }
 
-        EncontrarPontoMagiaPreparadaSeNecessario();
+        preparandoBolaDeFogo = true;
+        bool manaConsumida = false;
+        int manaConsumidaNestaPreparacao = 0;
 
-        if (pontoMagiaPreparada == null)
+        try
         {
-            statusPreparacaoMagia = "PontoMagiaPreparada nao configurado.";
+            EncontrarPontoMagiaPreparadaSeNecessario();
+
+            if (pontoMagiaPreparada == null)
+            {
+                statusPreparacaoMagia = "PontoMagiaPreparada nao configurado.";
+                statusManaDaMagia = "Mana nao consumida: PontoMagiaPreparada ausente.";
+                manterRunaAposFalhaPreparacao = true;
+                AtualizarDiagnosticoManaMagia();
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+
+            if (prefabBolaDeFogo == null)
+            {
+                statusPreparacaoMagia = "Prefab Bola de Fogo nao configurado.";
+                statusManaDaMagia = "Mana nao consumida: prefab Bola de Fogo ausente.";
+                manterRunaAposFalhaPreparacao = true;
+                AtualizarDiagnosticoManaMagia();
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+
+            StatusPlayer statusDono = ObterStatusPlayerDonoAtual(true);
+            if (statusDono == null && custoManaBolaDeFogo > 0)
+            {
+                statusPreparacaoMagia = "StatusPlayer do dono nao encontrado.";
+                statusManaDaMagia = "Mana nao consumida: StatusPlayer do dono nao encontrado.";
+                manterRunaAposFalhaPreparacao = true;
+                AtualizarDiagnosticoManaMagia();
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+
+            int custo = Mathf.Max(0, custoManaBolaDeFogo);
+            manaNecessariaBolaDeFogo = custo;
+            manaAtualDoDono = statusDono != null ? statusDono.GetManaAtual() : 0;
+            preparacaoBloqueadaPorFaltaDeMana = false;
+            ultimoConsumoManaSucesso = false;
+            manaConsumidaNaUltimaPreparacao = 0;
+
+            if (statusDono != null && !statusDono.TentarConsumirMana(custo))
+            {
+                manaAtualDoDono = statusDono.GetManaAtual();
+                preparacaoBloqueadaPorFaltaDeMana = true;
+                statusPreparacaoMagia = "Mana insuficiente para preparar Bola de Fogo.";
+                statusManaDaMagia = $"Mana insuficiente. Atual: {manaAtualDoDono}, necessaria: {custo}.";
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+
+            manaConsumida = custo > 0;
+            manaConsumidaNestaPreparacao = custo;
+            ultimoConsumoManaSucesso = manaConsumida;
+            manaConsumidaNaUltimaPreparacao = manaConsumidaNestaPreparacao;
+            manaAtualDoDono = statusDono != null ? statusDono.GetManaAtual() : manaAtualDoDono;
+
+            BolaDeFogo instancia = Instantiate(prefabBolaDeFogo, pontoMagiaPreparada.position, pontoMagiaPreparada.rotation);
+
+            if (instancia == null)
+            {
+                ReembolsarManaPreparacao(statusDono, manaConsumidaNestaPreparacao);
+                statusPreparacaoMagia = "Falha ao instanciar Bola de Fogo.";
+                manterRunaAposFalhaPreparacao = true;
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+
+            bolaDeFogoPreparadaAtual = instancia;
+            instancia.Preparar(pontoMagiaPreparada, ObterDonoDaMagia(), gameObject);
+
+            if (instancia.EstadoAtual != BolaDeFogo.EstadoBolaDeFogo.Preparada)
+            {
+                ReembolsarManaPreparacao(statusDono, manaConsumidaNestaPreparacao);
+                statusPreparacaoMagia = "Bola de Fogo instanciada, mas nao ficou em estado Preparada.";
+                manterRunaAposFalhaPreparacao = true;
+                bolaDeFogoPreparadaAtual = null;
+                Destroy(instancia.gameObject);
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+
+            manaConsumida = false;
+            statusPreparacaoMagia = "Bola de Fogo preparada.";
+            statusManaDaMagia = custo > 0
+                ? $"{custo} de mana consumidos para preparar Bola de Fogo."
+                : "Bola de Fogo preparada sem custo de mana.";
+            AtualizarDiagnosticoMagiaPreparada();
+            AtualizarMiraLaser();
+            return true;
+        }
+        catch (System.Exception erro)
+        {
+            if (manaConsumida)
+                ReembolsarManaPreparacao(statusPlayerDonoAtual, manaConsumidaNestaPreparacao);
+
+            statusPreparacaoMagia = "Falha excepcional ao preparar Bola de Fogo.";
+            statusManaDaMagia = $"Mana reembolsada apos falha: {erro.GetType().Name}.";
             manterRunaAposFalhaPreparacao = true;
             AtualizarDiagnosticoMagiaPreparada();
             return false;
         }
-
-        if (prefabBolaDeFogo == null)
+        finally
         {
-            statusPreparacaoMagia = "Prefab Bola de Fogo nao configurado.";
-            manterRunaAposFalhaPreparacao = true;
-            AtualizarDiagnosticoMagiaPreparada();
-            return false;
+            preparandoBolaDeFogo = false;
+            AtualizarDiagnosticoManaMagia();
         }
-
-        BolaDeFogo instancia = Instantiate(prefabBolaDeFogo, pontoMagiaPreparada.position, pontoMagiaPreparada.rotation);
-
-        if (instancia == null)
-        {
-            statusPreparacaoMagia = "Falha ao instanciar Bola de Fogo.";
-            manterRunaAposFalhaPreparacao = true;
-            AtualizarDiagnosticoMagiaPreparada();
-            return false;
-        }
-
-        bolaDeFogoPreparadaAtual = instancia;
-        instancia.Preparar(pontoMagiaPreparada, ObterDonoDaMagia(), gameObject);
-
-        if (instancia.EstadoAtual != BolaDeFogo.EstadoBolaDeFogo.Preparada)
-        {
-            statusPreparacaoMagia = "Bola de Fogo instanciada, mas nao ficou em estado Preparada.";
-            manterRunaAposFalhaPreparacao = true;
-            bolaDeFogoPreparadaAtual = null;
-            Destroy(instancia.gameObject);
-            AtualizarDiagnosticoMagiaPreparada();
-            return false;
-        }
-
-        statusPreparacaoMagia = "Bola de Fogo preparada.";
-        AtualizarDiagnosticoMagiaPreparada();
-        return true;
     }
 
     public void NotificarBolaDeFogoEncerrada(BolaDeFogo bola)
@@ -599,6 +741,7 @@ public class CajadoMagico : MonoBehaviour
 
         bolaDeFogoPreparadaAtual = null;
         statusPreparacaoMagia = "Bola de Fogo encerrada.";
+        EsconderMiraLaser();
         AtualizarDiagnosticoMagiaPreparada();
     }
 
@@ -618,6 +761,7 @@ public class CajadoMagico : MonoBehaviour
         if (bolaParaLancar.EstadoAtual != BolaDeFogo.EstadoBolaDeFogo.Preparada)
         {
             bolaDeFogoPreparadaAtual = null;
+            EsconderMiraLaser();
             statusLancamentoMagia = "Referencia de Bola de Fogo preparada estava invalida.";
             AtualizarDiagnosticoMagiaPreparada();
             return false;
@@ -655,6 +799,7 @@ public class CajadoMagico : MonoBehaviour
         }
 
         ultimaDirecaoLancamento = direcao.normalized;
+        EsconderMiraLaser();
         bolaDeFogoPreparadaAtual = null;
         bolaParaLancar.Lancar(ultimaDirecaoLancamento, ObterDonoDaMagia(), gameObject);
 
@@ -750,6 +895,288 @@ public class CajadoMagico : MonoBehaviour
         return materialTracoRuntime;
     }
 
+    private void GarantirMiraLaser()
+    {
+        if (linhaMiraLaser == null)
+        {
+            Transform miraExistente = EncontrarFilhoPorNomeExato("MiraLaserMagia");
+            if (miraExistente == null)
+            {
+                GameObject objetoMira = new GameObject("MiraLaserMagia");
+                objetoMira.transform.SetParent(transform, false);
+                objetoMira.transform.localPosition = Vector3.zero;
+                objetoMira.transform.localRotation = Quaternion.identity;
+                objetoMira.transform.localScale = Vector3.one;
+                miraExistente = objetoMira.transform;
+            }
+
+            linhaMiraLaser = miraExistente.GetComponent<LineRenderer>();
+            if (linhaMiraLaser == null)
+                linhaMiraLaser = miraExistente.gameObject.AddComponent<LineRenderer>();
+        }
+
+        GarantirBufferImpactosMira();
+        ConfigurarLinhaMiraLaserSeExistir();
+    }
+
+    private void ConfigurarLinhaMiraLaserSeExistir()
+    {
+        if (linhaMiraLaser == null)
+            return;
+
+        linhaMiraLaser.useWorldSpace = true;
+        linhaMiraLaser.positionCount = 2;
+        linhaMiraLaser.startWidth = larguraMiraLaser;
+        linhaMiraLaser.endWidth = larguraMiraLaser;
+        linhaMiraLaser.startColor = corMiraLaser;
+        linhaMiraLaser.endColor = corMiraLaser;
+        linhaMiraLaser.numCapVertices = 4;
+        linhaMiraLaser.numCornerVertices = 2;
+        linhaMiraLaser.loop = false;
+        linhaMiraLaser.shadowCastingMode = ShadowCastingMode.Off;
+        linhaMiraLaser.receiveShadows = false;
+
+        Material materialLinha = materialMiraLaser != null ? materialMiraLaser : ObterMaterialMiraLaserPadrao();
+        if (materialMiraLaser == null)
+            AplicarCorNoMaterialMiraLaserRuntime();
+
+        if (materialLinha != null)
+            linhaMiraLaser.material = materialLinha;
+
+        if (!miraLaserVisivel)
+            linhaMiraLaser.enabled = false;
+    }
+
+    private Material ObterMaterialMiraLaserPadrao()
+    {
+        if (materialMiraLaserRuntime != null)
+            return materialMiraLaserRuntime;
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+            shader = Shader.Find("Sprites/Default");
+
+        if (shader == null)
+            return null;
+
+        materialMiraLaserRuntime = new Material(shader)
+        {
+            name = "Mira Laser Magia Runtime"
+        };
+
+        if (materialMiraLaserRuntime.HasProperty("_BaseColor"))
+            materialMiraLaserRuntime.SetColor("_BaseColor", corMiraLaser);
+        else if (materialMiraLaserRuntime.HasProperty("_Color"))
+            materialMiraLaserRuntime.SetColor("_Color", corMiraLaser);
+
+        return materialMiraLaserRuntime;
+    }
+
+    private void AplicarCorNoMaterialMiraLaserRuntime()
+    {
+        if (materialMiraLaserRuntime == null)
+            return;
+
+        if (materialMiraLaserRuntime.HasProperty("_BaseColor"))
+            materialMiraLaserRuntime.SetColor("_BaseColor", corMiraLaser);
+        else if (materialMiraLaserRuntime.HasProperty("_Color"))
+            materialMiraLaserRuntime.SetColor("_Color", corMiraLaser);
+    }
+
+    private void GarantirBufferImpactosMira()
+    {
+        if (bufferImpactosMira == null || bufferImpactosMira.Length != capacidadeImpactosMira)
+            bufferImpactosMira = new RaycastHit[capacidadeImpactosMira];
+    }
+
+    private void AtualizarMiraLaser()
+    {
+        if (!DeveMostrarMiraLaser())
+        {
+            EsconderMiraLaser();
+            return;
+        }
+
+        GarantirBufferImpactosMira();
+        Vector3 origem = ObterOrigemMiraLaser();
+        Vector3 direcao = ObterDirecaoLancamento();
+
+        if (direcao.sqrMagnitude < 0.0001f)
+        {
+            statusMiraLaser = "Direcao da mira invalida.";
+            EsconderMiraLaser();
+            return;
+        }
+
+        direcao.Normalize();
+        origemAtualMira = origem;
+        direcaoAtualMira = direcao;
+        pontoFinalAtualMira = CalcularPontoFinalMira(origem, direcao, out float distanciaFinal, out GameObject objetoDetectado);
+        distanciaAtualMira = distanciaFinal;
+        ultimoObjetoDetectadoPelaMira = objetoDetectado;
+
+        linhaMiraLaser.SetPosition(0, origemAtualMira);
+        linhaMiraLaser.SetPosition(1, pontoFinalAtualMira);
+        MostrarMiraLaser();
+        statusMiraLaser = objetoDetectado != null
+            ? $"Mira apontando para {objetoDetectado.name}."
+            : "Mira sem impacto valido.";
+    }
+
+    private bool DeveMostrarMiraLaser()
+    {
+        if (!usarMiraLaser || !isActiveAndEnabled || linhaMiraLaser == null || estaDesenhando || !cajadoSegurado)
+            return false;
+
+        if (bolaDeFogoPreparadaAtual == null)
+            return false;
+
+        if (bolaDeFogoPreparadaAtual.EstadoAtual != BolaDeFogo.EstadoBolaDeFogo.Preparada)
+            return false;
+
+        EncontrarPontoDirecaoMagiaSeNecessario();
+        return pontoDirecaoMagia != null;
+    }
+
+    private Vector3 ObterOrigemMiraLaser()
+    {
+        if (bolaDeFogoPreparadaAtual != null)
+            return bolaDeFogoPreparadaAtual.transform.position;
+
+        if (pontoMagiaPreparada != null)
+            return pontoMagiaPreparada.position;
+
+        return transform.position;
+    }
+
+    private Vector3 CalcularPontoFinalMira(Vector3 origem, Vector3 direcao, out float distanciaFinal, out GameObject objetoDetectado)
+    {
+        distanciaFinal = distanciaMaximaMiraLaser;
+        objetoDetectado = null;
+
+        if (!limitarMiraNoPrimeiroImpacto)
+            return origem + direcao * distanciaFinal;
+
+        GarantirBufferImpactosMira();
+
+        float raioMira = ObterRaioMundialBolaDeFogoPreparada();
+        int impactos = raioMira > 0.001f
+            ? Physics.SphereCastNonAlloc(origem, raioMira, direcao, bufferImpactosMira, distanciaMaximaMiraLaser, camadasDetectadasPelaMira, detectarTriggersNaMira)
+            : Physics.RaycastNonAlloc(origem, direcao, bufferImpactosMira, distanciaMaximaMiraLaser, camadasDetectadasPelaMira, detectarTriggersNaMira);
+
+        float menorDistancia = distanciaMaximaMiraLaser;
+        RaycastHit melhorHit = default;
+        bool encontrouImpacto = false;
+
+        for (int i = 0; i < impactos; i++)
+        {
+            RaycastHit hit = bufferImpactosMira[i];
+            bufferImpactosMira[i] = default;
+
+            if (!ImpactoMiraValido(hit))
+                continue;
+
+            if (hit.distance < menorDistancia)
+            {
+                menorDistancia = hit.distance;
+                melhorHit = hit;
+                encontrouImpacto = true;
+            }
+        }
+
+        if (!encontrouImpacto)
+            return origem + direcao * distanciaFinal;
+
+        distanciaFinal = menorDistancia;
+        objetoDetectado = melhorHit.collider != null ? melhorHit.collider.gameObject : null;
+        return origem + direcao * distanciaFinal;
+    }
+
+    private float ObterRaioMundialBolaDeFogoPreparada()
+    {
+        if (bolaDeFogoPreparadaAtual == null)
+            return 0f;
+
+        SphereCollider sphere = bolaDeFogoPreparadaAtual.GetComponent<SphereCollider>();
+        if (sphere == null)
+            sphere = bolaDeFogoPreparadaAtual.GetComponentInChildren<SphereCollider>(true);
+
+        if (sphere == null)
+            return 0f;
+
+        Vector3 escala = sphere.transform.lossyScale;
+        float maiorEscala = Mathf.Max(Mathf.Abs(escala.x), Mathf.Abs(escala.y), Mathf.Abs(escala.z));
+        return Mathf.Max(0f, sphere.radius * maiorEscala);
+    }
+
+    private bool ImpactoMiraValido(RaycastHit hit)
+    {
+        Collider col = hit.collider;
+        if (col == null)
+            return false;
+
+        if (bolaDeFogoPreparadaAtual != null && bolaDeFogoPreparadaAtual.ColliderIgnoradoPelaMagia(col))
+            return false;
+
+        if (ColliderPertenceATransform(col, transform))
+            return false;
+
+        if (bolaDeFogoPreparadaAtual != null && ColliderPertenceATransform(col, bolaDeFogoPreparadaAtual.transform))
+            return false;
+
+        if (pontoMagiaPreparada != null && ColliderPertenceATransform(col, pontoMagiaPreparada))
+            return false;
+
+        if (pontoDirecaoMagia != null && ColliderPertenceATransform(col, pontoDirecaoMagia))
+            return false;
+
+        if (ultimoInteractor != null && ColliderPertenceATransform(col, ultimoInteractor))
+            return false;
+
+        GameObject dono = ObterDonoDaMagia();
+        if (dono != null && ColliderPertenceATransform(col, dono.transform))
+            return false;
+
+        return true;
+    }
+
+    private static bool ColliderPertenceATransform(Collider col, Transform raiz)
+    {
+        if (col == null || raiz == null)
+            return false;
+
+        if (col.transform == raiz || col.transform.IsChildOf(raiz))
+            return true;
+
+        Rigidbody rbContato = col.attachedRigidbody;
+        return rbContato != null && (rbContato.transform == raiz || rbContato.transform.IsChildOf(raiz));
+    }
+
+    private void MostrarMiraLaser()
+    {
+        if (linhaMiraLaser == null)
+            return;
+
+        linhaMiraLaser.enabled = true;
+        miraLaserVisivel = true;
+    }
+
+    private void EsconderMiraLaser()
+    {
+        if (linhaMiraLaser != null)
+        {
+            linhaMiraLaser.enabled = false;
+            linhaMiraLaser.positionCount = 2;
+            linhaMiraLaser.SetPosition(0, Vector3.zero);
+            linhaMiraLaser.SetPosition(1, Vector3.zero);
+        }
+
+        miraLaserVisivel = false;
+        distanciaAtualMira = 0f;
+        ultimoObjetoDetectadoPelaMira = null;
+        statusMiraLaser = "Mira escondida.";
+    }
+
     private void AtualizarEstadoSelecao()
     {
         if (interagivelXR == null)
@@ -801,10 +1228,13 @@ public class CajadoMagico : MonoBehaviour
 
         statusDiagnostico =
             $"Segurado: {cajadoSegurado} | Desenhando: {estaDesenhando} | Interactor: {nomeInteractor} | Ponto: {nomePonto} | Ponto Magia: {nomePontoMagia} | Ponto Direcao: {nomePontoDirecao} | Eixo Direcao: {eixoLocalDirecaoMagia} | Tracos: {quantidadeTracos} | Pontos Traco Atual: {quantidadePontosTracoAtual} | Limpar em: {tempoRestanteParaLimpar:0.00}s | Modo: {modoReconhecimentoRuna} | Runa: {ultimaRunaReconhecida} | Score: {pontuacaoUltimaAnalise:0.00} | Motivo: {motivoUltimaAnalise} | Magia Preparada: {ultimaMagiaPreparada} | Magia Lancada: {ultimaMagiaLancada} | Direcao Lancamento: {ultimaDirecaoLancamento} | Preparacao: {statusPreparacaoMagia} | Lancamento: {statusLancamentoMagia} | Direcao: {statusDirecaoLancamento}";
+        statusDiagnostico += $" | Mana: {manaAtualDoDono}/{manaNecessariaBolaDeFogo} | Status Mana: {statusManaDaMagia}";
+        statusDiagnostico += $" | Mira: {miraLaserVisivel} | Dist Mira: {distanciaAtualMira:0.00} | Status Mira: {statusMiraLaser}";
     }
 
     private void AtualizarDiagnosticoMagiaPreparada()
     {
+        AtualizarDiagnosticoManaMagia();
         temBolaDeFogoPreparada = bolaDeFogoPreparadaAtual != null &&
                                  bolaDeFogoPreparadaAtual.EstadoAtual == BolaDeFogo.EstadoBolaDeFogo.Preparada;
     }
@@ -924,6 +1354,71 @@ public class CajadoMagico : MonoBehaviour
             return null;
 
         return interactor.root != null ? interactor.root.gameObject : interactor.gameObject;
+    }
+
+    private void AtualizarStatusPlayerDonoAtual()
+    {
+        statusPlayerDonoAtual = ResolverStatusPlayerDoDono();
+        AtualizarDiagnosticoManaMagia();
+    }
+
+    private StatusPlayer ObterStatusPlayerDonoAtual(bool atualizarSeNecessario)
+    {
+        if (statusPlayerDonoAtual == null && atualizarSeNecessario)
+            AtualizarStatusPlayerDonoAtual();
+
+        return statusPlayerDonoAtual;
+    }
+
+    private StatusPlayer ResolverStatusPlayerDoDono()
+    {
+        GameObject dono = ObterDonoDaMagia();
+        StatusPlayer status = ResolverStatusPlayerEmGameObject(dono);
+        if (status != null)
+            return status;
+
+        Transform interactor = ultimoInteractor != null ? ultimoInteractor : ObterPrimeiroInteractorSelecionando();
+        return ResolverStatusPlayerEmTransform(interactor);
+    }
+
+    private static StatusPlayer ResolverStatusPlayerEmGameObject(GameObject alvo)
+    {
+        return alvo != null ? ResolverStatusPlayerEmTransform(alvo.transform) : null;
+    }
+
+    private static StatusPlayer ResolverStatusPlayerEmTransform(Transform alvo)
+    {
+        if (alvo == null)
+            return null;
+
+        StatusPlayer status = alvo.GetComponent<StatusPlayer>();
+        if (status != null)
+            return status;
+
+        status = alvo.GetComponentInParent<StatusPlayer>();
+        if (status != null)
+            return status;
+
+        Transform raiz = alvo.root;
+        return raiz != null ? raiz.GetComponentInChildren<StatusPlayer>(true) : null;
+    }
+
+    private void ReembolsarManaPreparacao(StatusPlayer statusDono, int quantidade)
+    {
+        if (statusDono == null || quantidade <= 0)
+            return;
+
+        statusDono.RecuperarMana(quantidade);
+        ultimoConsumoManaSucesso = false;
+        manaConsumidaNaUltimaPreparacao = 0;
+        manaAtualDoDono = statusDono.GetManaAtual();
+        statusManaDaMagia = $"Mana reembolsada: {quantidade}.";
+    }
+
+    private void AtualizarDiagnosticoManaMagia()
+    {
+        manaNecessariaBolaDeFogo = Mathf.Max(0, custoManaBolaDeFogo);
+        manaAtualDoDono = statusPlayerDonoAtual != null ? statusPlayerDonoAtual.GetManaAtual() : 0;
     }
 
     private void AvisarUmaVez(string mensagem, ref bool avisoJaMostrado)

@@ -480,9 +480,22 @@ MonoBehaviour:
   pontoMagiaPreparada: {fileID: 4474419255081216588}
   prefabBolaDeFogo: {fileID: 1001000000000000004, guid: 5e0c32ab6a9145fea5d33d20d5a81770, type: 3}
   procurarPontoMagiaPreparadaAutomaticamente: 1
+  custoManaBolaDeFogo: 10
   pontoDirecaoMagia: {fileID: 5711204806200281102}
   procurarPontoDirecaoAutomaticamente: 1
   eixoLocalDirecaoMagia: 0
+  usarMiraLaser: 1
+  linhaMiraLaser: {fileID: 0}
+  materialMiraLaser: {fileID: 0}
+  corMiraLaser: {r: 1, g: 0, b: 0, a: 1}
+  larguraMiraLaser: 0.008
+  distanciaMaximaMiraLaser: 50
+  camadasDetectadasPelaMira:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  detectarTriggersNaMira: 1
+  limitarMiraNoPrimeiroImpacto: 1
+  capacidadeImpactosMira: 32
   cajadoSegurado: 0
   estaDesenhando: 0
   quantidadeTracos: 0
@@ -512,6 +525,20 @@ MonoBehaviour:
   statusPreparacaoMagia: 
   statusLancamentoMagia: 
   statusDirecaoLancamento: 
+  statusPlayerDonoAtual: {fileID: 0}
+  manaAtualDoDono: 0
+  manaNecessariaBolaDeFogo: 10
+  ultimoConsumoManaSucesso: 0
+  manaConsumidaNaUltimaPreparacao: 0
+  preparacaoBloqueadaPorFaltaDeMana: 0
+  statusManaDaMagia:
+  miraLaserVisivel: 0
+  origemAtualMira: {x: 0, y: 0, z: 0}
+  direcaoAtualMira: {x: 0, y: 0, z: 0}
+  pontoFinalAtualMira: {x: 0, y: 0, z: 0}
+  distanciaAtualMira: 0
+  ultimoObjetoDetectadoPelaMira: {fileID: 0}
+  statusMiraLaser:
 --- !u!114 &7268886339069453360
 MonoBehaviour:
   m_ObjectHideFlags: 0

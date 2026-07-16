@@ -99,8 +99,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3d6a13bfe8d34fd8a4cbf958d82a3a57, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BolaDeFogo
-  velocidade: 15
-  tempoMaximoDeVida: 10
+  velocidade: 50
+  tempoMaximoDeVida: 15
   explodirAoTerminarTempo: 1
   camadasQueCausamImpacto:
     serializedVersion: 2
@@ -110,6 +110,7 @@ MonoBehaviour:
     m_Bits: 4294967295
   tagsQueRecebemDano:
   - Enemy
+  - Player
   collidersIgnorados: []
   raioDaExplosao: 2.5
   dano: 20
