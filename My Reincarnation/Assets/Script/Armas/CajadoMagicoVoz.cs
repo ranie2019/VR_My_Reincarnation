@@ -17,6 +17,7 @@ public class CajadoMagicoVoz : MonoBehaviour
     {
         Desativado,
         SemReferenciaVoiceSDK,
+        SemWitConfiguration,
         SemPermissaoMicrofone,
         SolicitandoPermissao,
         Pronto,
@@ -35,12 +36,12 @@ public class CajadoMagicoVoz : MonoBehaviour
     [SerializeField] private bool escutarAutomaticamenteAoSegurar = true;
     [SerializeField, Min(0f)] private float atrasoParaReativarEscuta = 0.35f;
     [SerializeField] private bool solicitarPermissaoAutomaticamente = true;
-    [SerializeField] private bool mostrarDiagnostico;
 
     [Header("Eventos")]
     [SerializeField] private EventoComandoVoz aoComandoVozRecebido = new EventoComandoVoz();
+    [SerializeField] private EventoComandoVoz aoTextoParcialVozRecebido = new EventoComandoVoz();
 
-    [Header("Diagnostico")]
+    [Header("Estado")]
     [SerializeField] private EstadoVozCajado estadoVoz = EstadoVozCajado.Desativado;
     [SerializeField] private bool cajadoSegurado;
     [SerializeField] private bool permissaoMicrofoneConcedida;
@@ -48,20 +49,20 @@ public class CajadoMagicoVoz : MonoBehaviour
     [SerializeField] private bool estaProcessando;
     [SerializeField] private string ultimaTranscricaoBruta;
     [SerializeField] private string ultimaTranscricaoNormalizada;
-    [SerializeField] private float horarioUltimaTranscricao;
-    [SerializeField] private string ultimoErro;
     [SerializeField] private Transform ultimoInteractor;
 
     private XRBaseInteractable interagivelXR;
     private XRBaseInteractable interagivelRegistrado;
     private Coroutine rotinaReativarEscuta;
     private int idSessaoVoz;
-    private int idSessaoCancelada;
+    private int idSessaoCancelada = -1;
     private bool cancelamentoAtivo;
     private bool listenersVoiceRegistrados;
     private bool permissaoSolicitadaAutomaticamente;
-    private bool avisoSemInteragivelMostrado;
-    private bool avisoSemVoiceMostrado;
+    private string ultimaTranscricaoFinalProcessada;
+    private string ultimaTranscricaoParcialProcessada;
+    private float horarioUltimaTranscricaoFinalProcessada = -999f;
+    private float horarioUltimaTranscricaoParcialProcessada = -999f;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
     private UnityEngine.Android.PermissionCallbacks callbacksPermissaoMicrofone;
@@ -75,6 +76,7 @@ public class CajadoMagicoVoz : MonoBehaviour
     public string UltimaTranscricaoBruta => ultimaTranscricaoBruta;
     public string UltimaTranscricaoNormalizada => ultimaTranscricaoNormalizada;
     public EventoComandoVoz AoComandoVozRecebido => aoComandoVozRecebido;
+    public EventoComandoVoz AoTextoParcialVozRecebido => aoTextoParcialVozRecebido;
 
     private void Awake()
     {
@@ -126,56 +128,51 @@ public class CajadoMagicoVoz : MonoBehaviour
             return;
 
         EncontrarAppVoiceExperienceSeNecessario();
+        RegistrarEventosVoiceSDK();
         AtualizarEstadoSelecao();
 
         if (!cajadoSegurado)
         {
-            estadoVoz = EstadoVozCajado.Desativado;
+            DefinirStatus(EstadoVozCajado.Desativado, "Escuta nao iniciada: cajado nao esta segurado.");
             return;
         }
 
-        if (appVoiceExperience == null)
-        {
-            estadoVoz = EstadoVozCajado.SemReferenciaVoiceSDK;
-            AvisarSemVoiceUmaVez();
+        if (!ValidarConfiguracaoVoiceSDK())
             return;
-        }
 
         if (!GarantirPermissaoMicrofone())
             return;
 
         if (estaEscutando || estaProcessando || appVoiceExperience.MicActive || appVoiceExperience.IsRequestActive)
+        {
+            DefinirStatus(estadoVoz, "Escuta nao iniciada: Voice SDK ja esta ativo ou processando.");
             return;
-
-        string erroAtivacao = appVoiceExperience.GetActivateAudioError();
-        string erroEnvio = appVoiceExperience.GetSendError();
+        }
 
         if (!appVoiceExperience.CanActivateAudio() || !appVoiceExperience.CanSend())
         {
-            ultimoErro = !string.IsNullOrEmpty(erroAtivacao) ? erroAtivacao : erroEnvio;
-            estadoVoz = EstadoVozCajado.Erro;
+            DefinirStatus(EstadoVozCajado.Erro, "Escuta nao iniciada: Voice SDK recusou ativacao.");
             return;
         }
 
         PararRotinaReativacao();
+        ultimaTranscricaoParcialProcessada = string.Empty;
         cancelamentoAtivo = false;
 
         int sessaoAtual = ++idSessaoVoz;
-        VoiceServiceRequestEvents eventosSessao = CriarEventosSessao(sessaoAtual);
-        VoiceServiceRequest request = appVoiceExperience.Activate(new WitRequestOptions(), eventosSessao);
+        VoiceServiceRequest request = appVoiceExperience.Activate(new WitRequestOptions(), CriarEventosSessao(sessaoAtual));
 
         if (request == null)
         {
-            ultimoErro = "O AppVoiceExperience nao iniciou uma requisicao de voz.";
-            estadoVoz = EstadoVozCajado.Erro;
             estaEscutando = false;
             estaProcessando = false;
+            DefinirStatus(EstadoVozCajado.Erro, "O Voice SDK nao iniciou a requisicao de voz.");
             return;
         }
 
         estaEscutando = true;
         estaProcessando = false;
-        estadoVoz = EstadoVozCajado.Escutando;
+        DefinirStatus(EstadoVozCajado.Escutando, "Escuta iniciada. Fale o comando agora.");
     }
 
     public void PararEscutaVoz()
@@ -189,7 +186,8 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         estaEscutando = false;
         estaProcessando = false;
-        estadoVoz = cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado;
+        DefinirStatus(cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado,
+            cajadoSegurado ? "Escuta parada; cajado ainda segurado." : "Escuta parada; cajado solto.");
     }
 
     public void SolicitarPermissaoMicrofone()
@@ -198,7 +196,7 @@ public class CajadoMagicoVoz : MonoBehaviour
         if (UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone))
         {
             permissaoMicrofoneConcedida = true;
-            estadoVoz = cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado;
+            DefinirStatus(cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado, "Permissao de microfone ja concedida.");
             return;
         }
 
@@ -207,12 +205,23 @@ public class CajadoMagicoVoz : MonoBehaviour
         callbacksPermissaoMicrofone.PermissionDenied += AoPermissaoMicrofoneNegada;
         callbacksPermissaoMicrofone.PermissionDeniedAndDontAskAgain += AoPermissaoMicrofoneNegada;
 
-        estadoVoz = EstadoVozCajado.SolicitandoPermissao;
+        DefinirStatus(EstadoVozCajado.SolicitandoPermissao, "Solicitando permissao de microfone.");
         UnityEngine.Android.Permission.RequestUserPermission(UnityEngine.Android.Permission.Microphone, callbacksPermissaoMicrofone);
 #else
         permissaoMicrofoneConcedida = true;
-        estadoVoz = cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado;
+        DefinirStatus(cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado, "Permissao de microfone liberada no Editor.");
 #endif
+    }
+
+    public void TestarEntregaDeTranscricao(string texto)
+    {
+        ProcessarTranscricaoFinal(texto, idSessaoVoz, false, "teste manual");
+    }
+
+    [ContextMenu("Testar Voz: Bola de Fogo")]
+    private void TestarEntregaBolaDeFogo()
+    {
+        TestarEntregaDeTranscricao("bola de fogo");
     }
 
     private VoiceServiceRequestEvents CriarEventosSessao(int sessao)
@@ -220,7 +229,10 @@ public class CajadoMagicoVoz : MonoBehaviour
         VoiceServiceRequestEvents eventos = new VoiceServiceRequestEvents();
         eventos.OnStartListening.AddListener(_ => AoIniciarEscuta(sessao));
         eventos.OnStopListening.AddListener(_ => AoPararEscuta(sessao));
+        eventos.OnAudioActivation.AddListener(_ => AoAudioAtivado(sessao));
+        eventos.OnAudioDeactivation.AddListener(_ => AoAudioDesativado(sessao));
         eventos.OnSend.AddListener(_ => AoEnviarAudio(sessao));
+        eventos.OnPartialTranscription.AddListener(texto => AoReceberTranscricaoParcial(texto, sessao));
         eventos.OnFullTranscription.AddListener(texto => AoReceberTranscricaoCompleta(texto, sessao));
         eventos.OnCancel.AddListener(_ => AoCancelarSessao(sessao));
         eventos.OnFailed.AddListener(_ => AoFalharSessao(sessao));
@@ -235,7 +247,7 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         estaEscutando = true;
         estaProcessando = false;
-        estadoVoz = EstadoVozCajado.Escutando;
+        DefinirStatus(EstadoVozCajado.Escutando, "Voice SDK iniciou captura do microfone.");
     }
 
     private void AoPararEscuta(int sessao)
@@ -245,7 +257,23 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         estaEscutando = false;
         estaProcessando = true;
-        estadoVoz = EstadoVozCajado.Processando;
+        DefinirStatus(EstadoVozCajado.Processando, "Voice SDK parou de escutar e esta processando.");
+    }
+
+    private void AoAudioAtivado(int sessao)
+    {
+        if (!SessaoAtualValida(sessao))
+            return;
+
+        DefinirStatus(EstadoVozCajado.Escutando, "Audio captado pelo microfone.");
+    }
+
+    private void AoAudioDesativado(int sessao)
+    {
+        if (!SessaoAtualValida(sessao))
+            return;
+
+        DefinirStatus(estadoVoz, "Audio desativado pelo Voice SDK.");
     }
 
     private void AoEnviarAudio(int sessao)
@@ -255,22 +283,21 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         estaEscutando = false;
         estaProcessando = true;
-        estadoVoz = EstadoVozCajado.Processando;
+        DefinirStatus(EstadoVozCajado.Processando, "Audio enviado para reconhecimento.");
     }
 
-    private void AoReceberTranscricaoCompleta(string texto, int sessao)
+    private void AoReceberTranscricaoParcial(string texto, int sessao)
     {
         if (!SessaoAtualValida(sessao))
             return;
 
-        ultimaTranscricaoBruta = texto ?? string.Empty;
-        ultimaTranscricaoNormalizada = NormalizarTranscricao(ultimaTranscricaoBruta);
-        horarioUltimaTranscricao = Time.time;
+        DefinirStatus(EstadoVozCajado.Processando, "Texto parcial recebido.");
+        ProcessarTranscricaoParcialRapida(texto, sessao, true);
+    }
 
-        if (string.IsNullOrEmpty(ultimaTranscricaoNormalizada))
-            return;
-
-        aoComandoVozRecebido?.Invoke(ultimaTranscricaoNormalizada);
+    private void AoReceberTranscricaoCompleta(string texto, int sessao)
+    {
+        ProcessarTranscricaoFinal(texto, sessao, true, "request");
     }
 
     private void AoCancelarSessao(int sessao)
@@ -280,7 +307,7 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         estaEscutando = false;
         estaProcessando = false;
-        estadoVoz = cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado;
+        DefinirStatus(cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado, "Sessao de voz cancelada.");
     }
 
     private void AoFalharSessao(int sessao)
@@ -290,8 +317,7 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         estaEscutando = false;
         estaProcessando = false;
-        ultimoErro = "Falha ao processar a escuta de voz.";
-        estadoVoz = EstadoVozCajado.Erro;
+        DefinirStatus(EstadoVozCajado.Erro, "Falha ao processar a escuta de voz.");
         AgendarReativacaoAutomatica();
     }
 
@@ -302,16 +328,110 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         estaEscutando = false;
         estaProcessando = false;
-        estadoVoz = cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado;
+        DefinirStatus(cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado, "Sessao de voz completa.");
         AgendarReativacaoAutomatica();
     }
 
     private void AoErroVoiceSDK(string tipoErro, string mensagem)
     {
-        ultimoErro = string.IsNullOrEmpty(tipoErro) ? mensagem : $"{tipoErro}: {mensagem}";
         estaEscutando = false;
         estaProcessando = false;
-        estadoVoz = EstadoVozCajado.Erro;
+        DefinirStatus(EstadoVozCajado.Erro, "Erro do Voice SDK.");
+    }
+
+    private void AoIniciarEscutaGlobal()
+    {
+        if (!cajadoSegurado)
+            return;
+
+        estaEscutando = true;
+        estaProcessando = false;
+        DefinirStatus(EstadoVozCajado.Escutando, "VoiceEvents: inicio da escuta.");
+    }
+
+    private void AoPararEscutaGlobal()
+    {
+        if (!cajadoSegurado)
+            return;
+
+        estaEscutando = false;
+        estaProcessando = true;
+        DefinirStatus(EstadoVozCajado.Processando, "VoiceEvents: fim da escuta.");
+    }
+
+    private void AoEnviarAudioGlobal()
+    {
+        if (!cajadoSegurado)
+            return;
+
+        DefinirStatus(EstadoVozCajado.Processando, "VoiceEvents: audio enviado.");
+    }
+
+    private void AoReceberTranscricaoParcialGlobal(string texto)
+    {
+        if (!cajadoSegurado)
+            return;
+
+        DefinirStatus(EstadoVozCajado.Processando, "VoiceEvents: texto parcial recebido.");
+        ProcessarTranscricaoParcialRapida(texto, idSessaoVoz, false);
+    }
+
+    private void AoReceberTranscricaoCompletaGlobal(string texto)
+    {
+        ProcessarTranscricaoFinal(texto, idSessaoVoz, false, "VoiceEvents");
+    }
+
+    private void ProcessarTranscricaoFinal(string texto, int sessao, bool exigirSessaoAtual, string origem)
+    {
+        if (exigirSessaoAtual && !SessaoAtualValida(sessao))
+            return;
+
+        if (!isActiveAndEnabled || !cajadoSegurado || cancelamentoAtivo)
+            return;
+
+        ultimaTranscricaoBruta = texto ?? string.Empty;
+        ultimaTranscricaoNormalizada = NormalizarTranscricao(ultimaTranscricaoBruta);
+
+        if (string.IsNullOrEmpty(ultimaTranscricaoNormalizada))
+        {
+            DefinirStatus(EstadoVozCajado.Processando, $"Texto final vazio recebido via {origem}.");
+            return;
+        }
+
+        if (string.Equals(ultimaTranscricaoFinalProcessada, ultimaTranscricaoNormalizada, StringComparison.Ordinal) &&
+            Time.time - horarioUltimaTranscricaoFinalProcessada < 0.25f)
+        {
+            DefinirStatus(EstadoVozCajado.Processando, $"Texto final duplicado ignorado: {ultimaTranscricaoNormalizada}");
+            return;
+        }
+
+        ultimaTranscricaoFinalProcessada = ultimaTranscricaoNormalizada;
+        horarioUltimaTranscricaoFinalProcessada = Time.time;
+        DefinirStatus(EstadoVozCajado.Processando, $"Texto entendido via {origem}: {ultimaTranscricaoNormalizada}");
+        aoComandoVozRecebido?.Invoke(ultimaTranscricaoNormalizada);
+    }
+
+    private void ProcessarTranscricaoParcialRapida(string texto, int sessao, bool exigirSessaoAtual)
+    {
+        if (exigirSessaoAtual && !SessaoAtualValida(sessao))
+            return;
+
+        if (!isActiveAndEnabled || !cajadoSegurado || cancelamentoAtivo)
+            return;
+
+        string normalizada = NormalizarTranscricao(texto);
+        if (string.IsNullOrEmpty(normalizada))
+            return;
+
+        if (string.Equals(ultimaTranscricaoParcialProcessada, normalizada, StringComparison.Ordinal) &&
+            Time.time - horarioUltimaTranscricaoParcialProcessada < 0.2f)
+        {
+            return;
+        }
+
+        ultimaTranscricaoParcialProcessada = normalizada;
+        horarioUltimaTranscricaoParcialProcessada = Time.time;
+        aoTextoParcialVozRecebido?.Invoke(normalizada);
     }
 
     private bool SessaoAtualValida(int sessao)
@@ -325,10 +445,7 @@ public class CajadoMagicoVoz : MonoBehaviour
 
     private void AgendarReativacaoAutomatica()
     {
-        if (!escutarAutomaticamenteAoSegurar || !cajadoSegurado || !isActiveAndEnabled)
-            return;
-
-        if (rotinaReativarEscuta != null)
+        if (!escutarAutomaticamenteAoSegurar || !cajadoSegurado || !isActiveAndEnabled || rotinaReativarEscuta != null)
             return;
 
         rotinaReativarEscuta = StartCoroutine(ReativarEscutaDepoisDoAtraso());
@@ -361,12 +478,14 @@ public class CajadoMagicoVoz : MonoBehaviour
         if (permissaoMicrofoneConcedida)
             return true;
 
-        estadoVoz = EstadoVozCajado.SemPermissaoMicrofone;
-
         if (solicitarPermissaoAutomaticamente && !permissaoSolicitadaAutomaticamente)
         {
             permissaoSolicitadaAutomaticamente = true;
             SolicitarPermissaoMicrofone();
+        }
+        else
+        {
+            DefinirStatus(EstadoVozCajado.SemPermissaoMicrofone, "Sem permissao de microfone.");
         }
 
         return false;
@@ -388,7 +507,7 @@ public class CajadoMagicoVoz : MonoBehaviour
             return;
 
         permissaoMicrofoneConcedida = true;
-        estadoVoz = cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado;
+        DefinirStatus(cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado, "Permissao de microfone concedida.");
 
         if (escutarAutomaticamenteAoSegurar && cajadoSegurado && isActiveAndEnabled)
             IniciarEscutaVoz();
@@ -400,8 +519,7 @@ public class CajadoMagicoVoz : MonoBehaviour
             return;
 
         permissaoMicrofoneConcedida = false;
-        ultimoErro = "Permissao de microfone negada.";
-        estadoVoz = EstadoVozCajado.SemPermissaoMicrofone;
+        DefinirStatus(EstadoVozCajado.SemPermissaoMicrofone, "Permissao de microfone negada.");
     }
 #endif
 
@@ -412,7 +530,7 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         if (interagivelXR == null)
         {
-            AvisarSemInteragivelUmaVez();
+            DefinirStatus(EstadoVozCajado.Erro, "CajadoMagicoVoz precisa de um XRBaseInteractable no cajado.");
             return;
         }
 
@@ -437,6 +555,11 @@ public class CajadoMagicoVoz : MonoBehaviour
             return;
 
         appVoiceExperience.VoiceEvents.OnError.AddListener(AoErroVoiceSDK);
+        appVoiceExperience.VoiceEvents.OnStartListening.AddListener(AoIniciarEscutaGlobal);
+        appVoiceExperience.VoiceEvents.OnStoppedListening.AddListener(AoPararEscutaGlobal);
+        appVoiceExperience.VoiceEvents.OnMicDataSent.AddListener(AoEnviarAudioGlobal);
+        appVoiceExperience.VoiceEvents.OnPartialTranscription.AddListener(AoReceberTranscricaoParcialGlobal);
+        appVoiceExperience.VoiceEvents.OnFullTranscription.AddListener(AoReceberTranscricaoCompletaGlobal);
         listenersVoiceRegistrados = true;
     }
 
@@ -446,6 +569,11 @@ public class CajadoMagicoVoz : MonoBehaviour
             return;
 
         appVoiceExperience.VoiceEvents.OnError.RemoveListener(AoErroVoiceSDK);
+        appVoiceExperience.VoiceEvents.OnStartListening.RemoveListener(AoIniciarEscutaGlobal);
+        appVoiceExperience.VoiceEvents.OnStoppedListening.RemoveListener(AoPararEscutaGlobal);
+        appVoiceExperience.VoiceEvents.OnMicDataSent.RemoveListener(AoEnviarAudioGlobal);
+        appVoiceExperience.VoiceEvents.OnPartialTranscription.RemoveListener(AoReceberTranscricaoParcialGlobal);
+        appVoiceExperience.VoiceEvents.OnFullTranscription.RemoveListener(AoReceberTranscricaoCompletaGlobal);
         listenersVoiceRegistrados = false;
     }
 
@@ -455,7 +583,8 @@ public class CajadoMagicoVoz : MonoBehaviour
         ultimoInteractor = ObterTransformInteractor(args != null ? args.interactorObject : null);
         cancelamentoAtivo = false;
         idSessaoCancelada = -1;
-        estadoVoz = appVoiceExperience != null ? EstadoVozCajado.Pronto : EstadoVozCajado.SemReferenciaVoiceSDK;
+        DefinirStatus(appVoiceExperience != null ? EstadoVozCajado.Pronto : EstadoVozCajado.SemReferenciaVoiceSDK,
+            "Cajado segurado; voz pronta para ativar.");
 
         if (escutarAutomaticamenteAoSegurar)
             IniciarEscutaVoz();
@@ -478,33 +607,34 @@ public class CajadoMagicoVoz : MonoBehaviour
         }
 
         cajadoSegurado = interagivelXR.isSelected;
+        ultimoInteractor = cajadoSegurado && ultimoInteractor == null ? ObterPrimeiroInteractorSelecionando() : ultimoInteractor;
 
-        if (cajadoSegurado)
-        {
-            if (ultimoInteractor == null)
-                ultimoInteractor = ObterPrimeiroInteractorSelecionando();
-        }
-        else
-        {
+        if (!cajadoSegurado)
             ultimoInteractor = null;
-        }
     }
 
     private void AtualizarEstadoInicial()
     {
         if (appVoiceExperience == null)
         {
-            estadoVoz = EstadoVozCajado.SemReferenciaVoiceSDK;
+            DefinirStatus(EstadoVozCajado.SemReferenciaVoiceSDK, "AppVoiceExperience ausente.");
+            return;
+        }
+
+        if (!VoiceSDKTemConfiguracaoValida())
+        {
+            DefinirStatus(EstadoVozCajado.SemWitConfiguration, "WitConfiguration ausente ou sem Client Access Token.");
             return;
         }
 
         if (!permissaoMicrofoneConcedida)
         {
-            estadoVoz = EstadoVozCajado.SemPermissaoMicrofone;
+            DefinirStatus(EstadoVozCajado.SemPermissaoMicrofone, "Permissao de microfone ausente.");
             return;
         }
 
-        estadoVoz = cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado;
+        DefinirStatus(cajadoSegurado ? EstadoVozCajado.Pronto : EstadoVozCajado.Desativado,
+            cajadoSegurado ? "Voz pronta com cajado segurado." : "Voz pronta; cajado ainda nao segurado.");
     }
 
     private void EncontrarAppVoiceExperienceSeNecessario()
@@ -512,7 +642,52 @@ public class CajadoMagicoVoz : MonoBehaviour
         if (appVoiceExperience != null)
             return;
 
-        appVoiceExperience = FindFirstObjectByType<AppVoiceExperience>();
+        AppVoiceExperience[] encontrados = FindObjectsByType<AppVoiceExperience>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
+
+        if (encontrados != null && encontrados.Length > 0)
+            appVoiceExperience = EscolherAppVoiceExperience(encontrados);
+    }
+
+    private static AppVoiceExperience EscolherAppVoiceExperience(AppVoiceExperience[] encontrados)
+    {
+        for (int i = 0; i < encontrados.Length; i++)
+        {
+            AppVoiceExperience candidato = encontrados[i];
+            if (candidato != null && candidato.isActiveAndEnabled)
+                return candidato;
+        }
+
+        return encontrados[0];
+    }
+
+    private bool ValidarConfiguracaoVoiceSDK()
+    {
+        if (appVoiceExperience == null)
+        {
+            DefinirStatus(EstadoVozCajado.SemReferenciaVoiceSDK, "AppVoiceExperience ausente.");
+            return false;
+        }
+
+        if (appVoiceExperience.Configuration == null)
+        {
+            DefinirStatus(EstadoVozCajado.SemWitConfiguration, "AppVoiceExperience sem WitConfiguration.");
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(appVoiceExperience.Configuration.GetClientAccessToken()))
+        {
+            DefinirStatus(EstadoVozCajado.SemWitConfiguration, "WitConfiguration sem Client Access Token.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool VoiceSDKTemConfiguracaoValida()
+    {
+        return appVoiceExperience != null
+            && appVoiceExperience.Configuration != null
+            && !string.IsNullOrEmpty(appVoiceExperience.Configuration.GetClientAccessToken());
     }
 
     private void EncontrarInteragivelXRSeNecessario()
@@ -555,7 +730,7 @@ public class CajadoMagicoVoz : MonoBehaviour
         {
             char caractere = textoLimpo[i];
 
-            if (char.IsWhiteSpace(caractere))
+            if (char.IsWhiteSpace(caractere) || EhSeparadorDeFrase(caractere))
             {
                 if (!espacoAnterior)
                 {
@@ -570,28 +745,18 @@ public class CajadoMagicoVoz : MonoBehaviour
             espacoAnterior = false;
         }
 
-        return builder.ToString();
+        return builder.ToString().Trim();
     }
 
-    private void AvisarSemInteragivelUmaVez()
+    private static bool EhSeparadorDeFrase(char caractere)
     {
-        if (avisoSemInteragivelMostrado)
-            return;
-
-        avisoSemInteragivelMostrado = true;
-
-        if (mostrarDiagnostico)
-            Debug.LogWarning("CajadoMagicoVoz precisa de um XRBaseInteractable ou XRGrabInteractable no cajado.", this);
+        return caractere == '-' || caractere == '_' || caractere == '.' ||
+               caractere == ',' || caractere == '!' || caractere == '?' ||
+               caractere == ';' || caractere == ':';
     }
 
-    private void AvisarSemVoiceUmaVez()
+    private void DefinirStatus(EstadoVozCajado novoEstado, string mensagem)
     {
-        if (avisoSemVoiceMostrado)
-            return;
-
-        avisoSemVoiceMostrado = true;
-
-        if (mostrarDiagnostico)
-            Debug.LogWarning("CajadoMagicoVoz nao encontrou um AppVoiceExperience na cena.", this);
+        estadoVoz = novoEstado;
     }
 }

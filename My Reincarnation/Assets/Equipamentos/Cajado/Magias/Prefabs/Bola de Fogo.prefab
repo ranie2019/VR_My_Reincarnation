@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1001000000000000002}
   - component: {fileID: 1001000000000000003}
   - component: {fileID: 1001000000000000004}
+  - component: {fileID: 2349729384680336656}
   m_Layer: 0
   m_Name: Bola de Fogo
   m_TagString: Untagged
@@ -29,7 +30,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.8186271, y: 0.8186271, z: 0.8186271}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1001000000000000101}
@@ -99,7 +100,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3d6a13bfe8d34fd8a4cbf958d82a3a57, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BolaDeFogo
-  velocidade: 50
+  velocidade: 100
   tempoMaximoDeVida: 15
   explodirAoTerminarTempo: 1
   camadasQueCausamImpacto:
@@ -135,11 +136,11 @@ MonoBehaviour:
   materialNucleo: {fileID: 2100000, guid: 4a16fc44d7834c10ac8b8eb391b79956, type: 2}
   materialParticulas: {fileID: 2100000, guid: 8f7d1b05df064ecfb3698a8cb6610f06, type: 2}
   materialRastro: {fileID: 2100000, guid: cfdf5a868f684ae0a503a36489ffcd6d, type: 2}
-  somFogoLoop: {fileID: 8300000, guid: 39eeabf0f489f4e46a024aa733bf1b4b, type: 3}
+  somFogoLoop: {fileID: 8300000, guid: ba033e9484adbde40a1a901f7c197fcd, type: 3}
   volumeSomFogoLoop: 1
-  somExplosao: {fileID: 8300000, guid: d306fcf87f5874a5888091cab90ba4a5, type: 3}
+  somExplosao: {fileID: 8300000, guid: 197514042cf1d654cb0b35340b016999, type: 3}
   volumeSomExplosao: 1
-  audioSource: {fileID: 0}
+  audioSource: {fileID: 2349729384680336656}
   rb: {fileID: 1001000000000000002}
   colliderImpacto: {fileID: 1001000000000000003}
   mostrarDiagnostico: 0
@@ -159,6 +160,103 @@ MonoBehaviour:
   ultimoPontoImpacto: {x: 0, y: 0, z: 0}
   ultimaNormalImpacto: {x: 0, y: 1, z: 0}
   motivoDaExplosao: 
+--- !u!82 &2349729384680336656
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1001000000000000000}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 1
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 10
+  MaxDistance: 75
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &1001000000000000100
 GameObject:
   m_ObjectHideFlags: 0

@@ -15,6 +15,12 @@ public enum EixoLocalDirecaoMagia
     BaixoY
 }
 
+public enum OrigemAtivacaoMagia
+{
+    Runa,
+    Voz
+}
+
 [DisallowMultipleComponent]
 public class CajadoMagico : MonoBehaviour
 {
@@ -103,6 +109,7 @@ public class CajadoMagico : MonoBehaviour
     [SerializeField] private string statusPreparacaoMagia;
     [SerializeField] private string statusLancamentoMagia;
     [SerializeField] private string statusDirecaoLancamento;
+    [SerializeField] private OrigemAtivacaoMagia ultimaOrigemAtivacaoMagia;
 
     [Header("Diagnostico Mana Magia")]
     [SerializeField] private StatusPlayer statusPlayerDonoAtual;
@@ -148,6 +155,10 @@ public class CajadoMagico : MonoBehaviour
     public BolaDeFogo BolaDeFogoPreparadaAtual => bolaDeFogoPreparadaAtual;
     public bool CajadoSegurado => cajadoSegurado;
     public bool EstaDesenhando => estaDesenhando;
+    public bool PreparacaoBloqueadaPorFaltaDeMana => preparacaoBloqueadaPorFaltaDeMana;
+    public OrigemAtivacaoMagia UltimaOrigemAtivacaoMagia => ultimaOrigemAtivacaoMagia;
+    public string StatusPreparacaoMagia => statusPreparacaoMagia;
+    public string StatusManaDaMagia => statusManaDaMagia;
     public IReadOnlyList<LineRenderer> TracosDaRuna => tracosDaRuna;
 
     private void Awake()
@@ -289,9 +300,6 @@ public class CajadoMagico : MonoBehaviour
         ultimoInteractor = ObterTransformInteractor(args != null ? args.interactorObject : null);
         AtualizarStatusPlayerDonoAtual();
         AtualizarDiagnostico();
-
-        if (mostrarDiagnostico)
-            Debug.Log($"{name}: cajado segurado por {(ultimoInteractor != null ? ultimoInteractor.name : "interactor desconhecido")}.", this);
     }
 
     private void AoSoltarCajado(SelectExitEventArgs args)
@@ -302,9 +310,6 @@ public class CajadoMagico : MonoBehaviour
         AtualizarEstadoSelecao();
         statusPlayerDonoAtual = null;
         AtualizarDiagnostico();
-
-        if (mostrarDiagnostico)
-            Debug.Log($"{name}: cajado solto.", this);
     }
 
     private void AoAtivarCajado(ActivateEventArgs args)
@@ -366,9 +371,6 @@ public class CajadoMagico : MonoBehaviour
 
         RegistrarPontoNoTracoAtual(pontoLancamento.position, true);
         AtualizarDiagnostico();
-
-        if (mostrarDiagnostico)
-            Debug.Log($"{name}: novo traco runico iniciado.", this);
     }
 
     public void FinalizarTracoAtual()
@@ -385,9 +387,6 @@ public class CajadoMagico : MonoBehaviour
             AnalisarRunaAposTracoFinalizado();
 
         AtualizarDiagnostico();
-
-        if (mostrarDiagnostico)
-            Debug.Log($"{name}: traco finalizado. Runa atual tem {quantidadeTracos} tracos.", this);
     }
 
     public void ConcluirRunaValida()
@@ -414,17 +413,9 @@ public class CajadoMagico : MonoBehaviour
         AplicarResultadoReconhecimento(resultado);
 
         if (!resultado.reconhecida)
-        {
-            if (mostrarDiagnostico)
-                Debug.Log($"{name}: runa ainda nao reconhecida. {resultado.motivo}", this);
-
             return;
-        }
 
         ultimaRunaReconhecida = resultado.idRuna;
-
-        if (mostrarDiagnostico)
-            Debug.Log($"{name}: runa reconhecida: {resultado.idRuna} ({resultado.pontuacao:0.00}).", this);
 
         ProcessarRunaReconhecida(resultado);
     }
@@ -576,7 +567,7 @@ public class CajadoMagico : MonoBehaviour
 
         if (resultado.idRuna == ResultadoReconhecimentoRuna.IdCirculoBolaDeFogo)
         {
-            bool preparou = PrepararBolaDeFogo();
+            bool preparou = TentarPrepararBolaDeFogo(OrigemAtivacaoMagia.Runa);
 
             if (!preparou)
             {
@@ -596,9 +587,49 @@ public class CajadoMagico : MonoBehaviour
         return true;
     }
 
-    private bool PrepararBolaDeFogo()
+    public bool TentarPrepararBolaDeFogoPorVoz()
+    {
+        return TentarPrepararBolaDeFogo(OrigemAtivacaoMagia.Voz);
+    }
+
+    public bool TentarPrepararBolaDeFogo(OrigemAtivacaoMagia origem)
+    {
+        ultimaOrigemAtivacaoMagia = origem;
+        AtualizarEstadoSelecao();
+
+        if (!isActiveAndEnabled)
+        {
+            statusPreparacaoMagia = "CajadoMagico esta desativado.";
+            AtualizarDiagnosticoMagiaPreparada();
+            AtualizarDiagnostico();
+            return false;
+        }
+
+        if (!cajadoSegurado)
+        {
+            statusPreparacaoMagia = origem == OrigemAtivacaoMagia.Voz
+                ? "Comando ignorado: cajado nao esta segurado."
+                : "Cajado nao esta segurado; preparacao ignorada.";
+            AtualizarDiagnosticoMagiaPreparada();
+            AtualizarDiagnostico();
+            return false;
+        }
+
+        if (origem == OrigemAtivacaoMagia.Voz && estaDesenhando)
+        {
+            statusPreparacaoMagia = "Comando ignorado: jogador esta desenhando uma runa.";
+            AtualizarDiagnosticoMagiaPreparada();
+            AtualizarDiagnostico();
+            return false;
+        }
+
+        return PrepararBolaDeFogo(origem);
+    }
+
+    private bool PrepararBolaDeFogo(OrigemAtivacaoMagia origem)
     {
         manterRunaAposFalhaPreparacao = false;
+        ultimaOrigemAtivacaoMagia = origem;
 
         if (preparandoBolaDeFogo)
         {
@@ -610,7 +641,9 @@ public class CajadoMagico : MonoBehaviour
 
         if (bolaDeFogoPreparadaAtual != null)
         {
-            statusPreparacaoMagia = "Ja existe uma Bola de Fogo preparada.";
+            statusPreparacaoMagia = origem == OrigemAtivacaoMagia.Voz
+                ? "Comando reconhecido, mas ja existe uma magia preparada."
+                : "Ja existe uma Bola de Fogo preparada.";
             statusManaDaMagia = "Mana nao consumida: ja existe uma Bola de Fogo preparada.";
             ultimoConsumoManaSucesso = false;
             manaConsumidaNaUltimaPreparacao = 0;
@@ -670,7 +703,9 @@ public class CajadoMagico : MonoBehaviour
             {
                 manaAtualDoDono = statusDono.GetManaAtual();
                 preparacaoBloqueadaPorFaltaDeMana = true;
-                statusPreparacaoMagia = "Mana insuficiente para preparar Bola de Fogo.";
+                statusPreparacaoMagia = origem == OrigemAtivacaoMagia.Voz
+                    ? "Comando reconhecido, mas nao ha mana suficiente."
+                    : "Mana insuficiente para preparar Bola de Fogo.";
                 statusManaDaMagia = $"Mana insuficiente. Atual: {manaAtualDoDono}, necessaria: {custo}.";
                 AtualizarDiagnosticoMagiaPreparada();
                 return false;
@@ -708,7 +743,10 @@ public class CajadoMagico : MonoBehaviour
             }
 
             manaConsumida = false;
-            statusPreparacaoMagia = "Bola de Fogo preparada.";
+            statusPreparacaoMagia = origem == OrigemAtivacaoMagia.Voz
+                ? "Bola de Fogo preparada por voz."
+                : "Bola de Fogo preparada por runa.";
+            ultimaMagiaPreparada = "Bola de Fogo";
             statusManaDaMagia = custo > 0
                 ? $"{custo} de mana consumidos para preparar Bola de Fogo."
                 : "Bola de Fogo preparada sem custo de mana.";
@@ -1227,7 +1265,7 @@ public class CajadoMagico : MonoBehaviour
         string nomePontoDirecao = pontoDirecaoMagia != null ? pontoDirecaoMagia.name : "nao configurado";
 
         statusDiagnostico =
-            $"Segurado: {cajadoSegurado} | Desenhando: {estaDesenhando} | Interactor: {nomeInteractor} | Ponto: {nomePonto} | Ponto Magia: {nomePontoMagia} | Ponto Direcao: {nomePontoDirecao} | Eixo Direcao: {eixoLocalDirecaoMagia} | Tracos: {quantidadeTracos} | Pontos Traco Atual: {quantidadePontosTracoAtual} | Limpar em: {tempoRestanteParaLimpar:0.00}s | Modo: {modoReconhecimentoRuna} | Runa: {ultimaRunaReconhecida} | Score: {pontuacaoUltimaAnalise:0.00} | Motivo: {motivoUltimaAnalise} | Magia Preparada: {ultimaMagiaPreparada} | Magia Lancada: {ultimaMagiaLancada} | Direcao Lancamento: {ultimaDirecaoLancamento} | Preparacao: {statusPreparacaoMagia} | Lancamento: {statusLancamentoMagia} | Direcao: {statusDirecaoLancamento}";
+            $"Segurado: {cajadoSegurado} | Desenhando: {estaDesenhando} | Interactor: {nomeInteractor} | Ponto: {nomePonto} | Ponto Magia: {nomePontoMagia} | Ponto Direcao: {nomePontoDirecao} | Eixo Direcao: {eixoLocalDirecaoMagia} | Tracos: {quantidadeTracos} | Pontos Traco Atual: {quantidadePontosTracoAtual} | Limpar em: {tempoRestanteParaLimpar:0.00}s | Modo: {modoReconhecimentoRuna} | Runa: {ultimaRunaReconhecida} | Score: {pontuacaoUltimaAnalise:0.00} | Motivo: {motivoUltimaAnalise} | Magia Preparada: {ultimaMagiaPreparada} | Magia Lancada: {ultimaMagiaLancada} | Origem: {ultimaOrigemAtivacaoMagia} | Direcao Lancamento: {ultimaDirecaoLancamento} | Preparacao: {statusPreparacaoMagia} | Lancamento: {statusLancamentoMagia} | Direcao: {statusDirecaoLancamento}";
         statusDiagnostico += $" | Mana: {manaAtualDoDono}/{manaNecessariaBolaDeFogo} | Status Mana: {statusManaDaMagia}";
         statusDiagnostico += $" | Mira: {miraLaserVisivel} | Dist Mira: {distanciaAtualMira:0.00} | Status Mira: {statusMiraLaser}";
     }
@@ -1427,7 +1465,6 @@ public class CajadoMagico : MonoBehaviour
             return;
 
         avisoJaMostrado = true;
-        Debug.LogWarning(mensagem, this);
     }
 
     private void OnDrawGizmosSelected()

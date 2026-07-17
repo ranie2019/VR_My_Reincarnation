@@ -112,6 +112,7 @@ GameObject:
   - component: {fileID: 5020164536544684833}
   - component: {fileID: 4039483765251597733}
   - component: {fileID: 7268886339069453360}
+  - component: {fileID: 918273645012345678}
   m_Layer: 0
   m_Name: Cajado de Ferro
   m_TagString: Staff
@@ -460,7 +461,7 @@ MonoBehaviour:
   materialTraco: {fileID: 0}
   corTracoDesenhando: {r: 0.2, g: 0.85, b: 1, a: 1}
   tempoParaApagarRuna: 3
-  mostrarDiagnostico: 1
+  mostrarDiagnostico: 0
   usarReconhecimentoRunico: 1
   diametroMinimoRuna: 0.18
   toleranciaFechamentoRelativa: 0.2
@@ -522,9 +523,10 @@ MonoBehaviour:
   ultimaMagiaPreparada: 
   ultimaMagiaLancada: 
   ultimaDirecaoLancamento: {x: 0, y: 0, z: 0}
-  statusPreparacaoMagia: 
-  statusLancamentoMagia: 
-  statusDirecaoLancamento: 
+  statusPreparacaoMagia:
+  statusLancamentoMagia:
+  statusDirecaoLancamento:
+  ultimaOrigemAtivacaoMagia: 0
   statusPlayerDonoAtual: {fileID: 0}
   manaAtualDoDono: 0
   manaNecessariaBolaDeFogo: 10
@@ -549,7 +551,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5c0c9aaf9afddd4458d9da73a304c422, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::CajadoMagicoVoz
   appVoiceExperience: {fileID: 0}
   escutarAutomaticamenteAoSegurar: 1
@@ -569,6 +571,56 @@ MonoBehaviour:
   horarioUltimaTranscricao: 0
   ultimoErro: 
   ultimoInteractor: {fileID: 0}
+--- !u!114 &918273645012345678
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3947225952642366381}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f83416f11238468984f036cda74691cb, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ComandosMagiaVoz
+  cajadoMagico: {fileID: 4039483765251597733}
+  cajadoMagicoVoz: {fileID: 7268886339069453360}
+  comandos:
+  - idMagia: BolaDeFogo
+    variantes:
+    - frase: bola de fogo
+      idioma: 0
+    - frase: conjurar bola de fogo
+      idioma: 0
+    - frase: criar bola de fogo
+      idioma: 0
+    - frase: preparar bola de fogo
+      idioma: 0
+    - frase: invoque bola de fogo
+      idioma: 0
+    - frase: fireball
+      idioma: 1
+    - frase: cast fireball
+      idioma: 1
+    - frase: create fireball
+      idioma: 1
+    - frase: prepare fireball
+      idioma: 1
+    - frase: summon fireball
+      idioma: 1
+  aceitarComandosEmPortugues: 1
+  aceitarComandosEmIngles: 1
+  intervaloMinimoMesmoComando: 1
+  mostrarDiagnostico: 0
+  ultimaTranscricaoRecebida:
+  ultimaFraseNormalizada:
+  ultimoIdIdentificado:
+  ultimoComandoAceito:
+  ultimoComandoIgnorado:
+  motivoDoUltimoResultado:
+  ultimoIdioma: 2
+  quantidadeDeComandosReconhecidos: 0
+  quantidadeDeComandosIgnorados: 0
 --- !u!1 &3990926824006793323
 GameObject:
   m_ObjectHideFlags: 0

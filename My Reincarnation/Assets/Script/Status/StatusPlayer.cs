@@ -40,6 +40,12 @@ public class StatusPlayer : MonoBehaviour
     [SerializeField] private int manaAtual = 50;
     [SerializeField] private int manaMaxima = 50;
 
+    [Header("Regeneracao de Mana")]
+    [SerializeField] private bool regenerarManaAutomaticamente = true;
+    [SerializeField, Min(0)] private int quantidadeManaRecuperada = 1;
+    [SerializeField, Min(0.1f)] private float intervaloRecuperacaoMana = 30f;
+    [SerializeField] private bool regenerarManaEnquantoMorto = false;
+
     [Header("Dano Recebido")]
     [SerializeField] private string[] tagsQueCausamDanoNoPlayer;
     [SerializeField] private float danoFallback = 1f;
@@ -97,6 +103,7 @@ public class StatusPlayer : MonoBehaviour
     private bool vidaAtualRealInicializada;
     private bool playerMorto;
     private CarteiraReinPlayer carteiraReinInscrita;
+    private Coroutine rotinaRegeneracaoMana;
 
     private void Awake()
     {
@@ -110,14 +117,26 @@ public class StatusPlayer : MonoBehaviour
         GarantirAtributosIniciais();
     }
 
+    private void OnEnable()
+    {
+        IniciarRegeneracaoMana();
+    }
+
     private void Start()
     {
         GarantirCarteiraRein();
         SincronizarVidaAtualReal();
     }
 
+    private void OnDisable()
+    {
+        PararRegeneracaoMana();
+    }
+
     private void OnDestroy()
     {
+        PararRegeneracaoMana();
+
         if (carteiraReinInscrita != null)
             carteiraReinInscrita.AoSaldoReinAlterado -= AoSaldoReinAlterado;
     }
@@ -133,6 +152,8 @@ public class StatusPlayer : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
         manaMaxima = Mathf.Max(1, manaMaxima);
         manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+        quantidadeManaRecuperada = Mathf.Max(0, quantidadeManaRecuperada);
+        intervaloRecuperacaoMana = Mathf.Max(0.1f, intervaloRecuperacaoMana);
         danoFallback = Mathf.Max(0f, danoFallback);
         intervaloEntreDanos = Mathf.Max(0f, intervaloEntreDanos);
         tempoAntesRespawn = Mathf.Max(0f, tempoAntesRespawn);
@@ -829,6 +850,50 @@ public class StatusPlayer : MonoBehaviour
 
         if (manaAtual != manaAnterior)
             NotificarStatusAlterado();
+    }
+
+    private void IniciarRegeneracaoMana()
+    {
+        if (rotinaRegeneracaoMana != null || !isActiveAndEnabled)
+            return;
+
+        rotinaRegeneracaoMana = StartCoroutine(RotinaRegeneracaoMana());
+    }
+
+    private void PararRegeneracaoMana()
+    {
+        if (rotinaRegeneracaoMana == null)
+            return;
+
+        StopCoroutine(rotinaRegeneracaoMana);
+        rotinaRegeneracaoMana = null;
+    }
+
+    private IEnumerator RotinaRegeneracaoMana()
+    {
+        WaitForSeconds espera = new WaitForSeconds(Mathf.Max(0.1f, intervaloRecuperacaoMana));
+
+        while (true)
+        {
+            yield return espera;
+
+            if (!regenerarManaAutomaticamente)
+                continue;
+
+            if (!regenerarManaEnquantoMorto && playerMorto)
+                continue;
+
+            if (quantidadeManaRecuperada <= 0)
+                continue;
+
+            manaMaxima = Mathf.Max(1, manaMaxima);
+            manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+
+            if (manaAtual >= manaMaxima)
+                continue;
+
+            RecuperarMana(quantidadeManaRecuperada);
+        }
     }
 
     public int GetForca()

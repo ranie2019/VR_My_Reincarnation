@@ -23,6 +23,11 @@ public class EfeitoFogoArea : MonoBehaviour
     [SerializeField] private Transform visualDaArea;
     [SerializeField] private bool ajustarVisualAoRaio = true;
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip somAreaFogoLoop;
+    [SerializeField, Range(0f, 1f)] private float volumeSomAreaFogoLoop = 1f;
+    [SerializeField] private AudioSource audioSourceArea;
+
     [Header("Diagnostico")]
     [SerializeField] private bool mostrarDiagnostico;
     [SerializeField] private GameObject donoDaMagia;
@@ -49,8 +54,14 @@ public class EfeitoFogoArea : MonoBehaviour
     {
         GarantirBuffer();
         GarantirVisual();
+        GarantirAudio();
         AplicarVisualAoRaio();
         AtualizarDiagnosticoArea("Aguardando inicializacao.");
+    }
+
+    private void OnEnable()
+    {
+        TocarSomAreaFogoLoop();
     }
 
     private void OnValidate()
@@ -61,17 +72,28 @@ public class EfeitoFogoArea : MonoBehaviour
         tempoDeVidaDaArea = Mathf.Max(0.1f, tempoDeVidaDaArea);
         capacidadeMaximaDeColliders = Mathf.Max(1, capacidadeMaximaDeColliders);
         tempoParaDestruirAposPararEfeito = Mathf.Max(0f, tempoParaDestruirAposPararEfeito);
+        volumeSomAreaFogoLoop = Mathf.Clamp01(volumeSomAreaFogoLoop);
         raioAtual = raioDaArea;
+
+        if (audioSourceArea == null)
+            audioSourceArea = GetComponent<AudioSource>();
     }
 
     private void OnDisable()
     {
+        PararSomAreaFogoLoop();
         PararRotinaArea();
     }
 
     private void OnDestroy()
     {
+        PararSomAreaFogoLoop();
         PararRotinaArea();
+    }
+
+    private void Reset()
+    {
+        GarantirAudio();
     }
 
     private void Update()
@@ -97,8 +119,10 @@ public class EfeitoFogoArea : MonoBehaviour
 
         GarantirBuffer();
         GarantirVisual();
+        GarantirAudio();
         AplicarVisualAoRaio();
         TocarEfeitos(true);
+        TocarSomAreaFogoLoop();
 
         PararRotinaArea();
         rotinaArea = StartCoroutine(RotinaArea());
@@ -470,6 +494,44 @@ public class EfeitoFogoArea : MonoBehaviour
         TocarParticleSystem(efeitoFogoArea, tocar);
         TocarParticleSystem(brasasArea, tocar);
         TocarParticleSystem(fumacaArea, tocar);
+    }
+
+    private void GarantirAudio()
+    {
+        if (audioSourceArea == null)
+            audioSourceArea = GetComponent<AudioSource>();
+
+        if (audioSourceArea == null)
+            audioSourceArea = gameObject.AddComponent<AudioSource>();
+
+        audioSourceArea.playOnAwake = false;
+        audioSourceArea.loop = true;
+        audioSourceArea.spatialBlend = 1f;
+        audioSourceArea.volume = volumeSomAreaFogoLoop;
+    }
+
+    private void TocarSomAreaFogoLoop()
+    {
+        GarantirAudio();
+
+        AudioClip clip = somAreaFogoLoop != null ? somAreaFogoLoop : audioSourceArea.clip;
+        if (clip == null)
+            return;
+
+        audioSourceArea.clip = clip;
+        audioSourceArea.loop = true;
+        audioSourceArea.volume = volumeSomAreaFogoLoop;
+
+        if (!audioSourceArea.isPlaying)
+            audioSourceArea.Play();
+    }
+
+    private void PararSomAreaFogoLoop()
+    {
+        if (audioSourceArea == null)
+            return;
+
+        audioSourceArea.Stop();
     }
 
     private static void TocarParticleSystem(ParticleSystem ps, bool tocar)

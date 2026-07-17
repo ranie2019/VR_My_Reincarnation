@@ -96,6 +96,7 @@ public class BolaDeFogo : MonoBehaviour, IDano
     private Material materialNucleoRuntime;
     private Material materialParticulasRuntime;
     private Material materialRastroRuntime;
+    private static Mesh meshEsferaRuntime;
 
     public EstadoBolaDeFogo EstadoAtual => estadoAtual;
     public bool EstaPreparada => estaPreparada;
@@ -816,8 +817,14 @@ public class BolaDeFogo : MonoBehaviour, IDano
 
         GarantirAudio();
 
-        if (audioSource != null)
-            audioSource.PlayOneShot(somExplosao, volumeSomExplosao);
+        if (audioSource == null)
+            return;
+
+        audioSource.Stop();
+        audioSource.loop = false;
+        audioSource.clip = somExplosao;
+        audioSource.volume = volumeSomExplosao;
+        audioSource.Play();
     }
 
     private void GarantirReferenciasVisuais()
@@ -919,26 +926,14 @@ public class BolaDeFogo : MonoBehaviour, IDano
         MeshFilter filtro = nucleo.GetComponent<MeshFilter>();
         MeshRenderer renderer = nucleo.GetComponent<MeshRenderer>();
 
-        if (filtro == null || renderer == null)
-        {
-            GameObject esfera = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            MeshFilter filtroEsfera = esfera.GetComponent<MeshFilter>();
-            MeshRenderer rendererEsfera = esfera.GetComponent<MeshRenderer>();
+        if (filtro == null)
+            filtro = nucleo.AddComponent<MeshFilter>();
 
-            if (filtro == null)
-                filtro = nucleo.AddComponent<MeshFilter>();
+        if (renderer == null)
+            renderer = nucleo.AddComponent<MeshRenderer>();
 
-            if (renderer == null)
-                renderer = nucleo.AddComponent<MeshRenderer>();
-
-            if (filtroEsfera != null)
-                filtro.sharedMesh = filtroEsfera.sharedMesh;
-
-            if (rendererEsfera != null)
-                renderer.sharedMaterials = rendererEsfera.sharedMaterials;
-
-            DestruirObjetoSeguro(esfera);
-        }
+        if (filtro.sharedMesh == null)
+            filtro.sharedMesh = ObterMeshEsfera();
 
         Collider col = nucleo.GetComponent<Collider>();
         if (col != null)
@@ -998,6 +993,103 @@ public class BolaDeFogo : MonoBehaviour, IDano
             materialRastroRuntime = CriarMaterialRuntime("Bola de Fogo Rastro Runtime", new Color(1f, 0.22f, 0.02f, 0.65f), false);
 
         return materialRastroRuntime;
+    }
+
+    private static Mesh ObterMeshEsfera()
+    {
+        Mesh meshInterna = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
+        if (meshInterna != null)
+            return meshInterna;
+
+        if (meshEsferaRuntime == null)
+            meshEsferaRuntime = CriarMeshEsferaRuntime();
+
+        return meshEsferaRuntime;
+    }
+
+    private static Mesh CriarMeshEsferaRuntime()
+    {
+        const int segmentos = 16;
+        const int aneis = 8;
+
+        List<Vector3> vertices = new List<Vector3>();
+        List<Vector3> normais = new List<Vector3>();
+        List<int> triangulos = new List<int>();
+
+        vertices.Add(Vector3.up * 0.5f);
+        normais.Add(Vector3.up);
+
+        for (int anel = 1; anel < aneis; anel++)
+        {
+            float v = anel / (float)aneis;
+            float phi = Mathf.PI * v;
+            float y = Mathf.Cos(phi) * 0.5f;
+            float raio = Mathf.Sin(phi) * 0.5f;
+
+            for (int segmento = 0; segmento < segmentos; segmento++)
+            {
+                float u = segmento / (float)segmentos;
+                float theta = Mathf.PI * 2f * u;
+                Vector3 normal = new Vector3(Mathf.Cos(theta) * raio, y, Mathf.Sin(theta) * raio).normalized;
+                vertices.Add(normal * 0.5f);
+                normais.Add(normal);
+            }
+        }
+
+        int indiceInferior = vertices.Count;
+        vertices.Add(Vector3.down * 0.5f);
+        normais.Add(Vector3.down);
+
+        for (int segmento = 0; segmento < segmentos; segmento++)
+        {
+            int atual = 1 + segmento;
+            int proximo = 1 + (segmento + 1) % segmentos;
+            triangulos.Add(0);
+            triangulos.Add(proximo);
+            triangulos.Add(atual);
+        }
+
+        for (int anel = 0; anel < aneis - 2; anel++)
+        {
+            int inicioAtual = 1 + anel * segmentos;
+            int inicioProximo = inicioAtual + segmentos;
+
+            for (int segmento = 0; segmento < segmentos; segmento++)
+            {
+                int atual = inicioAtual + segmento;
+                int proximo = inicioAtual + (segmento + 1) % segmentos;
+                int abaixo = inicioProximo + segmento;
+                int abaixoProximo = inicioProximo + (segmento + 1) % segmentos;
+
+                triangulos.Add(atual);
+                triangulos.Add(proximo);
+                triangulos.Add(abaixoProximo);
+                triangulos.Add(atual);
+                triangulos.Add(abaixoProximo);
+                triangulos.Add(abaixo);
+            }
+        }
+
+        int inicioUltimoAnel = 1 + (aneis - 2) * segmentos;
+        for (int segmento = 0; segmento < segmentos; segmento++)
+        {
+            int atual = inicioUltimoAnel + segmento;
+            int proximo = inicioUltimoAnel + (segmento + 1) % segmentos;
+            triangulos.Add(indiceInferior);
+            triangulos.Add(atual);
+            triangulos.Add(proximo);
+        }
+
+        Mesh mesh = new Mesh
+        {
+            name = "Bola de Fogo Esfera Runtime",
+            hideFlags = HideFlags.HideAndDontSave
+        };
+        mesh.SetVertices(vertices);
+        mesh.SetNormals(normais);
+        mesh.SetTriangles(triangulos, 0);
+        mesh.RecalculateBounds();
+        return mesh;
     }
 
     private static Material CriarMaterialRuntime(string nome, Color cor, bool emissivo)
@@ -1182,6 +1274,12 @@ public class BolaDeFogo : MonoBehaviour, IDano
             tempo = Mathf.Max(tempo, main.duration + main.startLifetime.constantMax);
         }
 
+        if (somExplosao != null)
+        {
+            float pitch = audioSource != null ? Mathf.Abs(audioSource.pitch) : 1f;
+            tempo = Mathf.Max(tempo, somExplosao.length / Mathf.Max(0.01f, pitch));
+        }
+
         yield return new WaitForSeconds(tempo);
         Destroy(gameObject);
     }
@@ -1220,17 +1318,6 @@ public class BolaDeFogo : MonoBehaviour, IDano
     {
         Gizmos.color = new Color(1f, 0.35f, 0.02f, 0.9f);
         Gizmos.DrawWireSphere(transform.position, Mathf.Max(0.01f, raioDaExplosao));
-    }
-
-    private static void DestruirObjetoSeguro(GameObject obj)
-    {
-        if (obj == null)
-            return;
-
-        if (Application.isPlaying)
-            Destroy(obj);
-        else
-            DestroyImmediate(obj);
     }
 
     private static void DestruirComponenteSeguro(Component componente)
