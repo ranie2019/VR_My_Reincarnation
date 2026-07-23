@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 1319763759713652555}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.08001709, y: -0.11199999, z: 0}
+  m_LocalPosition: {x: 0.034, y: 0, z: -0.015}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -62,37 +62,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4435075570199634199}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &5711204806200281101
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 5711204806200281102}
-  m_Layer: 0
-  m_Name: PontoDirecaoMagia
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &5711204806200281102
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5711204806200281101}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.867, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4435075570199634199}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3947225952642366381
 GameObject:
   m_ObjectHideFlags: 0
@@ -106,7 +75,7 @@ GameObject:
   - component: {fileID: 3298782715924241016}
   - component: {fileID: 5845378453755257154}
   - component: {fileID: 7721225862949602443}
-  - component: {fileID: 6078550937622270979}
+  - component: {fileID: 848449532677510207}
   - component: {fileID: 4130448659976515752}
   - component: {fileID: 1943380524709654234}
   - component: {fileID: 5020164536544684833}
@@ -246,7 +215,7 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 2
---- !u!114 &6078550937622270979
+--- !u!114 &848449532677510207
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -255,16 +224,16 @@ MonoBehaviour:
   m_GameObject: {fileID: 3947225952642366381}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6c2b0b53dcfefc24ea8fd65a89c96025, type: 3}
+  m_Script: {fileID: 11500000, guid: 226e7b567933781438504575d3548b47, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ArmaAttachDuasMao
+  m_EditorClassIdentifier: Assembly-CSharp::ArmaAttachPorMao
   m_InteractionManager: {fileID: 0}
   m_Colliders:
   - {fileID: 5845378453755257154}
   m_InteractionLayers:
-    m_Bits: 1
+    m_Bits: 4294967295
   m_DistanceCalculationMode: 1
-  m_SelectMode: 1
+  m_SelectMode: 0
   m_FocusMode: 1
   m_CustomReticle: {fileID: 0}
   m_AllowGazeInteraction: 0
@@ -347,7 +316,7 @@ MonoBehaviour:
   m_SmoothScale: 0
   m_SmoothScaleAmount: 8
   m_TightenScale: 0.1
-  m_ThrowOnDetach: 0
+  m_ThrowOnDetach: 1
   m_ThrowSmoothingDuration: 0.25
   m_ThrowSmoothingCurve:
     serializedVersion: 2
@@ -376,15 +345,8 @@ MonoBehaviour:
   m_LimitAngularVelocity: 0
   m_MaxLinearVelocityDelta: 10
   m_MaxAngularVelocityDelta: 20
-  attachSegurarDireita: {fileID: 4122427223564559059}
-  attachSegurarEsquerda: {fileID: 1238416319512573016}
-  referenciaMaoDireita: {fileID: 0}
-  referenciaMaoEsquerda: {fileID: 0}
-  seguradoPelaMaoDireita: 0
-  seguradoPelaMaoEsquerda: 0
-  arcoEstaSegurado: 0
-  interactorMaoSegurando: {fileID: 0}
-  interactorMaoLivreParaPuxar: {fileID: 0}
+  pontoMaoDireita: {fileID: 4122427223564559059}
+  pontoMaoEsquerda: {fileID: 1238416319512573016}
 --- !u!114 &4130448659976515752
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -456,12 +418,17 @@ MonoBehaviour:
   pontoLancamento: {fileID: 6461368946433556107}
   usarDesenhoRunico: 1
   distanciaMinimaEntrePontos: 0.025
+  distanciaMaximaSaltoEntrePontos: 0.45
   maximoPontosPorTraco: 512
-  larguraTraco: 0.02
+  larguraTraco: 0.05
   materialTraco: {fileID: 0}
   corTracoDesenhando: {r: 0.2, g: 0.85, b: 1, a: 1}
   tempoParaApagarRuna: 3
+  atrasoDesenhoAposSairInventario: 0.15
   mostrarDiagnostico: 0
+  framesConsecutivosPontoEstavel: 8
+  distanciaMaximaPontoEstavelPorFrame: 0.05
+  tempoMinimoAposSairInventario: 0.2
   usarReconhecimentoRunico: 1
   diametroMinimoRuna: 0.18
   toleranciaFechamentoRelativa: 0.2
@@ -513,19 +480,15 @@ MonoBehaviour:
   quadrantesValidos: 0
   separacaoValida: 0
   motivoUltimaAnalise: 
-  statusDiagnostico: 'Segurado: False | Desenhando: False | Interactor: nenhum |
-    Ponto: PontoLancamento | Ponto Magia: PontoMagiaPreparada | Tracos: 0 | Pontos
-    Traco Atual: 0 | Limpar em: 0,00s | Modo: CirculoSimplesBolaDeFogo | Runa:  |
-    Score: 0,00 | Motivo:  | Magia Preparada:  | Magia Lancada:  | Preparacao:  |
-    Lancamento: '
+  statusDiagnostico: 
   temBolaDeFogoPreparada: 0
   bolaDeFogoPreparadaAtual: {fileID: 0}
   ultimaMagiaPreparada: 
   ultimaMagiaLancada: 
   ultimaDirecaoLancamento: {x: 0, y: 0, z: 0}
-  statusPreparacaoMagia:
-  statusLancamentoMagia:
-  statusDirecaoLancamento:
+  statusPreparacaoMagia: 
+  statusLancamentoMagia: 
+  statusDirecaoLancamento: 
   ultimaOrigemAtivacaoMagia: 0
   statusPlayerDonoAtual: {fileID: 0}
   manaAtualDoDono: 0
@@ -533,14 +496,41 @@ MonoBehaviour:
   ultimoConsumoManaSucesso: 0
   manaConsumidaNaUltimaPreparacao: 0
   preparacaoBloqueadaPorFaltaDeMana: 0
-  statusManaDaMagia:
+  statusManaDaMagia: 
   miraLaserVisivel: 0
   origemAtualMira: {x: 0, y: 0, z: 0}
   direcaoAtualMira: {x: 0, y: 0, z: 0}
   pontoFinalAtualMira: {x: 0, y: 0, z: 0}
   distanciaAtualMira: 0
   ultimoObjetoDetectadoPelaMira: {fileID: 0}
-  statusMiraLaser:
+  statusMiraLaser: 
+  cajadoNoInventario: 0
+  estadoLimpoAoEntrarNoInventario: 0
+  listenersXRRegistrados: 0
+  quantidadeRegistrosActivated: 0
+  quantidadeRegistrosDeactivated: 0
+  quantidadeContainersDesenho: 0
+  pontosDoTracoAtual: 0
+  rigidbodyPresente: 1
+  rigidbodyCinematico: 0
+  rigidbodyUsandoGravidade: 1
+  rigidbodyDetectandoColisoes: 1
+  ultimoMotivoLimpeza: 
+  statusCicloInventario: 
+  estadoDisponibilidadeDesenho: 4
+  inventarioEstaProcessando: 0
+  socketAindaSelecionando: 0
+  maoEstaSelecionando: 0
+  aguardandoSoltarActivate: 0
+  framesEstaveisAtuais: 0
+  framesEstaveisNecessarios: 8
+  distanciaMovidaPelaPontaNoUltimoFrame: 0
+  parentMudouEstabilidade: 0
+  escalaMudouEstabilidade: 0
+  podeIniciarDesenho: 0
+  activatedRecebidosNesteCiclo: 0
+  deactivatedRecebidosNesteCiclo: 0
+  motivoBloqueioDesenho: 
 --- !u!114 &7268886339069453360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -551,14 +541,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5c0c9aaf9afddd4458d9da73a304c422, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CajadoMagicoVoz
   appVoiceExperience: {fileID: 0}
   escutarAutomaticamenteAoSegurar: 1
   atrasoParaReativarEscuta: 0.35
   solicitarPermissaoAutomaticamente: 1
-  mostrarDiagnostico: 0
   aoComandoVozRecebido:
+    m_PersistentCalls:
+      m_Calls: []
+  aoTextoParcialVozRecebido:
     m_PersistentCalls:
       m_Calls: []
   estadoVoz: 0
@@ -568,8 +560,6 @@ MonoBehaviour:
   estaProcessando: 0
   ultimaTranscricaoBruta: 
   ultimaTranscricaoNormalizada: 
-  horarioUltimaTranscricao: 0
-  ultimoErro: 
   ultimoInteractor: {fileID: 0}
 --- !u!114 &918273645012345678
 MonoBehaviour:
@@ -581,7 +571,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f83416f11238468984f036cda74691cb, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ComandosMagiaVoz
   cajadoMagico: {fileID: 4039483765251597733}
   cajadoMagicoVoz: {fileID: 7268886339069453360}
@@ -608,19 +598,21 @@ MonoBehaviour:
       idioma: 1
     - frase: summon fireball
       idioma: 1
+    - frase: invocar bola de fogo
+      idioma: 0
+    - frase: bola fogo
+      idioma: 0
+    - frase: fire ball
+      idioma: 1
+    - frase: cast fire ball
+      idioma: 1
   aceitarComandosEmPortugues: 1
   aceitarComandosEmIngles: 1
+  aceitarTranscricaoParcialRapida: 1
   intervaloMinimoMesmoComando: 1
-  mostrarDiagnostico: 0
-  ultimaTranscricaoRecebida:
-  ultimaFraseNormalizada:
-  ultimoIdIdentificado:
-  ultimoComandoAceito:
-  ultimoComandoIgnorado:
-  motivoDoUltimoResultado:
-  ultimoIdioma: 2
-  quantidadeDeComandosReconhecidos: 0
-  quantidadeDeComandosIgnorados: 0
+  usarToleranciaFonica: 1
+  toleranciaFonicaPorPalavra: 0.3
+  tamanhoMinimoPalavraParaTolerancia: 3
 --- !u!1 &3990926824006793323
 GameObject:
   m_ObjectHideFlags: 0
@@ -652,6 +644,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4435075570199634199}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &5711204806200281101
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5711204806200281102}
+  m_Layer: 0
+  m_Name: PontoDirecaoMagia
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5711204806200281102
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5711204806200281101}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.867, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4435075570199634199}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8629188800043581466
 GameObject:
   m_ObjectHideFlags: 0
@@ -677,7 +700,7 @@ Transform:
   m_GameObject: {fileID: 8629188800043581466}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.09100342, y: -0.11199999, z: 0}
+  m_LocalPosition: {x: -0.04, y: 0, z: -0.02}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

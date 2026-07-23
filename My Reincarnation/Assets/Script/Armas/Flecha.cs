@@ -16,6 +16,18 @@ public class Flecha : MonoBehaviour, IDano
     [SerializeField] private bool ignorarDonoDaFlecha = true;
     [SerializeField] private bool ignorarTerrain = true;
 
+    [Header("Direcao Visual")]
+    [SerializeField] private Transform traseiraDirecao;
+    [SerializeField] private Transform pontaDirecao;
+
+    [Header("Diagnostico Disparo")]
+    [SerializeField] private bool diagnosticoTraseiraEncontrada;
+    [SerializeField] private bool diagnosticoPontaEncontrada;
+    [SerializeField] private Vector3 diagnosticoDirecaoVisual;
+    [SerializeField] private Vector3 diagnosticoEscalaMundial;
+    [SerializeField] private bool diagnosticoRigidbodyCinematico;
+    [SerializeField] private int diagnosticoQuantidadeParesIgnorados;
+
     [Header("Tempo de Vida")]
     [SerializeField] private float tempoDeVidaAposLancada = 10f;
     [SerializeField] private bool destruirDepoisDoTempoDeVida = true;
@@ -43,6 +55,19 @@ public class Flecha : MonoBehaviour, IDano
     private float multiplicadorDano = 1f;
     private GameObject dono;
     private Transform raizDono;
+    private readonly List<ParColisaoIgnorado> paresColisaoIgnorados = new();
+
+    private readonly struct ParColisaoIgnorado
+    {
+        public readonly Collider Flecha;
+        public readonly Collider Ignorado;
+
+        public ParColisaoIgnorado(Collider flecha, Collider ignorado)
+        {
+            Flecha = flecha;
+            Ignorado = ignorado;
+        }
+    }
 
     public float ObterDano()
     {
@@ -65,6 +90,91 @@ public class Flecha : MonoBehaviour, IDano
         multiplicadorDano = Mathf.Max(0f, valor);
     }
 
+    public bool TentarObterDirecaoVisual(out Vector3 direcao)
+    {
+        direcao = Vector3.zero;
+        diagnosticoTraseiraEncontrada = traseiraDirecao != null;
+        diagnosticoPontaEncontrada = pontaDirecao != null;
+
+        if (!diagnosticoTraseiraEncontrada || !diagnosticoPontaEncontrada || traseiraDirecao == pontaDirecao)
+        {
+            diagnosticoDirecaoVisual = Vector3.zero;
+            return false;
+        }
+
+        Vector3 diferenca = pontaDirecao.position - traseiraDirecao.position;
+        if (diferenca.sqrMagnitude < 0.000001f)
+        {
+            diagnosticoDirecaoVisual = Vector3.zero;
+            return false;
+        }
+
+        direcao = diferenca.normalized;
+        diagnosticoDirecaoVisual = direcao;
+        return true;
+    }
+
+    public int ConfigurarColisoesIgnoradas(
+        GameObject arco,
+        GameObject donoDisparo,
+        IEnumerable<Collider> collidersExtras)
+    {
+        RestaurarColisoesIgnoradas();
+        DefinirDono(donoDisparo);
+
+        Collider[] collidersFlecha = GetComponentsInChildren<Collider>(true);
+        HashSet<Collider> collidersIgnorados = new();
+        AdicionarColliders(arco, collidersIgnorados);
+        AdicionarColliders(donoDisparo, collidersIgnorados);
+
+        if (collidersExtras != null)
+        {
+            foreach (Collider colliderExtra in collidersExtras)
+            {
+                if (colliderExtra != null)
+                    collidersIgnorados.Add(colliderExtra);
+            }
+        }
+
+        for (int i = 0; i < collidersFlecha.Length; i++)
+        {
+            Collider colliderFlecha = collidersFlecha[i];
+            if (colliderFlecha == null)
+                continue;
+
+            foreach (Collider colliderIgnorado in collidersIgnorados)
+            {
+                if (colliderIgnorado == null || colliderIgnorado == colliderFlecha ||
+                    ColliderPertenceAPropriaFlecha(colliderIgnorado))
+                {
+                    continue;
+                }
+
+                Physics.IgnoreCollision(colliderFlecha, colliderIgnorado, true);
+                paresColisaoIgnorados.Add(new ParColisaoIgnorado(colliderFlecha, colliderIgnorado));
+            }
+        }
+
+        diagnosticoQuantidadeParesIgnorados = paresColisaoIgnorados.Count;
+        return diagnosticoQuantidadeParesIgnorados;
+    }
+
+    public void PrepararFisicaParaDisparo(bool usarGravidade)
+    {
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = GetComponentInChildren<Rigidbody>();
+
+        if (rb == null)
+            return;
+
+        rb.isKinematic = false;
+        rb.useGravity = usarGravidade;
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        AtualizarDiagnosticoFisica(rb);
+    }
+
     public void MarcarComoLancada(GameObject donoDaFlecha)
     {
         DefinirDono(donoDaFlecha);
@@ -77,6 +187,7 @@ public class Flecha : MonoBehaviour, IDano
 
     public void ResetarEstadoParaInventarioOuPrefab()
     {
+        RestaurarColisoesIgnoradas();
         foiLancada = false;
         tempoDeVidaAtivo = false;
         tempoLancamento = 0f;
@@ -89,6 +200,7 @@ public class Flecha : MonoBehaviour, IDano
     private void Awake()
     {
         InstanciarEfeitoCriacao();
+        AtualizarDiagnosticoFisica(GetComponent<Rigidbody>());
     }
 
     private void Update()
@@ -112,11 +224,9 @@ public class Flecha : MonoBehaviour, IDano
         if (rb == null)
             return false;
 
-        rb.isKinematic = false;
-        rb.useGravity = true;
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
+        PrepararFisicaParaDisparo(true);
         rb.AddForce(direcao.normalized * Mathf.Max(0f, forca), ForceMode.Impulse);
+        AtualizarDiagnosticoFisica(rb);
 
         if (!foiLancada)
             MarcarComoLancada(dono);
@@ -132,6 +242,47 @@ public class Flecha : MonoBehaviour, IDano
         tempoDestruirEfeitoColisao = Mathf.Max(0f, tempoDestruirEfeitoColisao);
         atrasoDestruirAposColisao = Mathf.Max(0f, atrasoDestruirAposColisao);
         tempoDeVidaAposLancada = Mathf.Max(0f, tempoDeVidaAposLancada);
+        diagnosticoTraseiraEncontrada = traseiraDirecao != null;
+        diagnosticoPontaEncontrada = pontaDirecao != null;
+        diagnosticoEscalaMundial = transform.lossyScale;
+    }
+
+    private void OnDestroy()
+    {
+        paresColisaoIgnorados.Clear();
+    }
+
+    private static void AdicionarColliders(GameObject raiz, HashSet<Collider> destino)
+    {
+        if (raiz == null || destino == null)
+            return;
+
+        Collider[] colliders = raiz.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+                destino.Add(colliders[i]);
+        }
+    }
+
+    private void RestaurarColisoesIgnoradas()
+    {
+        for (int i = 0; i < paresColisaoIgnorados.Count; i++)
+        {
+            ParColisaoIgnorado par = paresColisaoIgnorados[i];
+            if (par.Flecha != null && par.Ignorado != null)
+                Physics.IgnoreCollision(par.Flecha, par.Ignorado, false);
+        }
+
+        paresColisaoIgnorados.Clear();
+        diagnosticoQuantidadeParesIgnorados = 0;
+    }
+
+    private void AtualizarDiagnosticoFisica(Rigidbody rb)
+    {
+        diagnosticoEscalaMundial = transform.lossyScale;
+        diagnosticoRigidbodyCinematico = rb != null && rb.isKinematic;
+        TentarObterDirecaoVisual(out _);
     }
 
     private void OnCollisionEnter(Collision collision)

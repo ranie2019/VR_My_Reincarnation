@@ -82,7 +82,7 @@ public class SaveManager : MonoBehaviour
 
         SaveData data = new SaveData
         {
-            versaoSave = "0.1-teste",
+            versaoSave = "0.2-status-player",
             dataSave = DateTime.Now.ToString("O"),
             player = CriarPlayerSaveData(),
             inventario = salvarInventario ? CapturarInventarioAtual() : new List<InventorySaveData>(),
@@ -177,42 +177,87 @@ public class SaveManager : MonoBehaviour
             sceneName = SceneManager.GetActiveScene().name
         };
 
-        if (player != null)
-        {
-            Vector3 posicao = player.position;
-            Vector3 rotacao = player.eulerAngles;
+        StatusPlayer status = ResolverStatusPlayer();
+        Transform playerResolvido = ResolverTransformPlayer(status);
 
+        if (playerResolvido != null)
+        {
+            Vector3 posicao = playerResolvido.position;
+            Vector3 rotacao = playerResolvido.eulerAngles;
+
+            data.playerTransformSalvo = true;
             data.posX = posicao.x;
             data.posY = posicao.y;
             data.posZ = posicao.z;
             data.rotX = rotacao.x;
             data.rotY = rotacao.y;
             data.rotZ = rotacao.z;
-
-            StatusPlayer status = player.GetComponentInChildren<StatusPlayer>(true);
-            if (status != null)
-                CapturarStatusPlayer(status, data);
         }
+
+        if (status != null)
+            CapturarStatusPlayer(status, data);
 
         return data;
     }
 
     private void RestaurarPlayer(PlayerSaveData data)
     {
-        if (data == null || player == null)
+        if (data == null)
             return;
 
-        Vector3 posicao = new Vector3(data.posX, data.posY, data.posZ);
-        if (salvarPosicaoPlayer && VetorFinito(posicao))
-            player.position = posicao;
+        StatusPlayer status = ResolverStatusPlayer();
+        Transform playerResolvido = ResolverTransformPlayer(status);
 
-        Vector3 rotacao = new Vector3(data.rotX, data.rotY, data.rotZ);
-        if (salvarRotacaoPlayer && VetorFinito(rotacao))
-            player.rotation = Quaternion.Euler(rotacao);
+        // Saves antigos criados sem a referencia do Player possuem posicao e
+        // rotacao zeradas. O marcador impede que esses zeros teleportem o Player.
+        if (data.playerTransformSalvo && playerResolvido != null)
+        {
+            Vector3 posicao = new Vector3(data.posX, data.posY, data.posZ);
+            if (salvarPosicaoPlayer && VetorFinito(posicao))
+                playerResolvido.position = posicao;
 
-        StatusPlayer status = player.GetComponentInChildren<StatusPlayer>(true);
+            Vector3 rotacao = new Vector3(data.rotX, data.rotY, data.rotZ);
+            if (salvarRotacaoPlayer && VetorFinito(rotacao))
+                playerResolvido.rotation = Quaternion.Euler(rotacao);
+        }
+
         if (status != null)
             RestaurarStatusPlayer(status, data);
+    }
+
+    private StatusPlayer ResolverStatusPlayer()
+    {
+        if (player != null)
+        {
+            StatusPlayer statusNoPlayer = player.GetComponentInChildren<StatusPlayer>(true);
+            if (statusNoPlayer != null)
+                return statusNoPlayer;
+        }
+
+        StatusPlayer[] statusEncontrados = FindObjectsByType<StatusPlayer>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+
+        for (int i = 0; i < statusEncontrados.Length; i++)
+        {
+            StatusPlayer status = statusEncontrados[i];
+            if (status != null && status.gameObject.activeInHierarchy)
+                return status;
+        }
+
+        return statusEncontrados.Length > 0 ? statusEncontrados[0] : null;
+    }
+
+    private Transform ResolverTransformPlayer(StatusPlayer status)
+    {
+        if (player != null)
+            return player;
+
+        if (status == null)
+            return null;
+
+        player = status.transform.root;
+        return player;
     }
 
     private List<SceneObjectSaveData> CapturarObjetosCena()
@@ -817,6 +862,10 @@ public class SaveManager : MonoBehaviour
     {
         data.level = ObterInteiroStatus(status, "GetNivel", "nivel");
         data.xp = ObterInteiroStatus(status, "GetExperienciaAtual", "experienciaAtual");
+        data.experienciaParaProximoNivel = ObterInteiroStatus(
+            status,
+            "GetExperienciaParaProximoNivel",
+            "experienciaParaProximoNivel");
         data.vidaAtual = ObterInteiroStatus(status, "GetVidaAtual", "vidaAtual");
         data.vidaMaxima = ObterInteiroStatus(status, "GetVidaMaxima", "vidaMaxima");
         data.manaAtual = ObterInteiroStatus(status, "GetManaAtual", "manaAtual");
@@ -843,10 +892,20 @@ public class SaveManager : MonoBehaviour
 
     private void RestaurarStatusPlayer(StatusPlayer status, PlayerSaveData data)
     {
+        if (!StatusSalvoEhValido(data))
+            return;
+
         // O StatusPlayer atual nao possui setters publicos para todos os campos.
         // Para teste local, usamos reflexao nos campos serializados existentes.
         DefinirInteiroStatus(status, "nivel", data.level);
         DefinirInteiroStatus(status, "experienciaAtual", data.xp);
+        if (data.experienciaParaProximoNivel > 0)
+        {
+            DefinirInteiroStatus(
+                status,
+                "experienciaParaProximoNivel",
+                data.experienciaParaProximoNivel);
+        }
         DefinirInteiroStatus(status, "vidaAtual", data.vidaAtual);
         DefinirInteiroStatus(status, "vidaMaxima", data.vidaMaxima);
         DefinirInteiroStatus(status, "manaAtual", data.manaAtual);
@@ -874,6 +933,20 @@ public class SaveManager : MonoBehaviour
         }
 
         NotificarStatusAlterado(status);
+    }
+
+    private bool StatusSalvoEhValido(PlayerSaveData data)
+    {
+        if (data == null)
+            return false;
+
+        if (data.statusDetalhadoSalvo)
+            return true;
+
+        // Compatibilidade com saves anteriores ao marcador. Um status realmente
+        // capturado sempre possuia limites positivos de vida e mana. O arquivo
+        // gerado sem Player referenciado deixa todos esses campos em zero.
+        return data.vidaMaxima > 0 && data.manaMaxima > 0;
     }
 
     private int ObterInteiroStatus(StatusPlayer status, string nomeGetter, string nomeCampo)

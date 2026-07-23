@@ -24,19 +24,36 @@ public enum OrigemAtivacaoMagia
 [DisallowMultipleComponent]
 public class CajadoMagico : MonoBehaviour
 {
+    private enum EstadoDisponibilidadeDesenho
+    {
+        NoInventario,
+        SaindoDoInventario,
+        AguardandoEstabilidade,
+        AguardandoSoltarActivate,
+        Pronto,
+        Desenhando
+    }
+
     [Header("Ponto de Desenho")]
     [SerializeField] private Transform pontoLancamento;
 
     [Header("Desenho Runico")]
     [SerializeField] private bool usarDesenhoRunico = true;
     [SerializeField] private float distanciaMinimaEntrePontos = 0.025f;
+    [SerializeField] private float distanciaMaximaSaltoEntrePontos = 0.45f;
     [SerializeField] private int maximoPontosPorTraco = 256;
     [SerializeField] private float larguraTraco = 0.015f;
     [SerializeField] private Material materialTraco;
     [SerializeField] private Color corTracoDesenhando = new Color(0.2f, 0.85f, 1f, 1f);
     [Min(0.1f)]
     [SerializeField] private float tempoParaApagarRuna = 3f;
+    [SerializeField] private float atrasoDesenhoAposSairInventario = 0.15f;
     [SerializeField] private bool mostrarDiagnostico;
+
+    [Header("Estabilidade Apos Inventario")]
+    [SerializeField, Min(1)] private int framesConsecutivosPontoEstavel = 3;
+    [SerializeField, Min(0.0001f)] private float distanciaMaximaPontoEstavelPorFrame = 0.12f;
+    [SerializeField, Min(0.01f)] private float tempoMinimoAposSairInventario = 0.20f;
 
     [Header("Reconhecimento de Runas")]
     [SerializeField] private bool usarReconhecimentoRunico = true;
@@ -129,12 +146,44 @@ public class CajadoMagico : MonoBehaviour
     [SerializeField] private GameObject ultimoObjetoDetectadoPelaMira;
     [SerializeField] private string statusMiraLaser;
 
+    [Header("Diagnostico Inventario")]
+    [SerializeField] private bool cajadoNoInventario;
+    [SerializeField] private bool estadoLimpoAoEntrarNoInventario;
+    [SerializeField] private bool listenersXRRegistrados;
+    [SerializeField] private int quantidadeRegistrosActivated;
+    [SerializeField] private int quantidadeRegistrosDeactivated;
+    [SerializeField] private int quantidadeContainersDesenho;
+    [SerializeField] private int pontosDoTracoAtual;
+    [SerializeField] private bool rigidbodyPresente;
+    [SerializeField] private bool rigidbodyCinematico;
+    [SerializeField] private bool rigidbodyUsandoGravidade;
+    [SerializeField] private bool rigidbodyDetectandoColisoes;
+    [SerializeField] private string ultimoMotivoLimpeza;
+    [SerializeField] private string statusCicloInventario;
+
+    [Header("Diagnostico Estabilidade Desenho")]
+    [SerializeField] private EstadoDisponibilidadeDesenho estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.Pronto;
+    [SerializeField] private bool inventarioEstaProcessando;
+    [SerializeField] private bool socketAindaSelecionando;
+    [SerializeField] private bool maoEstaSelecionando;
+    [SerializeField] private bool aguardandoSoltarActivate;
+    [SerializeField] private int framesEstaveisAtuais;
+    [SerializeField] private int framesEstaveisNecessarios;
+    [SerializeField] private float distanciaMovidaPelaPontaNoUltimoFrame;
+    [SerializeField] private bool parentMudouEstabilidade;
+    [SerializeField] private bool escalaMudouEstabilidade;
+    [SerializeField] private bool podeIniciarDesenho;
+    [SerializeField] private int activatedRecebidosNesteCiclo;
+    [SerializeField] private int deactivatedRecebidosNesteCiclo;
+    [SerializeField] private string motivoBloqueioDesenho;
+
     private readonly List<LineRenderer> tracosDaRuna = new();
     private readonly List<List<Vector3>> pontosPorTraco = new();
     private readonly ReconhecedorRunas reconhecedorRunas = new();
     private List<Vector3> pontosTracoAtual;
     private XRBaseInteractable interagivelXR;
     private XRBaseInteractable interagivelRegistrado;
+    private EstadoItemInventario estadoInventario;
     private GameObject raizDesenhoRunico;
     private LineRenderer tracoAtual;
     private Material materialTracoRuntime;
@@ -146,6 +195,13 @@ public class CajadoMagico : MonoBehaviour
     private bool manterRunaAposFalhaPreparacao;
     private bool activateFoiUsadoParaLancar;
     private bool preparandoBolaDeFogo;
+    private bool eventoInventarioRegistrado;
+    private float desenhoBloqueadoAte;
+    private float horarioSaidaInventario;
+    private Transform parentAnteriorEstabilidade;
+    private Vector3 escalaAnteriorEstabilidade = Vector3.one;
+    private Vector3 posicaoAnteriorPontoEstabilidade;
+    private bool posicaoAnteriorPontoValida;
     private RaycastHit[] bufferImpactosMira;
     private Material materialMiraLaserRuntime;
 
@@ -167,6 +223,8 @@ public class CajadoMagico : MonoBehaviour
         EncontrarPontoMagiaPreparadaSeNecessario();
         EncontrarPontoDirecaoMagiaSeNecessario();
         EncontrarInteragivelXRSeNecessario();
+        EncontrarEstadoInventarioSeNecessario(true);
+        SincronizarEstadoInventarioAtual();
         GarantirMiraLaser();
         AtualizarEstadoSelecao();
         EsconderMiraLaser();
@@ -179,6 +237,8 @@ public class CajadoMagico : MonoBehaviour
         EncontrarPontoMagiaPreparadaSeNecessario();
         EncontrarPontoDirecaoMagiaSeNecessario();
         EncontrarInteragivelXRSeNecessario();
+        RegistrarEventoInventario();
+        SincronizarEstadoInventarioAtual();
         GarantirMiraLaser();
         RegistrarEventosXR();
         AtualizarEstadoSelecao();
@@ -188,10 +248,9 @@ public class CajadoMagico : MonoBehaviour
 
     private void OnDisable()
     {
-        if (estaDesenhando)
-            FinalizarTracoAtual();
-
+        CancelarDesenhoSemReconhecer("OnDisable");
         RemoverEventosXR();
+        RemoverEventoInventario();
         cajadoSegurado = false;
         ultimoInteractor = null;
         statusPlayerDonoAtual = null;
@@ -202,6 +261,7 @@ public class CajadoMagico : MonoBehaviour
     private void OnDestroy()
     {
         RemoverEventosXR();
+        RemoverEventoInventario();
         DestruirRunaVisual();
         EsconderMiraLaser();
 
@@ -215,9 +275,14 @@ public class CajadoMagico : MonoBehaviour
     private void OnValidate()
     {
         distanciaMinimaEntrePontos = Mathf.Max(0.001f, distanciaMinimaEntrePontos);
+        distanciaMaximaSaltoEntrePontos = Mathf.Max(distanciaMinimaEntrePontos, distanciaMaximaSaltoEntrePontos);
         maximoPontosPorTraco = Mathf.Max(2, maximoPontosPorTraco);
         larguraTraco = Mathf.Max(0.001f, larguraTraco);
         tempoParaApagarRuna = Mathf.Max(0.1f, tempoParaApagarRuna);
+        atrasoDesenhoAposSairInventario = Mathf.Max(0f, atrasoDesenhoAposSairInventario);
+        framesConsecutivosPontoEstavel = Mathf.Max(1, framesConsecutivosPontoEstavel);
+        distanciaMaximaPontoEstavelPorFrame = Mathf.Max(0.05f, distanciaMaximaPontoEstavelPorFrame);
+        tempoMinimoAposSairInventario = Mathf.Max(0.01f, tempoMinimoAposSairInventario);
         diametroMinimoRuna = Mathf.Max(0.01f, diametroMinimoRuna);
         toleranciaFechamentoRelativa = Mathf.Max(0.01f, toleranciaFechamentoRelativa);
         toleranciaConexaoRelativa = Mathf.Max(0.01f, toleranciaConexaoRelativa);
@@ -259,12 +324,15 @@ public class CajadoMagico : MonoBehaviour
 
     private void LateUpdate()
     {
+        AtualizarEstabilidadeDesenhoAposInventario();
         AtualizarMiraLaser();
     }
 
     private void RegistrarEventosXR()
     {
-        if (interagivelRegistrado != null)
+        EncontrarInteragivelXRSeNecessario();
+
+        if (listenersXRRegistrados && interagivelRegistrado == interagivelXR)
             return;
 
         if (interagivelXR == null)
@@ -275,27 +343,221 @@ public class CajadoMagico : MonoBehaviour
             return;
         }
 
+        RemoverEventosXR();
+
+        interagivelXR.selectEntered.RemoveListener(AoSelecionarCajado);
+        interagivelXR.selectExited.RemoveListener(AoSoltarCajado);
+        interagivelXR.activated.RemoveListener(AoAtivarCajado);
+        interagivelXR.deactivated.RemoveListener(AoDesativarCajado);
         interagivelXR.selectEntered.AddListener(AoSelecionarCajado);
         interagivelXR.selectExited.AddListener(AoSoltarCajado);
         interagivelXR.activated.AddListener(AoAtivarCajado);
         interagivelXR.deactivated.AddListener(AoDesativarCajado);
         interagivelRegistrado = interagivelXR;
+        listenersXRRegistrados = true;
+        quantidadeRegistrosActivated = 1;
+        quantidadeRegistrosDeactivated = 1;
     }
 
     private void RemoverEventosXR()
     {
         if (interagivelRegistrado == null)
+        {
+            listenersXRRegistrados = false;
+            quantidadeRegistrosActivated = 0;
+            quantidadeRegistrosDeactivated = 0;
             return;
+        }
 
         interagivelRegistrado.selectEntered.RemoveListener(AoSelecionarCajado);
         interagivelRegistrado.selectExited.RemoveListener(AoSoltarCajado);
         interagivelRegistrado.activated.RemoveListener(AoAtivarCajado);
         interagivelRegistrado.deactivated.RemoveListener(AoDesativarCajado);
         interagivelRegistrado = null;
+        listenersXRRegistrados = false;
+        quantidadeRegistrosActivated = 0;
+        quantidadeRegistrosDeactivated = 0;
+    }
+
+    private void EncontrarEstadoInventarioSeNecessario(bool criarSeNecessario)
+    {
+        if (estadoInventario != null)
+            return;
+
+        estadoInventario = GetComponent<EstadoItemInventario>();
+
+        if (estadoInventario == null && criarSeNecessario)
+            estadoInventario = gameObject.AddComponent<EstadoItemInventario>();
+    }
+
+    private void RegistrarEventoInventario()
+    {
+        EncontrarEstadoInventarioSeNecessario(true);
+
+        if (estadoInventario == null || eventoInventarioRegistrado)
+            return;
+
+        estadoInventario.EstadoInventarioAlterado -= AoEstadoInventarioAlterado;
+        estadoInventario.EstadoInventarioAlterado += AoEstadoInventarioAlterado;
+        eventoInventarioRegistrado = true;
+    }
+
+    private void RemoverEventoInventario()
+    {
+        if (estadoInventario != null && eventoInventarioRegistrado)
+            estadoInventario.EstadoInventarioAlterado -= AoEstadoInventarioAlterado;
+
+        eventoInventarioRegistrado = false;
+    }
+
+    private void SincronizarEstadoInventarioAtual()
+    {
+        EncontrarEstadoInventarioSeNecessario(false);
+        bool estaNoInventarioAgora = estadoInventario != null && estadoInventario.estaNoInventario;
+
+        if (estaNoInventarioAgora)
+        {
+            AoEntrarNoInventario();
+        }
+        else if (cajadoNoInventario || estadoDisponibilidadeDesenho == EstadoDisponibilidadeDesenho.NoInventario)
+        {
+            AoSairDoInventario();
+        }
+        else
+        {
+            cajadoNoInventario = false;
+            if (!estaDesenhando)
+                estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.Pronto;
+        }
+    }
+
+    private void AoEstadoInventarioAlterado(bool estaNoInventarioAgora)
+    {
+        if (estaNoInventarioAgora)
+            AoEntrarNoInventario();
+        else
+            AoSairDoInventario();
+    }
+
+    private void AoEntrarNoInventario()
+    {
+        cajadoNoInventario = true;
+        estadoLimpoAoEntrarNoInventario = false;
+        desenhoBloqueadoAte = float.PositiveInfinity;
+        estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.NoInventario;
+        aguardandoSoltarActivate = false;
+        ResetarAmostraEstabilidade("Entrou no inventario.");
+
+        CancelarDesenhoSemReconhecer("Entrou no inventario.");
+        activateFoiUsadoParaLancar = false;
+        cajadoSegurado = false;
+        ultimoInteractor = null;
+        statusPlayerDonoAtual = null;
+        EsconderMiraLaser();
+
+        estadoLimpoAoEntrarNoInventario = tracosDaRuna.Count == 0 &&
+                                          pontosPorTraco.Count == 0 &&
+                                          tracoAtual == null &&
+                                          pontosTracoAtual == null &&
+                                          !estaDesenhando;
+        statusCicloInventario = estadoLimpoAoEntrarNoInventario
+            ? "Cajado entrou no inventario com runa limpa."
+            : "Cajado entrou no inventario, mas ainda ha estado de runa.";
+        AtualizarDiagnostico();
+    }
+
+    private void AoSairDoInventario()
+    {
+        cajadoNoInventario = false;
+        estadoLimpoAoEntrarNoInventario = false;
+        desenhoBloqueadoAte = Time.time + Mathf.Max(atrasoDesenhoAposSairInventario, tempoMinimoAposSairInventario);
+
+        CancelarDesenhoSemReconhecer("Saiu do inventario.");
+        EncontrarPontoLancamentoSeNecessario();
+        EncontrarPontoMagiaPreparadaSeNecessario();
+        EncontrarPontoDirecaoMagiaSeNecessario();
+        EncontrarInteragivelXRSeNecessario();
+        RegistrarEventosXR();
+        AtualizarEstadoSelecao();
+        EsconderMiraLaser();
+        IniciarValidacaoEstabilidadeAposInventario("Saiu do inventario.");
+
+        statusCicloInventario = "Cajado saiu do inventario e aguarda estabilidade.";
+        AtualizarDiagnostico();
+    }
+
+    private void CancelarDesenhoSemReconhecer(string motivo)
+    {
+        ultimoMotivoLimpeza = motivo;
+        suprimirAnaliseAoFinalizar = false;
+        manterRunaAposFalhaPreparacao = false;
+        estaDesenhando = false;
+        tracoAtual = null;
+        pontosTracoAtual = null;
+        CancelarTemporizadorLimpeza();
+        DestruirRunaVisual();
+    }
+
+    private void RemoverTracoAtualInvalido(string motivo)
+    {
+        ultimoMotivoLimpeza = motivo;
+
+        LineRenderer tracoInvalido = tracoAtual;
+        int indice = tracoInvalido != null ? tracosDaRuna.IndexOf(tracoInvalido) : -1;
+
+        if (indice >= 0)
+        {
+            tracosDaRuna.RemoveAt(indice);
+            if (indice < pontosPorTraco.Count)
+                pontosPorTraco.RemoveAt(indice);
+        }
+
+        if (tracoInvalido != null)
+            Destroy(tracoInvalido.gameObject);
+
+        tracoAtual = null;
+        pontosTracoAtual = null;
+        estaDesenhando = false;
+        estadoDisponibilidadeDesenho = cajadoNoInventario
+            ? EstadoDisponibilidadeDesenho.NoInventario
+            : EstadoDisponibilidadeDesenho.Pronto;
+
+        if (pontosPorTraco.Count > 0)
+            IniciarTemporizadorLimpeza();
+        else
+        {
+            CancelarTemporizadorLimpeza();
+            DestruirRaizDesenhoSeVazia();
+        }
+    }
+
+    private void CancelarTracoPorInstabilidade(string motivo)
+    {
+        CancelarDesenhoSemReconhecer(motivo);
+        aguardandoSoltarActivate = false;
+        IniciarValidacaoEstabilidadeAposInventario(motivo);
+        estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.AguardandoEstabilidade;
+        AtualizarDiagnostico();
+    }
+
+    private void DestruirRaizDesenhoSeVazia()
+    {
+        if (raizDesenhoRunico == null || raizDesenhoRunico.transform.childCount > 0)
+            return;
+
+        Destroy(raizDesenhoRunico);
+        raizDesenhoRunico = null;
     }
 
     private void AoSelecionarCajado(SelectEnterEventArgs args)
     {
+        if (cajadoNoInventario || !InteractorEhMaoValida(args != null ? args.interactorObject : null))
+        {
+            AtualizarEstadoSelecao();
+            AtualizarDiagnostico();
+            return;
+        }
+
         cajadoSegurado = true;
         ultimoInteractor = ObterTransformInteractor(args != null ? args.interactorObject : null);
         AtualizarStatusPlayerDonoAtual();
@@ -304,7 +566,13 @@ public class CajadoMagico : MonoBehaviour
 
     private void AoSoltarCajado(SelectExitEventArgs args)
     {
-        if (estaDesenhando)
+        if (cajadoNoInventario)
+        {
+            CancelarDesenhoSemReconhecer("Solto pelo inventario.");
+            return;
+        }
+
+        if (estaDesenhando && EventoVeioDeMaoOuSemInteractor(args != null ? args.interactorObject : null))
             FinalizarTracoAtual();
 
         AtualizarEstadoSelecao();
@@ -314,6 +582,11 @@ public class CajadoMagico : MonoBehaviour
 
     private void AoAtivarCajado(ActivateEventArgs args)
     {
+        if (cajadoNoInventario || !EventoVeioDeMaoOuSemInteractor(args != null ? args.interactorObject : null))
+            return;
+
+        activatedRecebidosNesteCiclo++;
+
         if (activateFoiUsadoParaLancar)
             return;
 
@@ -326,7 +599,23 @@ public class CajadoMagico : MonoBehaviour
 
         if (bolaDeFogoPreparadaAtual != null)
         {
+            if (!PodeUsarActivateAgora(out string motivoBloqueioMagia))
+            {
+                aguardandoSoltarActivate = false;
+                motivoBloqueioDesenho = motivoBloqueioMagia;
+                AtualizarDiagnostico();
+                return;
+            }
+
             activateFoiUsadoParaLancar = LancarBolaDeFogoPreparada();
+            return;
+        }
+
+        if (!PodeIniciarDesenhoAgora(out string motivoBloqueio))
+        {
+            aguardandoSoltarActivate = false;
+            motivoBloqueioDesenho = motivoBloqueio;
+            AtualizarDiagnostico();
             return;
         }
 
@@ -335,6 +624,20 @@ public class CajadoMagico : MonoBehaviour
 
     private void AoDesativarCajado(DeactivateEventArgs args)
     {
+        if (cajadoNoInventario || !EventoVeioDeMaoOuSemInteractor(args != null ? args.interactorObject : null))
+            return;
+
+        deactivatedRecebidosNesteCiclo++;
+
+        if (aguardandoSoltarActivate)
+        {
+            aguardandoSoltarActivate = false;
+            estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.AguardandoEstabilidade;
+            motivoBloqueioDesenho = "Activate residual liberado; aguardando estabilidade.";
+            AtualizarDiagnostico();
+            return;
+        }
+
         if (activateFoiUsadoParaLancar)
         {
             activateFoiUsadoParaLancar = false;
@@ -349,14 +652,24 @@ public class CajadoMagico : MonoBehaviour
     {
         AtualizarEstadoSelecao();
 
-        if (!usarDesenhoRunico || !cajadoSegurado || estaDesenhando)
+        if (!PodeIniciarDesenhoAgora(out string motivoBloqueio))
+        {
+            motivoBloqueioDesenho = motivoBloqueio;
             return;
+        }
 
         if (pontoLancamento == null)
         {
             AvisarUmaVez(
                 "CajadoMagico nao pode iniciar desenho porque PontoLancamento nao foi configurado.",
                 ref avisoSemPontoLancamentoMostrado);
+            return;
+        }
+
+        Vector3 primeiroPonto = pontoLancamento.position;
+        if (!VetorFinito(primeiroPonto))
+        {
+            motivoBloqueioDesenho = "PontoLancamento invalido.";
             return;
         }
 
@@ -368,8 +681,10 @@ public class CajadoMagico : MonoBehaviour
         tracosDaRuna.Add(tracoAtual);
         pontosPorTraco.Add(pontosTracoAtual);
         estaDesenhando = true;
+        estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.Desenhando;
+        motivoBloqueioDesenho = "Desenhando.";
 
-        RegistrarPontoNoTracoAtual(pontoLancamento.position, true);
+        RegistrarPontoNoTracoAtual(primeiroPonto, true);
         AtualizarDiagnostico();
     }
 
@@ -378,9 +693,19 @@ public class CajadoMagico : MonoBehaviour
         if (!estaDesenhando)
             return;
 
+        if (pontosTracoAtual == null || pontosTracoAtual.Count < 2)
+        {
+            RemoverTracoAtualInvalido("Traco com menos de dois pontos.");
+            AtualizarDiagnostico();
+            return;
+        }
+
         estaDesenhando = false;
         tracoAtual = null;
         pontosTracoAtual = null;
+        estadoDisponibilidadeDesenho = cajadoNoInventario
+            ? EstadoDisponibilidadeDesenho.NoInventario
+            : EstadoDisponibilidadeDesenho.Pronto;
         IniciarTemporizadorLimpeza();
 
         if (!suprimirAnaliseAoFinalizar)
@@ -485,9 +810,32 @@ public class CajadoMagico : MonoBehaviour
 
     private void AtualizarTracoAtual()
     {
+        if (cajadoNoInventario)
+        {
+            CancelarDesenhoSemReconhecer("Atualizacao bloqueada porque o cajado esta no inventario.");
+            return;
+        }
+
+        AtualizarFlagsSelecaoEInventario();
+
+        if (!cajadoSegurado)
+        {
+            if (inventarioEstaProcessando || socketAindaSelecionando)
+                CancelarTracoPorInstabilidade("Desenho cancelado por transicao de inventario.");
+            else
+                FinalizarTracoAtual();
+            return;
+        }
+
         if (pontoLancamento == null || tracoAtual == null || pontosTracoAtual == null)
         {
-            FinalizarTracoAtual();
+            CancelarDesenhoSemReconhecer("Referencia de desenho invalida.");
+            return;
+        }
+
+        if (!PodeContinuarDesenhoAtual(out string motivoBloqueio))
+        {
+            CancelarTracoPorInstabilidade(motivoBloqueio);
             return;
         }
 
@@ -499,6 +847,9 @@ public class CajadoMagico : MonoBehaviour
         if (tracoAtual == null || pontosTracoAtual == null)
             return;
 
+        if (!VetorFinito(posicao))
+            return;
+
         if (pontosTracoAtual.Count >= maximoPontosPorTraco)
             return;
 
@@ -508,11 +859,18 @@ public class CajadoMagico : MonoBehaviour
 
             if (distancia < distanciaMinimaEntrePontos)
                 return;
+
+            if (distancia > distanciaMaximaSaltoEntrePontos)
+            {
+                CancelarTracoPorInstabilidade("Salto grande entre pontos; traco descartado.");
+                return;
+            }
         }
 
+        int indice = pontosTracoAtual.Count;
         pontosTracoAtual.Add(posicao);
-        tracoAtual.positionCount = pontosTracoAtual.Count;
-        tracoAtual.SetPosition(pontosTracoAtual.Count - 1, posicao);
+        tracoAtual.positionCount = indice + 1;
+        tracoAtual.SetPosition(indice, posicao);
     }
 
     private void IniciarTemporizadorLimpeza()
@@ -600,6 +958,14 @@ public class CajadoMagico : MonoBehaviour
         if (!isActiveAndEnabled)
         {
             statusPreparacaoMagia = "CajadoMagico esta desativado.";
+            AtualizarDiagnosticoMagiaPreparada();
+            AtualizarDiagnostico();
+            return false;
+        }
+
+        if (cajadoNoInventario)
+        {
+            statusPreparacaoMagia = "Preparacao ignorada: cajado esta no inventario.";
             AtualizarDiagnosticoMagiaPreparada();
             AtualizarDiagnostico();
             return false;
@@ -857,7 +1223,12 @@ public class CajadoMagico : MonoBehaviour
             LineRenderer traco = tracosDaRuna[i];
 
             if (traco != null)
+            {
+                traco.positionCount = 0;
+                traco.enabled = false;
+                traco.gameObject.SetActive(false);
                 Destroy(traco.gameObject);
+            }
         }
 
         tracosDaRuna.Clear();
@@ -876,6 +1247,7 @@ public class CajadoMagico : MonoBehaviour
 
         if (raizDesenhoRunico != null)
         {
+            raizDesenhoRunico.SetActive(false);
             Destroy(raizDesenhoRunico);
             raizDesenhoRunico = null;
         }
@@ -886,7 +1258,9 @@ public class CajadoMagico : MonoBehaviour
         if (raizDesenhoRunico != null)
             return;
 
-        raizDesenhoRunico = new GameObject($"Desenho Runico - {name}");
+        raizDesenhoRunico = new GameObject($"Desenho Runico - {name} - {GetInstanceID()}");
+        raizDesenhoRunico.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+        raizDesenhoRunico.transform.localScale = Vector3.one;
     }
 
     private LineRenderer CriarLineRendererDoTraco()
@@ -895,10 +1269,14 @@ public class CajadoMagico : MonoBehaviour
 
         GameObject objetoTraco = new GameObject($"Traco {indiceTracoCriado}");
         objetoTraco.transform.SetParent(raizDesenhoRunico.transform, false);
+        objetoTraco.transform.localPosition = Vector3.zero;
+        objetoTraco.transform.localRotation = Quaternion.identity;
+        objetoTraco.transform.localScale = Vector3.one;
 
         LineRenderer lineRenderer = objetoTraco.AddComponent<LineRenderer>();
         lineRenderer.useWorldSpace = true;
         lineRenderer.positionCount = 0;
+        lineRenderer.widthMultiplier = 1f;
         lineRenderer.numCapVertices = 4;
         lineRenderer.numCornerVertices = 4;
         lineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -1215,16 +1593,331 @@ public class CajadoMagico : MonoBehaviour
         statusMiraLaser = "Mira escondida.";
     }
 
+    private void IniciarValidacaoEstabilidadeAposInventario(string motivo)
+    {
+        horarioSaidaInventario = Time.time;
+        estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.SaindoDoInventario;
+        activatedRecebidosNesteCiclo = 0;
+        deactivatedRecebidosNesteCiclo = 0;
+        ResetarAmostraEstabilidade(motivo);
+    }
+
+    private void ResetarAmostraEstabilidade(string motivo)
+    {
+        framesEstaveisAtuais = 0;
+        framesEstaveisNecessarios = Mathf.Max(1, framesConsecutivosPontoEstavel);
+        distanciaMovidaPelaPontaNoUltimoFrame = 0f;
+        parentMudouEstabilidade = false;
+        escalaMudouEstabilidade = false;
+        parentAnteriorEstabilidade = transform.parent;
+        escalaAnteriorEstabilidade = transform.localScale;
+        posicaoAnteriorPontoValida = pontoLancamento != null && VetorFinito(pontoLancamento.position);
+        posicaoAnteriorPontoEstabilidade = posicaoAnteriorPontoValida ? pontoLancamento.position : Vector3.zero;
+        motivoBloqueioDesenho = motivo;
+    }
+
+    private void AtualizarEstabilidadeDesenhoAposInventario()
+    {
+        CorrigirEstadoInventarioLocalSeNecessario();
+        AtualizarFlagsSelecaoEInventario();
+
+        if (cajadoNoInventario)
+        {
+            estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.NoInventario;
+            podeIniciarDesenho = false;
+            motivoBloqueioDesenho = "Cajado no inventario.";
+            return;
+        }
+
+        if (estaDesenhando)
+        {
+            estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.Desenhando;
+            podeIniciarDesenho = false;
+            motivoBloqueioDesenho = "Desenhando.";
+            return;
+        }
+
+        if (estadoDisponibilidadeDesenho == EstadoDisponibilidadeDesenho.Pronto &&
+            !inventarioEstaProcessando &&
+            !socketAindaSelecionando)
+        {
+            PodeIniciarDesenhoAgora(out _);
+            return;
+        }
+
+        if (aguardandoSoltarActivate)
+        {
+            aguardandoSoltarActivate = false;
+            motivoBloqueioDesenho = "Activate residual limpo automaticamente.";
+        }
+
+        estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.AguardandoEstabilidade;
+
+        if (!CondicoesBasicasParaEstabilidade(out string motivoBasico))
+        {
+            ResetarAmostraEstabilidade(motivoBasico);
+            podeIniciarDesenho = false;
+            return;
+        }
+
+        bool estabilizouNesteFrame = AtualizarAmostraEstabilidadeAtual();
+
+        if (!estabilizouNesteFrame)
+        {
+            podeIniciarDesenho = false;
+            return;
+        }
+
+        bool tempoMinimoCumprido = Time.time - horarioSaidaInventario >= tempoMinimoAposSairInventario &&
+                                   Time.time >= desenhoBloqueadoAte;
+
+        if (!tempoMinimoCumprido)
+        {
+            podeIniciarDesenho = false;
+            motivoBloqueioDesenho = "Aguardando tempo minimo apos inventario.";
+            return;
+        }
+
+        if (framesEstaveisAtuais < framesConsecutivosPontoEstavel)
+        {
+            podeIniciarDesenho = false;
+            motivoBloqueioDesenho = "Aguardando frames estaveis.";
+            return;
+        }
+
+        estadoDisponibilidadeDesenho = EstadoDisponibilidadeDesenho.Pronto;
+        podeIniciarDesenho = true;
+        motivoBloqueioDesenho = "Pronto.";
+    }
+
+    private void CorrigirEstadoInventarioLocalSeNecessario()
+    {
+        if (!cajadoNoInventario)
+            return;
+
+        bool maoSelecionandoAgora = ObterPrimeiroInteractorMaoSelecionando() != null;
+        bool socketSelecionandoAgora = ExisteSocketSelecionando();
+        bool estadoExternoAindaNoInventario = estadoInventario != null &&
+                                              (estadoInventario.estaNoInventario || estadoInventario.estaSendoProcessado);
+
+        if ((!estadoExternoAindaNoInventario || maoSelecionandoAgora) && maoSelecionandoAgora && !socketSelecionandoAgora)
+        {
+            cajadoNoInventario = false;
+            IniciarValidacaoEstabilidadeAposInventario("Estado local de inventario corrigido pela mao.");
+        }
+    }
+
+    private bool AtualizarAmostraEstabilidadeAtual()
+    {
+        if (pontoLancamento == null || !VetorFinito(pontoLancamento.position))
+        {
+            ResetarAmostraEstabilidade("PontoLancamento invalido.");
+            return false;
+        }
+
+        Transform parentAtual = transform.parent;
+        Vector3 escalaAtual = transform.localScale;
+        Vector3 posicaoAtual = pontoLancamento.position;
+
+        parentMudouEstabilidade = parentAtual != parentAnteriorEstabilidade;
+        escalaMudouEstabilidade = !VetoresQuaseIguais(escalaAtual, escalaAnteriorEstabilidade, 0.0001f);
+        distanciaMovidaPelaPontaNoUltimoFrame = posicaoAnteriorPontoValida
+            ? Vector3.Distance(posicaoAnteriorPontoEstabilidade, posicaoAtual)
+            : 0f;
+
+        float limiteMovimentoNormal = Mathf.Max(
+            distanciaMaximaPontoEstavelPorFrame,
+            distanciaMaximaSaltoEntrePontos * 0.5f);
+        bool pontoMoveuMuito = !posicaoAnteriorPontoValida ||
+                               distanciaMovidaPelaPontaNoUltimoFrame > limiteMovimentoNormal;
+
+        parentAnteriorEstabilidade = parentAtual;
+        escalaAnteriorEstabilidade = escalaAtual;
+        posicaoAnteriorPontoEstabilidade = posicaoAtual;
+        posicaoAnteriorPontoValida = true;
+
+        if (parentMudouEstabilidade || escalaMudouEstabilidade || pontoMoveuMuito)
+        {
+            framesEstaveisAtuais = 0;
+            if (parentMudouEstabilidade)
+                motivoBloqueioDesenho = "Parent do cajado mudou.";
+            else if (escalaMudouEstabilidade)
+                motivoBloqueioDesenho = "Escala do cajado mudou.";
+            else
+                motivoBloqueioDesenho = "PontoLancamento ainda esta movendo.";
+            return false;
+        }
+
+        framesEstaveisAtuais++;
+        return true;
+    }
+
+    private bool CondicoesBasicasParaEstabilidade(out string motivo)
+    {
+        AtualizarFlagsSelecaoEInventario();
+
+        if (inventarioEstaProcessando)
+        {
+            motivo = "Inventario ainda esta processando o item.";
+            return false;
+        }
+
+        if (socketAindaSelecionando)
+        {
+            motivo = "Socket do inventario ainda seleciona o cajado.";
+            return false;
+        }
+
+        if (!maoEstaSelecionando)
+        {
+            motivo = "Nenhuma mao valida selecionando o cajado.";
+            return false;
+        }
+
+        if (pontoLancamento == null)
+        {
+            motivo = "PontoLancamento nao configurado.";
+            return false;
+        }
+
+        motivo = string.Empty;
+        return true;
+    }
+
+    private bool PodeContinuarDesenhoAtual(out string motivo)
+    {
+        if (cajadoNoInventario)
+        {
+            motivo = "Cajado voltou ao inventario durante o desenho.";
+            return false;
+        }
+
+        if (!CondicoesBasicasParaEstabilidade(out motivo))
+            return false;
+
+        motivo = string.Empty;
+        return true;
+    }
+
+    private bool PodeIniciarDesenhoAgora(out string motivo)
+    {
+        if (!usarDesenhoRunico)
+        {
+            motivo = "Desenho runico desativado.";
+            podeIniciarDesenho = false;
+            return false;
+        }
+
+        return PodeUsarActivateAgora(out motivo);
+    }
+
+    private bool PodeUsarActivateAgora(out string motivo)
+    {
+        if (aguardandoSoltarActivate)
+        {
+            aguardandoSoltarActivate = false;
+        }
+
+        if (estaDesenhando)
+        {
+            motivo = "Ja esta desenhando.";
+            podeIniciarDesenho = false;
+            return false;
+        }
+
+        if (estadoDisponibilidadeDesenho != EstadoDisponibilidadeDesenho.Pronto)
+        {
+            motivo = $"Estado atual: {estadoDisponibilidadeDesenho}.";
+            podeIniciarDesenho = false;
+            return false;
+        }
+
+        if (!CondicoesBasicasParaEstabilidade(out motivo))
+        {
+            podeIniciarDesenho = false;
+            return false;
+        }
+
+        if (Time.time < desenhoBloqueadoAte)
+        {
+            motivo = "Aguardando tempo minimo apos inventario.";
+            podeIniciarDesenho = false;
+            return false;
+        }
+
+        motivo = "Pronto.";
+        podeIniciarDesenho = true;
+        return true;
+    }
+
+    private void AtualizarFlagsSelecaoEInventario()
+    {
+        inventarioEstaProcessando = InventarioAindaEstaProcessando();
+        socketAindaSelecionando = ExisteSocketSelecionando();
+        maoEstaSelecionando = ExisteMaoSelecionando();
+        framesEstaveisNecessarios = Mathf.Max(1, framesConsecutivosPontoEstavel);
+    }
+
+    private bool InventarioAindaEstaProcessando()
+    {
+        if (estadoInventario == null)
+            return false;
+
+        bool maoSelecionandoAgora = ObterPrimeiroInteractorMaoSelecionando() != null;
+        bool socketSelecionandoAgora = ExisteSocketSelecionando();
+
+        if (estadoInventario.estaNoInventario && !maoSelecionandoAgora)
+            return true;
+
+        if (estadoInventario.estaSendoProcessado && (socketSelecionandoAgora || !maoSelecionandoAgora))
+            return true;
+
+        return false;
+    }
+
+    private bool ExisteMaoSelecionando()
+    {
+        return ObterPrimeiroInteractorMaoSelecionando() != null;
+    }
+
+    private bool ExisteSocketSelecionando()
+    {
+        if (interagivelXR == null || interagivelXR.interactorsSelecting == null)
+            return false;
+
+        for (int i = 0; i < interagivelXR.interactorsSelecting.Count; i++)
+        {
+            if (InteractorEhSocketOuInventario(interagivelXR.interactorsSelecting[i]))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool VetoresQuaseIguais(Vector3 a, Vector3 b, float tolerancia)
+    {
+        return (a - b).sqrMagnitude <= tolerancia * tolerancia;
+    }
+
     private void AtualizarEstadoSelecao()
     {
-        if (interagivelXR == null)
+        if (interagivelXR == null || cajadoNoInventario)
         {
             cajadoSegurado = false;
             ultimoInteractor = null;
             return;
         }
 
-        cajadoSegurado = interagivelXR.isSelected;
+        AtualizarFlagsSelecaoEInventario();
+        if (inventarioEstaProcessando || socketAindaSelecionando)
+        {
+            cajadoSegurado = false;
+            ultimoInteractor = null;
+            return;
+        }
+
+        Transform interactorMao = ObterPrimeiroInteractorMaoSelecionando();
+        cajadoSegurado = interactorMao != null;
 
         if (!cajadoSegurado)
         {
@@ -1233,13 +1926,17 @@ public class CajadoMagico : MonoBehaviour
         }
 
         if (ultimoInteractor == null)
-            ultimoInteractor = ObterPrimeiroInteractorSelecionando();
+            ultimoInteractor = interactorMao;
     }
 
     private void AtualizarDiagnostico()
     {
         quantidadeTracos = tracosDaRuna.Count;
         quantidadePontosTracoAtual = pontosTracoAtual != null ? pontosTracoAtual.Count : 0;
+        pontosDoTracoAtual = quantidadePontosTracoAtual;
+        quantidadeContainersDesenho = raizDesenhoRunico != null ? 1 : 0;
+        AtualizarFlagsSelecaoEInventario();
+        AtualizarDiagnosticoRigidbody();
         AtualizarDiagnosticoMagiaPreparada();
 
         if (apagarRunaEm >= 0f && !estaDesenhando)
@@ -1268,6 +1965,17 @@ public class CajadoMagico : MonoBehaviour
             $"Segurado: {cajadoSegurado} | Desenhando: {estaDesenhando} | Interactor: {nomeInteractor} | Ponto: {nomePonto} | Ponto Magia: {nomePontoMagia} | Ponto Direcao: {nomePontoDirecao} | Eixo Direcao: {eixoLocalDirecaoMagia} | Tracos: {quantidadeTracos} | Pontos Traco Atual: {quantidadePontosTracoAtual} | Limpar em: {tempoRestanteParaLimpar:0.00}s | Modo: {modoReconhecimentoRuna} | Runa: {ultimaRunaReconhecida} | Score: {pontuacaoUltimaAnalise:0.00} | Motivo: {motivoUltimaAnalise} | Magia Preparada: {ultimaMagiaPreparada} | Magia Lancada: {ultimaMagiaLancada} | Origem: {ultimaOrigemAtivacaoMagia} | Direcao Lancamento: {ultimaDirecaoLancamento} | Preparacao: {statusPreparacaoMagia} | Lancamento: {statusLancamentoMagia} | Direcao: {statusDirecaoLancamento}";
         statusDiagnostico += $" | Mana: {manaAtualDoDono}/{manaNecessariaBolaDeFogo} | Status Mana: {statusManaDaMagia}";
         statusDiagnostico += $" | Mira: {miraLaserVisivel} | Dist Mira: {distanciaAtualMira:0.00} | Status Mira: {statusMiraLaser}";
+        statusDiagnostico += $" | Inventario: {cajadoNoInventario} | Limpo Inventario: {estadoLimpoAoEntrarNoInventario} | Listeners XR: {listenersXRRegistrados} | Activated Reg: {quantidadeRegistrosActivated} | Deactivated Reg: {quantidadeRegistrosDeactivated} | Containers: {quantidadeContainersDesenho} | Ultima Limpeza: {ultimoMotivoLimpeza} | Ciclo Inventario: {statusCicloInventario} | Rigidbody: {rigidbodyPresente} | Kinematic: {rigidbodyCinematico} | Gravity: {rigidbodyUsandoGravidade} | Collisions: {rigidbodyDetectandoColisoes}";
+        statusDiagnostico += $" | Estado Desenho: {estadoDisponibilidadeDesenho} | Processando: {inventarioEstaProcessando} | Socket: {socketAindaSelecionando} | Mao: {maoEstaSelecionando} | Aguardando Soltar: {aguardandoSoltarActivate} | Frames Estaveis: {framesEstaveisAtuais}/{framesEstaveisNecessarios} | Dist Ponta: {distanciaMovidaPelaPontaNoUltimoFrame:0.000} | Parent Mudou: {parentMudouEstabilidade} | Escala Mudou: {escalaMudouEstabilidade} | Pode Desenhar: {podeIniciarDesenho} | Activated Ciclo: {activatedRecebidosNesteCiclo} | Deactivated Ciclo: {deactivatedRecebidosNesteCiclo} | Bloqueio: {motivoBloqueioDesenho}";
+    }
+
+    private void AtualizarDiagnosticoRigidbody()
+    {
+        Rigidbody rb = GetComponent<Rigidbody>();
+        rigidbodyPresente = rb != null;
+        rigidbodyCinematico = rb != null && rb.isKinematic;
+        rigidbodyUsandoGravidade = rb != null && rb.useGravity;
+        rigidbodyDetectandoColisoes = rb != null && rb.detectCollisions;
     }
 
     private void AtualizarDiagnosticoMagiaPreparada()
@@ -1371,12 +2079,78 @@ public class CajadoMagico : MonoBehaviour
             interagivelXR = GetComponentInChildren<XRBaseInteractable>(true);
     }
 
-    private Transform ObterPrimeiroInteractorSelecionando()
+    private bool InteractorEhMaoValida(IXRInteractor interactor)
+    {
+        if (interactor == null || InteractorEhSocketOuInventario(interactor))
+            return false;
+
+        if (interactor is XRDirectInteractor || interactor is XRRayInteractor)
+            return true;
+
+        Transform interactorTransform = ObterTransformInteractor(interactor);
+        while (interactorTransform != null)
+        {
+            string nome = NormalizarNome(interactorTransform.name);
+            if (nome.Contains("left") ||
+                nome.Contains("right") ||
+                nome.Contains("esquerda") ||
+                nome.Contains("direita") ||
+                nome.Contains("hand") ||
+                nome.Contains("mao") ||
+                nome.Contains("controller") ||
+                nome.Contains("controlador"))
+                return true;
+
+            interactorTransform = interactorTransform.parent;
+        }
+
+        return false;
+    }
+
+    private bool EventoVeioDeMaoOuSemInteractor(IXRInteractor interactor)
+    {
+        return interactor == null || InteractorEhMaoValida(interactor);
+    }
+
+    private bool InteractorEhSocketOuInventario(IXRInteractor interactor)
+    {
+        if (interactor == null)
+            return false;
+
+        if (interactor is XRSocketInteractor)
+            return true;
+
+        Transform atual = ObterTransformInteractor(interactor);
+        while (atual != null)
+        {
+            string nome = NormalizarNome(atual.name);
+            if (nome.Contains("socket") ||
+                nome.Contains("slot") ||
+                nome.Contains("inventario") ||
+                nome.Contains("inventory") ||
+                nome.Contains("pontoencaixe") ||
+                nome.Contains("ponto_encaixe"))
+                return true;
+
+            atual = atual.parent;
+        }
+
+        return false;
+    }
+
+    private Transform ObterPrimeiroInteractorMaoSelecionando()
     {
         if (interagivelXR == null || interagivelXR.interactorsSelecting == null || interagivelXR.interactorsSelecting.Count == 0)
             return null;
 
-        return ObterTransformInteractor(interagivelXR.interactorsSelecting[0]);
+        for (int i = 0; i < interagivelXR.interactorsSelecting.Count; i++)
+        {
+            IXRInteractor interactor = interagivelXR.interactorsSelecting[i];
+            if (InteractorEhMaoValida(interactor))
+                return ObterTransformInteractor(interactor);
+        }
+
+        return null;
     }
 
     private static Transform ObterTransformInteractor(IXRInteractor interactor)
@@ -1386,7 +2160,7 @@ public class CajadoMagico : MonoBehaviour
 
     private GameObject ObterDonoDaMagia()
     {
-        Transform interactor = ultimoInteractor != null ? ultimoInteractor : ObterPrimeiroInteractorSelecionando();
+        Transform interactor = ultimoInteractor != null ? ultimoInteractor : ObterPrimeiroInteractorMaoSelecionando();
 
         if (interactor == null)
             return null;
@@ -1415,7 +2189,7 @@ public class CajadoMagico : MonoBehaviour
         if (status != null)
             return status;
 
-        Transform interactor = ultimoInteractor != null ? ultimoInteractor : ObterPrimeiroInteractorSelecionando();
+        Transform interactor = ultimoInteractor != null ? ultimoInteractor : ObterPrimeiroInteractorMaoSelecionando();
         return ResolverStatusPlayerEmTransform(interactor);
     }
 
@@ -1457,6 +2231,20 @@ public class CajadoMagico : MonoBehaviour
     {
         manaNecessariaBolaDeFogo = Mathf.Max(0, custoManaBolaDeFogo);
         manaAtualDoDono = statusPlayerDonoAtual != null ? statusPlayerDonoAtual.GetManaAtual() : 0;
+    }
+
+    private static bool VetorFinito(Vector3 valor)
+    {
+        return !float.IsNaN(valor.x) && !float.IsInfinity(valor.x) &&
+               !float.IsNaN(valor.y) && !float.IsInfinity(valor.y) &&
+               !float.IsNaN(valor.z) && !float.IsInfinity(valor.z);
+    }
+
+    private static string NormalizarNome(string nome)
+    {
+        return string.IsNullOrWhiteSpace(nome)
+            ? string.Empty
+            : nome.Trim().ToLowerInvariant();
     }
 
     private void AvisarUmaVez(string mensagem, ref bool avisoJaMostrado)

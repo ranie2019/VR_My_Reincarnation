@@ -36,6 +36,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     [SerializeField] private int diagnosticoRenderersAtivosTopo;
     [SerializeField] private int diagnosticoRenderersAtivosEscondidos;
     [SerializeField] private string diagnosticoTopoPilha;
+    [SerializeField] private int diagnosticoAtualizacoesDaPilha;
+    [SerializeField] private int diagnosticoAlteracoesFisicasReais;
 
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
@@ -49,6 +51,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private readonly Dictionary<XRGrabInteractable, Vector3> escalasVisuaisInventario = new();
 
     private XRGrabInteractable itemGuardado;
+    private XRGrabInteractable itemComListenerRetiradaExterna;
     private string nomeItemAtual = string.Empty;
     private bool ignorarProximoExited = false;
     private bool inventarioAberto = true;
@@ -90,6 +93,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private void OnDisable()
     {
         RemoverFiltroDoItemGuardado();
+        RemoverListenerRetiradaExterna();
 
         if (socketInteractor != null)
         {
@@ -234,6 +238,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (itemGuardado == null)
             return;
 
+        RegistrarListenerRetiradaExterna(itemGuardado);
+
         var filtros = itemGuardado.selectFilters;
         for (int i = 0; i < filtros.count; i++)
         {
@@ -250,6 +256,28 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
 
         itemGuardado.selectFilters.Remove(this);
+
+        if (itemComListenerRetiradaExterna == itemGuardado)
+            RemoverListenerRetiradaExterna();
+    }
+
+    private void RegistrarListenerRetiradaExterna(XRGrabInteractable item)
+    {
+        if (item == null || itemComListenerRetiradaExterna == item)
+            return;
+
+        RemoverListenerRetiradaExterna();
+        item.selectEntered.RemoveListener(AoItemGuardadoSelecionadoPorInteractorExterno);
+        item.selectEntered.AddListener(AoItemGuardadoSelecionadoPorInteractorExterno);
+        itemComListenerRetiradaExterna = item;
+    }
+
+    private void RemoverListenerRetiradaExterna()
+    {
+        if (itemComListenerRetiradaExterna != null)
+            itemComListenerRetiradaExterna.selectEntered.RemoveListener(AoItemGuardadoSelecionadoPorInteractorExterno);
+
+        itemComListenerRetiradaExterna = null;
     }
 
     private void SincronizarPontoEncaixeDoSocket()
@@ -353,6 +381,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         var estado = ObterEstadoInventario(item, true);
         if (estado == null)
             return null;
+
+        if (estadosOriginais.TryGetValue(item, out EstadoOriginalItem estadoOriginal))
+            PrepararInteractableParaInventario(item, estadoOriginal);
 
         estado.MarcarAceito(this, escondido);
         MarcarPersistenciaComoInventario(item);
@@ -530,15 +561,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
                 estadoCollider.Collider.enabled = false;
         }
 
-        item.enabled = false;
-
-        var rb = item.GetComponent<Rigidbody>();
-        if (rb != null)
-        {
-            rb.isKinematic = true;
-            rb.useGravity = false;
-            rb.detectCollisions = false;
-        }
+        AplicarFisicaDoItemDaPilha(item, estado, false);
 
         MarcarItemComoEscondidoNaPilha(item);
     }
@@ -559,8 +582,6 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         RestaurarEscalaOriginalDoEstado(item, estado, false);
 
-        item.enabled = estado.GrabEnabled;
-
         foreach (var estadoRenderer in estado.Renderers)
         {
             if (estadoRenderer.Renderer != null)
@@ -575,13 +596,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
                 estadoCollider.Collider.enabled = estadoCollider.Enabled;
         }
 
-        var rb = item.GetComponent<Rigidbody>();
-        if (rb != null)
-        {
-            rb.isKinematic = true;
-            rb.useGravity = false;
-            rb.detectCollisions = true;
-        }
+        AplicarFisicaDoItemDaPilha(item, estado, true);
 
         bool forcarRecalculo = forcarEscalaMesmoInvisivel ||
                                itensRestauradosDoSave.Contains(item) ||
@@ -867,6 +882,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
                 rb.constraints = estado.ConstraintsOriginal;
                 rb.collisionDetectionMode = estado.CollisionDetectionModeOriginal;
                 rb.interpolation = estado.InterpolationOriginal;
+                rb.linearDamping = estado.LinearDampingOriginal;
+                rb.angularDamping = estado.AngularDampingOriginal;
             }
             else
             {
@@ -877,6 +894,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
             rb.WakeUp();
         }
+
+        item.throwOnDetach = estado.ThrowOnDetachOriginal;
 
     }
 
@@ -1414,6 +1433,77 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         PromoverNovoTopoAposRetirada();
     }
 
+    private void AoItemGuardadoSelecionadoPorInteractorExterno(SelectEnterEventArgs args)
+    {
+        if (operacaoInternaSocket || atualizandoTopo || itemGuardado == null)
+            return;
+
+        if (!inventarioAberto || !visivelNaRolagem)
+            return;
+
+        if (args == null || args.interactableObject == null || args.interactorObject == null)
+            return;
+
+        if (args.interactableObject.transform != itemGuardado.transform)
+            return;
+
+        if (EhSocketDoSlot(args.interactorObject) || EhOutroSocket(args.interactorObject))
+            return;
+
+        RetirarItemGuardadoParaInteractorExterno(itemGuardado);
+    }
+
+    private void RetirarItemGuardadoParaInteractorExterno(XRGrabInteractable itemRemovido)
+    {
+        if (itemRemovido == null || TopoDaPilha() != itemRemovido)
+            return;
+
+        RemoverFiltroDoItemGuardado();
+        LiberarSelecaoSocketSemEvento(itemRemovido);
+
+        pilhaItens.RemoveAt(pilhaItens.Count - 1);
+
+        bool podeAtualizarEfeitos = inventarioAberto && visivelNaRolagem && gameObject.activeInHierarchy && enabled;
+        if (podeAtualizarEfeitos)
+            TocarSom(somRetirarItem);
+
+        itemGuardado = null;
+        RestaurarItemParaMundo(itemRemovido);
+        AtualizarContadorTMP();
+
+        if (pilhaItens.Count == 0)
+        {
+            nomeItemAtual = string.Empty;
+            return;
+        }
+
+        PromoverNovoTopoAposRetirada();
+    }
+
+    private void LiberarSelecaoSocketSemEvento(XRGrabInteractable item)
+    {
+        if (socketInteractor == null || item == null || socketInteractor.interactionManager == null)
+            return;
+
+        if (!socketInteractor.IsSelecting(item))
+            return;
+
+        bool operacaoAnterior = operacaoInternaSocket;
+        operacaoInternaSocket = true;
+
+        try
+        {
+            socketInteractor.interactionManager.SelectExit(
+                (IXRSelectInteractor)socketInteractor,
+                (IXRSelectInteractable)item
+            );
+        }
+        finally
+        {
+            operacaoInternaSocket = operacaoAnterior;
+        }
+    }
+
     private void PromoverNovoTopoAposRetirada()
     {
         XRGrabInteractable novoTopo = TopoDaPilha();
@@ -1899,6 +1989,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private void AtualizarVisibilidadeDaPilha()
     {
+        diagnosticoAtualizacoesDaPilha++;
         RemoverItensNulosDaPilha();
 
         XRGrabInteractable topo = TopoDaPilha();
@@ -2024,15 +2115,56 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (item == null)
             return;
 
-        item.enabled = ehTopo && (estado == null || estado.GrabEnabled);
+        PrepararInteractableParaInventario(item, estado);
+
+        bool grabAtivo = ehTopo && (estado == null || estado.GrabEnabled);
+        if (item.enabled != grabAtivo)
+        {
+            item.enabled = grabAtivo;
+            diagnosticoAlteracoesFisicasReais++;
+        }
 
         Rigidbody rb = item.GetComponent<Rigidbody>();
         if (rb == null)
             return;
 
-        rb.isKinematic = true;
-        rb.useGravity = false;
-        rb.detectCollisions = ehTopo;
+        ZerarVelocidadeRigidbody(rb);
+
+        if (!rb.isKinematic)
+        {
+            rb.isKinematic = true;
+            diagnosticoAlteracoesFisicasReais++;
+        }
+
+        if (rb.useGravity)
+        {
+            rb.useGravity = false;
+            diagnosticoAlteracoesFisicasReais++;
+        }
+
+        if (rb.detectCollisions != ehTopo)
+        {
+            rb.detectCollisions = ehTopo;
+            diagnosticoAlteracoesFisicasReais++;
+        }
+    }
+
+    private void PrepararInteractableParaInventario(XRGrabInteractable item, EstadoOriginalItem estado)
+    {
+        if (item == null || estado == null || !item.throwOnDetach)
+            return;
+
+        item.throwOnDetach = false;
+        diagnosticoAlteracoesFisicasReais++;
+    }
+
+    private static void ZerarVelocidadeRigidbody(Rigidbody rb)
+    {
+        if (rb == null || rb.isKinematic)
+            return;
+
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
     }
 
     private int ContarRenderersAtivos(XRGrabInteractable item)
@@ -2083,6 +2215,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     public void SetVisivelNaRolagem(bool visivel)
     {
+        if (visivelNaRolagem == visivel)
+            return;
+
         visivelNaRolagem = visivel;
 
         if (inventarioAberto && visivelNaRolagem)
@@ -2127,6 +2262,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     public void SetInventarioAberto(bool aberto)
     {
+        if (inventarioAberto == aberto)
+            return;
+
         inventarioAberto = aberto;
 
         if (aberto)
@@ -2200,10 +2338,13 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         public readonly bool RigidbodyKinematic;
         public readonly bool RigidbodyUseGravity;
         public readonly bool RigidbodyDetectCollisions;
+        public readonly bool ThrowOnDetachOriginal;
         public readonly bool ForcarFisicaDinamicaAoSair;
         public readonly RigidbodyConstraints ConstraintsOriginal;
         public readonly CollisionDetectionMode CollisionDetectionModeOriginal;
         public readonly RigidbodyInterpolation InterpolationOriginal;
+        public readonly float LinearDampingOriginal;
+        public readonly float AngularDampingOriginal;
         public readonly EstadoRenderer[] Renderers;
         public readonly EstadoCollider[] Colliders;
         public readonly EstadoCanvas[] Canvases;
@@ -2223,10 +2364,13 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             RigidbodyKinematic = Rigidbody != null && Rigidbody.isKinematic;
             RigidbodyUseGravity = Rigidbody != null && Rigidbody.useGravity;
             RigidbodyDetectCollisions = Rigidbody == null || Rigidbody.detectCollisions;
+            ThrowOnDetachOriginal = item.throwOnDetach;
             ForcarFisicaDinamicaAoSair = TinhaRigidbody && (!RigidbodyKinematic || RigidbodyUseGravity || item.isSelected);
             ConstraintsOriginal = Rigidbody != null ? Rigidbody.constraints : RigidbodyConstraints.None;
             CollisionDetectionModeOriginal = Rigidbody != null ? Rigidbody.collisionDetectionMode : CollisionDetectionMode.Discrete;
             InterpolationOriginal = Rigidbody != null ? Rigidbody.interpolation : RigidbodyInterpolation.None;
+            LinearDampingOriginal = Rigidbody != null ? Rigidbody.linearDamping : 0f;
+            AngularDampingOriginal = Rigidbody != null ? Rigidbody.angularDamping : 0.05f;
 
             Renderer[] renderers = item.GetComponentsInChildren<Renderer>(true);
             Renderers = new EstadoRenderer[renderers.Length];

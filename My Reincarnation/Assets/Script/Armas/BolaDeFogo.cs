@@ -1139,13 +1139,12 @@ public class BolaDeFogo : MonoBehaviour, IDano
         if (rb == null)
             return;
 
+        ZerarVelocidadesSeDinamico();
         rb.isKinematic = true;
         rb.useGravity = false;
         rb.detectCollisions = false;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         rb.interpolation = RigidbodyInterpolation.None;
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
     }
 
     private void ConfigurarRigidbodyLancado()
@@ -1171,11 +1170,19 @@ public class BolaDeFogo : MonoBehaviour, IDano
         if (rb == null)
             return;
 
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
+        ZerarVelocidadesSeDinamico();
         rb.isKinematic = true;
         rb.useGravity = false;
         rb.detectCollisions = false;
+    }
+
+    private void ZerarVelocidadesSeDinamico()
+    {
+        if (rb == null || rb.isKinematic)
+            return;
+
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
     }
 
     private void AtualizarSeguimentoPreparacao()
@@ -1189,11 +1196,7 @@ public class BolaDeFogo : MonoBehaviour, IDano
         if (transform.parent != pontoPreparacao)
             transform.SetParent(pontoPreparacao, false);
 
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-        }
+        ZerarVelocidadesSeDinamico();
 
         transform.SetPositionAndRotation(pontoPreparacao.position, pontoPreparacao.rotation);
         transform.localScale = escalaOriginalLocal;

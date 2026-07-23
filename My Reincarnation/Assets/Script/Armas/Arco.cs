@@ -124,6 +124,19 @@ public class Arco : MonoBehaviour
     [SerializeField] private Transform pontoFlechaEsquerda;
     [SerializeField] private Transform pontoDirecaoDisparoEsquerda;
 
+    [Header("Diagnostico Direcao e Fisica da Flecha")]
+    [SerializeField] private bool diagnosticoOrigemEDirecaoMesmoTransform;
+    [SerializeField] private float diagnosticoDistanciaOrigemDirecao;
+    [SerializeField] private Vector3 diagnosticoDirecaoCalculada;
+    [SerializeField] private Vector3 diagnosticoDirecaoVisualFlecha;
+    [SerializeField] private float diagnosticoAnguloEntreDirecoes;
+    [SerializeField] private Vector3 diagnosticoEscalaMundialAntesParent;
+    [SerializeField] private Vector3 diagnosticoEscalaMundialDurantePreparo;
+    [SerializeField] private Vector3 diagnosticoEscalaMundialAposDisparo;
+    [SerializeField] private int diagnosticoQuantidadeCollidersIgnorados;
+    [SerializeField] private bool diagnosticoColliderSobrepondoArcoAntesDisparo;
+    [SerializeField] private string diagnosticoUltimoMotivoCancelamentoDisparo;
+
     [Header("Mira do Arco")]
     [SerializeField] private bool usarMiraArco = true;
     [SerializeField] private TipoMiraArco tipoMiraArco = TipoMiraArco.TrajetoriaCurva;
@@ -244,6 +257,8 @@ public class Arco : MonoBehaviour
     [SerializeField] private AudioClip somPuxarCorda;
     [SerializeField] private AudioClip somSoltarFlecha;
     [SerializeField] private AudioSource audioSource;
+    [SerializeField] private bool audioTensaoAtivo;
+    [SerializeField] private bool tiroCanceladoAteSoltarCorda;
 
     private bool cordaSendoPuxada;
     private bool disparoJaProcessado;
@@ -252,7 +267,12 @@ public class Arco : MonoBehaviour
     private bool cordaSeguradaPeloGrip;
     private Transform maoCandidataPuxar;
     private Transform maoPuxando;
+    private Transform maoCanceladaAteSoltarCorda;
     private GameObject flechaPreparada;
+    private Vector3 escalaMundialFlechaPreparada;
+    private bool escalaMundialFlechaPreparadaValida;
+    private bool animacaoMirarAtiva;
+    private bool animacaoMirarDireita;
 
     private float distanciaPuxadaAtual;
     private float percentualPuxada;
@@ -402,7 +422,10 @@ public class Arco : MonoBehaviour
         maoCandidataPuxar = null;
         maoCandidataDentroDaArea = false;
         cordaSeguradaPeloGrip = false;
+        LimparBloqueioCancelamentoCorda();
+        PararTodosAudiosTemporariosDoArco();
         CancelarPuxada();
+        DesativarAnimacaoMirar();
     }
 
     public void DefinirModoInventario(bool noInventario)
@@ -412,6 +435,8 @@ public class Arco : MonoBehaviour
 
         if (estaNoInventario)
         {
+            LimparBloqueioCancelamentoCorda();
+            PararTodosAudiosTemporariosDoArco();
             CancelarPuxadaSemDisparar();
             AplicarVisualModoInventario(true);
 
@@ -423,6 +448,8 @@ public class Arco : MonoBehaviour
         }
 
         visualModoInventarioAplicado = false;
+        LimparBloqueioCancelamentoCorda();
+        PararTodosAudiosTemporariosDoArco();
         CancelarPuxadaSemDisparar();
         AplicarVisualModoInventario(false);
 
@@ -443,8 +470,10 @@ public class Arco : MonoBehaviour
 
     private void CancelarPuxadaSemDisparar()
     {
+        PararTodosAudiosTemporariosDoArco();
         LimparFlechaPreparada(true);
         EsconderMiraArco();
+        DesativarAnimacaoMirar();
 
         cordaSendoPuxada = false;
         cordaSeguradaPeloGrip = false;
@@ -1130,7 +1159,7 @@ public class Arco : MonoBehaviour
         if (estaNoInventario)
             return;
 
-        if (Quebrado || cordaSendoPuxada || mao == null)
+        if (Quebrado || cordaSendoPuxada || mao == null || tiroCanceladoAteSoltarCorda)
             return;
 
         if (!MaoValidaParaPuxarCorda(mao))
@@ -1144,11 +1173,12 @@ public class Arco : MonoBehaviour
         cordaSeguradaPeloGrip = true;
         disparoJaProcessado = false;
         maoPuxando = mao;
+        AtivarAnimacaoMirar(mao);
 
         if (criarFlechaAutomaticamente)
             PrepararFlecha();
 
-        TocarSom(somPuxarCorda);
+        IniciarAudioTensao();
     }
 
     private void AtualizarEntradaPuxada()
@@ -1161,9 +1191,20 @@ public class Arco : MonoBehaviour
             if (cordaSendoPuxada)
                 CancelarPuxada();
 
+            LimparBloqueioCancelamentoCorda();
             gripPuxarPressionado = false;
             maoCandidataPuxar = null;
             maoCandidataDentroDaArea = false;
+            return;
+        }
+
+        if (tiroCanceladoAteSoltarCorda)
+        {
+            PararAudioTensao();
+
+            if (MaoCanceladaSoltouCorda())
+                LimparBloqueioCancelamentoCorda();
+
             return;
         }
 
@@ -1222,7 +1263,7 @@ public class Arco : MonoBehaviour
 
         if (vetorPuxada.magnitude > distanciaMaximaPuxada * multiplicadorDistanciaSeguranca)
         {
-            CancelarPuxada();
+            CancelarTiroPorExcessoDePuxada();
             return;
         }
 
@@ -1239,6 +1280,7 @@ public class Arco : MonoBehaviour
         AplicarCurvaturaVisual(percentualPuxada);
         AtualizarLinhaCorda();
         ManterFlechaPreparadaNoPonto();
+        AtualizarAudioTensao(percentualPuxada);
         AtualizarAcumuloEnergia();
         AtualizarMiraArco();
     }
@@ -1261,6 +1303,7 @@ public class Arco : MonoBehaviour
             return;
 
         disparoJaProcessado = true;
+        PararAudioTensao();
 
         if (Quebrado)
         {
@@ -1285,15 +1328,27 @@ public class Arco : MonoBehaviour
     private bool DispararFlecha()
     {
         if (estaNoInventario)
+        {
+            diagnosticoUltimoMotivoCancelamentoDisparo = "Arco no inventario";
             return false;
+        }
 
         if (Quebrado)
+        {
+            diagnosticoUltimoMotivoCancelamentoDisparo = "Arco quebrado";
             return false;
+        }
 
         Transform pontoFlechaAtual = ObterPontoFlechaAtual();
+        if (!ObterOrigemEDirecaoDisparo(out Vector3 origemDisparo, out Vector3 direcao))
+        {
+            diagnosticoUltimoMotivoCancelamentoDisparo = "Pontos de origem/direcao invalidos";
+            return false;
+        }
+
         if (!TentarPrepararPrefabFlechaParaDisparo(out GameObject prefabParaDisparo))
         {
-            flechaPreparada = null;
+            diagnosticoUltimoMotivoCancelamentoDisparo = "Nenhuma flecha disponivel";
             AtualizarDiagnosticoFlechaEquipada();
             return false;
         }
@@ -1301,24 +1356,37 @@ public class Arco : MonoBehaviour
         GameObject flecha = flechaPreparada;
 
         if (flecha == null && prefabParaDisparo != null && pontoFlechaAtual != null)
-            flecha = Instantiate(prefabParaDisparo, pontoFlechaAtual.position, pontoFlechaAtual.rotation);
+        {
+            flecha = Instantiate(prefabParaDisparo, origemDisparo, pontoFlechaAtual.rotation);
+            escalaMundialFlechaPreparada = flecha.transform.lossyScale;
+            escalaMundialFlechaPreparadaValida = EscalaValida(escalaMundialFlechaPreparada);
+            diagnosticoEscalaMundialAntesParent = escalaMundialFlechaPreparada;
+        }
 
         if (flecha == null)
         {
-            flechaPreparada = null;
+            diagnosticoUltimoMotivoCancelamentoDisparo = "Falha ao criar flecha";
             return false;
         }
 
         GarantirMalhaFlechaVisivel(flecha);
 
         Transform flechaTransform = flecha.transform;
-        Vector3 direcao = CalcularDirecaoDisparo();
+        diagnosticoColliderSobrepondoArcoAntesDisparo = DetectarSobreposicaoComArco(flecha);
         flechaTransform.SetParent(null, true);
-        flechaTransform.position = pontoFlechaAtual != null ? pontoFlechaAtual.position : flechaTransform.position;
+        flechaTransform.position = origemDisparo;
         AplicarRotacaoFlechaLancada(flechaTransform, direcao, pontoFlechaAtual);
 
+        if (escalaMundialFlechaPreparadaValida)
+            RestaurarEscalaMundial(flechaTransform, escalaMundialFlechaPreparada);
+
+        diagnosticoEscalaMundialAposDisparo = flechaTransform.lossyScale;
+
         GarantirComponenteFlecha(flecha);
+        ValidarSentidoVisualFlecha(flecha, direcao, pontoFlechaAtual);
         ConfigurarDonoFlecha(flecha);
+        ConfigurarColisoesIgnoradasDaFlecha(flecha);
+        PrepararRigidbodyParaDisparo(flecha);
 
         float forcaBase = Mathf.Lerp(forcaMinimaDisparo, forcaMaximaDisparo, percentualPuxada);
         float forcaFinal = forcaBase + energiaAcumulada;
@@ -1333,7 +1401,7 @@ public class Arco : MonoBehaviour
 
         if (!disparou)
         {
-            flechaPreparada = null;
+            diagnosticoUltimoMotivoCancelamentoDisparo = "Flecha sem Rigidbody compativel";
             return false;
         }
 
@@ -1347,12 +1415,17 @@ public class Arco : MonoBehaviour
         MarcarFlechaComoLancada(flecha);
         TocarSom(somSoltarFlecha);
         flechaPreparada = null;
+        escalaMundialFlechaPreparadaValida = false;
+        diagnosticoUltimoMotivoCancelamentoDisparo = string.Empty;
         AtualizarDiagnosticoFlechaEquipada();
         return true;
     }
 
     private void ResetarCorda()
     {
+        PararAudioTensao();
+        DesativarAnimacaoMirar();
+
         if (pontoCordaAtual != null && pontoCordaRepouso != null)
         {
             DefinirPosicaoCordaAtual(pontoCordaRepouso.position);
@@ -1375,6 +1448,30 @@ public class Arco : MonoBehaviour
 
         if (ocultarMiraAoSoltar)
             EsconderMiraArco();
+    }
+
+    private void AtivarAnimacaoMirar(Transform mao)
+    {
+        if (attachDuasMao == null ||
+            !attachDuasMao.DetectarSeTransformEhMaoDireitaOuEsquerda(mao, out bool maoDireita))
+            return;
+
+        if (animacaoMirarAtiva && animacaoMirarDireita == maoDireita)
+            return;
+
+        DesativarAnimacaoMirar();
+        animacaoMirarDireita = maoDireita;
+        animacaoMirarAtiva = true;
+        AnimacaoPegadaMaoVR.NotificarMirar(animacaoMirarDireita, true);
+    }
+
+    private void DesativarAnimacaoMirar()
+    {
+        if (!animacaoMirarAtiva)
+            return;
+
+        AnimacaoPegadaMaoVR.NotificarMirar(animacaoMirarDireita, false);
+        animacaoMirarAtiva = false;
     }
 
     private void GarantirMiraCriada()
@@ -2355,6 +2452,12 @@ public class Arco : MonoBehaviour
         if (mao == null)
             return;
 
+        if (tiroCanceladoAteSoltarCorda &&
+            (MaoPertenceAoTransform(mao, maoCanceladaAteSoltarCorda) || MaoPertenceAoTransform(maoCanceladaAteSoltarCorda, mao)))
+        {
+            LimparBloqueioCancelamentoCorda();
+        }
+
         if (MaoPertenceAoTransform(mao, maoCandidataPuxar) || MaoPertenceAoTransform(maoCandidataPuxar, mao))
         {
             maoCandidataDentroDaArea = false;
@@ -2927,7 +3030,10 @@ public class Arco : MonoBehaviour
         if (!TentarPrepararPrefabFlechaParaDisparo(out GameObject prefabParaPreparar) || prefabParaPreparar == null)
             return;
 
-        flechaPreparada = Instantiate(prefabParaPreparar, pontoFlechaAtual.position, pontoFlechaAtual.rotation, pontoFlechaAtual);
+        flechaPreparada = Instantiate(prefabParaPreparar, pontoFlechaAtual.position, pontoFlechaAtual.rotation);
+        escalaMundialFlechaPreparada = flechaPreparada.transform.lossyScale;
+        escalaMundialFlechaPreparadaValida = EscalaValida(escalaMundialFlechaPreparada);
+        diagnosticoEscalaMundialAntesParent = escalaMundialFlechaPreparada;
         GarantirMalhaFlechaVisivel(flechaPreparada);
         AplicarPoseFlechaNoArco(flechaPreparada, pontoFlechaAtual);
 
@@ -2957,8 +3063,42 @@ public class Arco : MonoBehaviour
         if (!cordaSendoPuxada && flechaPreparada == null)
             return;
 
+        PararAudioTensao();
         LimparFlechaPreparada(true);
         ResetarCorda();
+    }
+
+    private void CancelarTiroPorExcessoDePuxada()
+    {
+        if (tiroCanceladoAteSoltarCorda)
+            return;
+
+        maoCanceladaAteSoltarCorda = maoPuxando != null ? maoPuxando : maoCandidataPuxar;
+        tiroCanceladoAteSoltarCorda = true;
+        CancelarPuxadaSemDisparar();
+
+        if (maoCanceladaAteSoltarCorda != null)
+        {
+            maoCandidataPuxar = maoCanceladaAteSoltarCorda;
+            maoCandidataDentroDaArea = true;
+        }
+    }
+
+    private bool MaoCanceladaSoltouCorda()
+    {
+        if (maoCanceladaAteSoltarCorda == null)
+            return true;
+
+        if (!exigirBotaoParaPuxarCorda)
+            return !maoCandidataDentroDaArea;
+
+        return !GripPressionadoParaMao(maoCanceladaAteSoltarCorda);
+    }
+
+    private void LimparBloqueioCancelamentoCorda()
+    {
+        tiroCanceladoAteSoltarCorda = false;
+        maoCanceladaAteSoltarCorda = null;
     }
 
     private void ManterFlechaPreparadaNoPonto()
@@ -2981,11 +3121,21 @@ public class Arco : MonoBehaviour
         Transform pontoPose = pontoVisualFlechaNoArco != null ? pontoVisualFlechaNoArco : pontoFlechaAtual;
         Transform flechaTransform = flecha.transform;
 
-        flechaTransform.SetParent(pontoPose, false);
-        flechaTransform.localPosition = usarOffsetFlechaNoArco ? offsetLocalPosicaoFlechaNoArco : Vector3.zero;
-        flechaTransform.localRotation = usarOffsetFlechaNoArco
+        Vector3 escalaMundialDesejada = escalaMundialFlechaPreparadaValida
+            ? escalaMundialFlechaPreparada
+            : flechaTransform.lossyScale;
+        Vector3 posicaoMundo = pontoPose.TransformPoint(
+            usarOffsetFlechaNoArco ? offsetLocalPosicaoFlechaNoArco : Vector3.zero);
+        Quaternion rotacaoMundo = pontoPose.rotation * (usarOffsetFlechaNoArco
             ? Quaternion.Euler(offsetLocalRotacaoFlechaNoArco)
-            : Quaternion.identity;
+            : Quaternion.identity);
+
+        if (flechaTransform.parent != pontoPose)
+            flechaTransform.SetParent(pontoPose, true);
+
+        flechaTransform.SetPositionAndRotation(posicaoMundo, rotacaoMundo);
+        RestaurarEscalaMundial(flechaTransform, escalaMundialDesejada);
+        diagnosticoEscalaMundialDurantePreparo = flechaTransform.lossyScale;
     }
 
     private void AplicarRotacaoFlechaLancada(Transform flechaTransform, Vector3 direcao, Transform pontoFlechaAtual)
@@ -3321,6 +3471,7 @@ public class Arco : MonoBehaviour
             Destroy(flechaPreparada);
 
         flechaPreparada = null;
+        escalaMundialFlechaPreparadaValida = false;
     }
 
     private void ReativarCollidersDaFlecha(GameObject flecha)
@@ -3328,6 +3479,153 @@ public class Arco : MonoBehaviour
         Collider[] colliders = flecha.GetComponentsInChildren<Collider>(true);
         for (int i = 0; i < colliders.Length; i++)
             colliders[i].enabled = true;
+    }
+
+    private void ConfigurarColisoesIgnoradasDaFlecha(GameObject flecha)
+    {
+        diagnosticoQuantidadeCollidersIgnorados = 0;
+        if (flecha == null)
+            return;
+
+        GameObject donoFlecha = ObterDonoFlecha();
+        Collider[] extras = areaPuxarCorda != null
+            ? new[] { areaPuxarCorda }
+            : Array.Empty<Collider>();
+        Flecha[] componentesFlecha = flecha.GetComponentsInChildren<Flecha>(true);
+
+        for (int i = 0; i < componentesFlecha.Length; i++)
+        {
+            Flecha componenteFlecha = componentesFlecha[i];
+            if (componenteFlecha != null)
+            {
+                diagnosticoQuantidadeCollidersIgnorados += componenteFlecha.ConfigurarColisoesIgnoradas(
+                    gameObject,
+                    donoFlecha,
+                    extras);
+            }
+        }
+    }
+
+    private static void PrepararRigidbodyParaDisparo(GameObject flecha)
+    {
+        if (flecha == null)
+            return;
+
+        Flecha componenteFlecha = flecha.GetComponentInChildren<Flecha>(true);
+        if (componenteFlecha != null)
+        {
+            componenteFlecha.PrepararFisicaParaDisparo(true);
+            return;
+        }
+
+        Rigidbody rb = flecha.GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = flecha.GetComponentInChildren<Rigidbody>();
+
+        if (rb == null)
+            return;
+
+        rb.isKinematic = false;
+        rb.useGravity = true;
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+    }
+
+    private void ValidarSentidoVisualFlecha(GameObject flecha, Vector3 direcao, Transform pontoFlechaAtual)
+    {
+        diagnosticoDirecaoVisualFlecha = Vector3.zero;
+        diagnosticoAnguloEntreDirecoes = 0f;
+
+        if (flecha == null || !VetorValido(direcao) || direcao.sqrMagnitude < 0.000001f)
+            return;
+
+        Flecha componenteFlecha = flecha.GetComponentInChildren<Flecha>(true);
+        if (componenteFlecha == null || !componenteFlecha.TentarObterDirecaoVisual(out Vector3 direcaoVisual))
+            return;
+
+        if (Vector3.Dot(direcaoVisual, direcao) < 0f)
+        {
+            Vector3 eixoCima = pontoFlechaAtual != null ? pontoFlechaAtual.up : transform.up;
+            if (!VetorValido(eixoCima) || eixoCima.sqrMagnitude < 0.000001f)
+                eixoCima = Vector3.up;
+
+            flecha.transform.rotation = Quaternion.AngleAxis(180f, eixoCima.normalized) * flecha.transform.rotation;
+            componenteFlecha.TentarObterDirecaoVisual(out direcaoVisual);
+        }
+
+        diagnosticoDirecaoVisualFlecha = direcaoVisual;
+        diagnosticoAnguloEntreDirecoes = Vector3.Angle(direcao, direcaoVisual);
+    }
+
+    private bool DetectarSobreposicaoComArco(GameObject flecha)
+    {
+        if (flecha == null)
+            return false;
+
+        Collider[] collidersFlecha = flecha.GetComponentsInChildren<Collider>(true);
+        Collider[] collidersArco = GetComponentsInChildren<Collider>(true);
+
+        for (int i = 0; i < collidersFlecha.Length; i++)
+        {
+            Collider colliderFlecha = collidersFlecha[i];
+            if (colliderFlecha == null)
+                continue;
+
+            for (int j = 0; j < collidersArco.Length; j++)
+            {
+                Collider colliderArco = collidersArco[j];
+                if (colliderArco == null || colliderArco.transform.IsChildOf(flecha.transform))
+                    continue;
+
+                if (Physics.ComputePenetration(
+                    colliderFlecha,
+                    colliderFlecha.transform.position,
+                    colliderFlecha.transform.rotation,
+                    colliderArco,
+                    colliderArco.transform.position,
+                    colliderArco.transform.rotation,
+                    out _,
+                    out float distancia) && distancia > 0.000001f)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static void RestaurarEscalaMundial(Transform alvo, Vector3 escalaMundialDesejada)
+    {
+        if (alvo == null || !EscalaValida(escalaMundialDesejada))
+            return;
+
+        for (int tentativa = 0; tentativa < 3; tentativa++)
+        {
+            Vector3 escalaAtual = alvo.lossyScale;
+            if (!EscalaValida(escalaAtual))
+                return;
+
+            Vector3 fatorCorrecao = new Vector3(
+                DividirEscalaSeguro(escalaMundialDesejada.x, escalaAtual.x),
+                DividirEscalaSeguro(escalaMundialDesejada.y, escalaAtual.y),
+                DividirEscalaSeguro(escalaMundialDesejada.z, escalaAtual.z));
+
+            alvo.localScale = Vector3.Scale(alvo.localScale, fatorCorrecao);
+        }
+    }
+
+    private static float DividirEscalaSeguro(float valor, float divisor)
+    {
+        return Mathf.Abs(divisor) > 0.000001f ? valor / divisor : 1f;
+    }
+
+    private static bool EscalaValida(Vector3 escala)
+    {
+        return VetorValido(escala) &&
+               Mathf.Abs(escala.x) > 0.000001f &&
+               Mathf.Abs(escala.y) > 0.000001f &&
+               Mathf.Abs(escala.z) > 0.000001f;
     }
 
     private Transform ObterPontoFlechaAtual()
@@ -3405,34 +3703,34 @@ public class Arco : MonoBehaviour
         Transform pontoFlechaAtual = ObterPontoFlechaAtual();
         Transform pontoDirecaoAtual = ObterPontoDirecaoDisparoAtual();
 
-        origem = pontoFlechaAtual != null ? pontoFlechaAtual.position : transform.position;
+        origem = pontoFlechaAtual != null ? pontoFlechaAtual.position : Vector3.zero;
+        direcao = Vector3.zero;
+        diagnosticoOrigemEDirecaoMesmoTransform = pontoFlechaAtual != null && pontoFlechaAtual == pontoDirecaoAtual;
+        diagnosticoDistanciaOrigemDirecao = pontoFlechaAtual != null && pontoDirecaoAtual != null
+            ? Vector3.Distance(pontoFlechaAtual.position, pontoDirecaoAtual.position)
+            : 0f;
+
+        bool direcaoValida = TentarObterDirecaoDisparo(pontoFlechaAtual, pontoDirecaoAtual, out direcao);
+        diagnosticoDirecaoCalculada = direcaoValida ? direcao : Vector3.zero;
+        return direcaoValida && VetorValido(origem);
+    }
+
+    private static bool TentarObterDirecaoDisparo(
+        Transform origem,
+        Transform pontoDirecao,
+        out Vector3 direcao)
+    {
         direcao = Vector3.zero;
 
-        if (pontoDirecaoAtual != null)
-        {
-            Vector3 direcaoEntrePontos = pontoDirecaoAtual.position - origem;
-            if (direcaoEntrePontos.sqrMagnitude > 0.0001f)
-                direcao = direcaoEntrePontos.normalized;
-            else if (VetorValido(pontoDirecaoAtual.forward) && pontoDirecaoAtual.forward.sqrMagnitude > 0.0001f)
-                direcao = pontoDirecaoAtual.forward.normalized;
-        }
+        if (origem == null || pontoDirecao == null || origem == pontoDirecao)
+            return false;
 
-        if (direcao.sqrMagnitude <= 0.0001f &&
-            pontoFlechaAtual != null &&
-            VetorValido(pontoFlechaAtual.forward) &&
-            pontoFlechaAtual.forward.sqrMagnitude > 0.0001f)
-        {
-            direcao = pontoFlechaAtual.forward.normalized;
-        }
+        Vector3 diferenca = pontoDirecao.position - origem.position;
+        if (!VetorValido(diferenca) || diferenca.sqrMagnitude < 0.000001f)
+            return false;
 
-        if (direcao.sqrMagnitude <= 0.0001f &&
-            VetorValido(transform.forward) &&
-            transform.forward.sqrMagnitude > 0.0001f)
-        {
-            direcao = transform.forward.normalized;
-        }
-
-        return VetorValido(origem) && VetorValido(direcao) && direcao.sqrMagnitude > 0.0001f;
+        direcao = diferenca.normalized;
+        return true;
     }
 
     private void AtualizarDiagnosticoMaoSegurando()
@@ -3449,11 +3747,11 @@ public class Arco : MonoBehaviour
         if (pontoFlechaDireita == null)
             pontoFlechaDireita = EncontrarTransformPorNomes("ponto flecha d", "pontoflechad", "ponto flecha direita", "pontoflechadireita");
 
-        if (pontoDirecaoDisparoEsquerda == null)
-            pontoDirecaoDisparoEsquerda = EncontrarTransformPorNomes("me dis", "medis", "ponto direcao esquerda", "pontodirecaoesquerda", "ponto direcao disparo esquerda", "pontodirecaodisparoesquerda");
+        if (pontoDirecaoDisparoEsquerda == null || pontoDirecaoDisparoEsquerda == pontoFlechaEsquerda)
+            pontoDirecaoDisparoEsquerda = EncontrarTransformPorNomes("ponto direcao disparo e", "me dis", "medis", "ponto direcao esquerda", "pontodirecaoesquerda", "ponto direcao disparo esquerda", "pontodirecaodisparoesquerda");
 
-        if (pontoDirecaoDisparoDireita == null)
-            pontoDirecaoDisparoDireita = EncontrarTransformPorNomes("md dis", "mddis", "ponto direcao direita", "pontodirecaodireita", "ponto direcao disparo direita", "pontodirecaodisparodireita");
+        if (pontoDirecaoDisparoDireita == null || pontoDirecaoDisparoDireita == pontoFlechaDireita)
+            pontoDirecaoDisparoDireita = EncontrarTransformPorNomes("ponto direcao disparo d", "md dis", "mddis", "ponto direcao direita", "pontodirecaodireita", "ponto direcao disparo direita", "pontodirecaodisparodireita");
     }
 
     private Transform EncontrarTransformPorNomes(params string[] nomes)
@@ -3481,7 +3779,7 @@ public class Arco : MonoBehaviour
         if (ObterOrigemEDirecaoDisparo(out _, out Vector3 direcao))
             return direcao;
 
-        return transform.forward;
+        return Vector3.zero;
     }
 
     private float CalcularMultiplicadorDano()
@@ -3667,6 +3965,43 @@ public class Arco : MonoBehaviour
             return;
 
         audioSource.PlayOneShot(clip);
+    }
+
+    private void IniciarAudioTensao()
+    {
+        if (audioTensaoAtivo || somPuxarCorda == null || audioSource == null)
+            return;
+
+        audioTensaoAtivo = true;
+        audioSource.pitch = 1f;
+        audioSource.loop = false;
+        audioSource.clip = null;
+        audioSource.PlayOneShot(somPuxarCorda);
+    }
+
+    private void AtualizarAudioTensao(float percentual)
+    {
+    }
+
+    private void PararAudioTensao()
+    {
+        if (audioSource != null && (audioTensaoAtivo || audioSource.clip == somPuxarCorda))
+        {
+            audioSource.Stop();
+
+            if (audioSource.clip == somPuxarCorda)
+                audioSource.clip = null;
+
+            audioSource.loop = false;
+            audioSource.pitch = 1f;
+        }
+
+        audioTensaoAtivo = false;
+    }
+
+    private void PararTodosAudiosTemporariosDoArco()
+    {
+        PararAudioTensao();
     }
 
     private static bool MaoPertenceAoTransform(Transform mao, Transform alvo)

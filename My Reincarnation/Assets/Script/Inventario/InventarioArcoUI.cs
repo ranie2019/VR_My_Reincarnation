@@ -11,7 +11,17 @@ using UnityEngine.XR.Interaction.Toolkit.UI;
 [DisallowMultipleComponent]
 public class InventarioArcoUI : MonoBehaviour
 {
-    private const string CaminhoConfirmacaoFlechaPrimary2DAxisClick = "<XRController>{RightHand}/{Primary2DAxisClick}";
+    private enum MaoArcoUI
+    {
+        Nenhuma,
+        Esquerda,
+        Direita
+    }
+
+    private const string CaminhoConfirmacaoFlechaPrimaryButtonEsquerdo = "<XRController>{LeftHand}/primaryButton";
+    private const string CaminhoConfirmacaoFlechaPrimaryButtonDireito = "<XRController>{RightHand}/primaryButton";
+    private const string CaminhoConfirmacaoFlechaPrimary2DAxisClickEsquerdo = "<XRController>{LeftHand}/primary2DAxisClick";
+    private const string CaminhoConfirmacaoFlechaPrimary2DAxisClickDireito = "<XRController>{RightHand}/primary2DAxisClick";
 
     [Serializable]
     public class SlotFlechaVisual
@@ -57,12 +67,16 @@ public class InventarioArcoUI : MonoBehaviour
 
     [Header("Entrada")]
     [SerializeField] private InputActionReference acaoAbrirInventarioArco;
+    [SerializeField] private InputActionReference acaoAbrirInventarioArcoMaoEsquerda;
+    [SerializeField] private InputActionReference acaoAbrirInventarioArcoMaoDireita;
     [SerializeField] private bool abrirSomenteComArcoSegurado = true;
     [SerializeField] private bool permitirTeclaXNoEditor = true;
     [SerializeField] private float intervaloMinimoAlternarUI = 0.25f;
 
     [Header("Confirmacao Botao Flecha")]
     [SerializeField] private InputActionReference acaoConfirmarBotaoFlecha;
+    [SerializeField] private InputActionReference acaoConfirmarBotaoFlechaMaoEsquerda;
+    [SerializeField] private InputActionReference acaoConfirmarBotaoFlechaMaoDireita;
     [SerializeField] private bool confirmarBotaoFlechaComAcao = true;
     [SerializeField] private bool usarSelecionadoEventSystemParaBotaoFlecha = true;
     [SerializeField] private float intervaloMinimoConfirmacaoBotaoFlecha = 0.15f;
@@ -97,6 +111,9 @@ public class InventarioArcoUI : MonoBehaviour
     [SerializeField] private string diagnosticoUltimoPreviewCriado;
     [SerializeField] private string diagnosticoUltimoPreviewDestruido;
     [SerializeField] private bool diagnosticoAtualizandoUI;
+    [SerializeField] private string diagnosticoMaoSegurandoArco;
+    [SerializeField] private string diagnosticoMaoLivreArco;
+    [SerializeField] private string diagnosticoUltimaAcaoEntrada;
 
     private readonly List<InventarioFlechas.FlechaInventarioInfo> cacheFlechas =
         new List<InventarioFlechas.FlechaInventarioInfo>();
@@ -106,10 +123,13 @@ public class InventarioArcoUI : MonoBehaviour
     private bool painelAberto;
     private float proximoTempoPodeAlternarUI;
     private Button botaoFlechaEmHover;
-    private InputAction acaoConfirmarBotaoFlechaFallback;
-    private InputAction acaoConfirmarBotaoFlechaAtual;
-    private bool acaoConfirmarBotaoFlechaHabilitadaPorEsteScript;
+    private InputAction acaoAbrirInventarioArcoFallbackEsquerda;
+    private InputAction acaoAbrirInventarioArcoFallbackDireita;
+    private InputAction acaoConfirmarBotaoFlechaFallbackEsquerda;
+    private InputAction acaoConfirmarBotaoFlechaFallbackDireita;
+    private readonly List<InputAction> acoesHabilitadasPorEsteScript = new List<InputAction>();
     private float proximoTempoPodeConfirmarBotaoFlecha;
+    private bool entradaConfirmacaoConsumidaNesteFrame;
 
     private void Awake()
     {
@@ -140,8 +160,13 @@ public class InventarioArcoUI : MonoBehaviour
         diagnosticoBloqueadoPorArcoNaoSegurado = false;
         diagnosticoArcoSegurado = ArcoEstaSegurado(arco);
         diagnosticoConfirmacaoRecebida = false;
+        entradaConfirmacaoConsumidaNesteFrame = false;
+        AtualizarDiagnosticoMaosArco();
 
         AtualizarConfirmacaoBotaoFlecha();
+
+        if (entradaConfirmacaoConsumidaNesteFrame)
+            return;
 
         if (!BotaoAbrirInventarioArcoPressionado())
             return;
@@ -493,8 +518,7 @@ public class InventarioArcoUI : MonoBehaviour
         if (!BotaoFlechaValido(botao))
             return;
 
-        InputAction acaoConfirmar = ObterAcaoConfirmarBotaoFlecha();
-        if (acaoConfirmar == null || !acaoConfirmar.WasPressedThisFrame())
+        if (!BotaoConfirmarFlechaPressionado())
             return;
 
         if (Time.time < proximoTempoPodeConfirmarBotaoFlecha)
@@ -502,6 +526,7 @@ public class InventarioArcoUI : MonoBehaviour
 
         proximoTempoPodeConfirmarBotaoFlecha = Time.time + Mathf.Max(0f, intervaloMinimoConfirmacaoBotaoFlecha);
         diagnosticoConfirmacaoRecebida = true;
+        entradaConfirmacaoConsumidaNesteFrame = true;
         botao.onClick.Invoke();
     }
 
@@ -584,65 +609,227 @@ public class InventarioArcoUI : MonoBehaviour
         hover.Configurar(this, botao, idTipoFlecha);
     }
 
-    private InputAction ObterAcaoConfirmarBotaoFlecha()
+    private bool BotaoConfirmarFlechaPressionado()
     {
-        InputAction acao = acaoConfirmarBotaoFlecha != null && acaoConfirmarBotaoFlecha.action != null
-            ? acaoConfirmarBotaoFlecha.action
-            : ObterAcaoConfirmarBotaoFlechaFallback();
-
-        if (acao == null)
-            return null;
-
-        if (acaoConfirmarBotaoFlechaAtual != acao)
-        {
-            DesabilitarAcaoConfirmarBotaoFlecha();
-            acaoConfirmarBotaoFlechaAtual = acao;
-        }
-
-        if (!acao.enabled)
-        {
-            acao.Enable();
-            acaoConfirmarBotaoFlechaHabilitadaPorEsteScript = true;
-        }
-
-        return acao;
+        return EntradaMaoLivrePressionada(
+            acaoConfirmarBotaoFlechaMaoEsquerda,
+            acaoConfirmarBotaoFlechaMaoDireita,
+            acaoConfirmarBotaoFlecha,
+            ObterAcaoConfirmarBotaoFlechaFallbackEsquerda(),
+            ObterAcaoConfirmarBotaoFlechaFallbackDireita(),
+            "Confirmar flecha"
+        );
     }
 
-    private InputAction ObterAcaoConfirmarBotaoFlechaFallback()
+    private InputAction ObterAcaoAbrirInventarioArcoFallbackEsquerda()
     {
-        if (acaoConfirmarBotaoFlechaFallback != null)
-            return acaoConfirmarBotaoFlechaFallback;
+        if (acaoAbrirInventarioArcoFallbackEsquerda != null)
+            return acaoAbrirInventarioArcoFallbackEsquerda;
 
-        acaoConfirmarBotaoFlechaFallback = new InputAction("Confirmar Botao Flecha", InputActionType.Button);
-        acaoConfirmarBotaoFlechaFallback.AddBinding(CaminhoConfirmacaoFlechaPrimary2DAxisClick);
-        return acaoConfirmarBotaoFlechaFallback;
+        acaoAbrirInventarioArcoFallbackEsquerda = new InputAction("Abrir Inventario Arco Esquerda", InputActionType.Button);
+        acaoAbrirInventarioArcoFallbackEsquerda.AddBinding(CaminhoConfirmacaoFlechaPrimaryButtonEsquerdo);
+        return acaoAbrirInventarioArcoFallbackEsquerda;
+    }
+
+    private InputAction ObterAcaoAbrirInventarioArcoFallbackDireita()
+    {
+        if (acaoAbrirInventarioArcoFallbackDireita != null)
+            return acaoAbrirInventarioArcoFallbackDireita;
+
+        acaoAbrirInventarioArcoFallbackDireita = new InputAction("Abrir Inventario Arco Direita", InputActionType.Button);
+        acaoAbrirInventarioArcoFallbackDireita.AddBinding(CaminhoConfirmacaoFlechaPrimaryButtonDireito);
+        return acaoAbrirInventarioArcoFallbackDireita;
+    }
+
+    private InputAction ObterAcaoConfirmarBotaoFlechaFallbackEsquerda()
+    {
+        if (acaoConfirmarBotaoFlechaFallbackEsquerda != null)
+            return acaoConfirmarBotaoFlechaFallbackEsquerda;
+
+        acaoConfirmarBotaoFlechaFallbackEsquerda = new InputAction("Confirmar Botao Flecha Esquerda", InputActionType.Button);
+        acaoConfirmarBotaoFlechaFallbackEsquerda.AddBinding(CaminhoConfirmacaoFlechaPrimaryButtonEsquerdo);
+        acaoConfirmarBotaoFlechaFallbackEsquerda.AddBinding(CaminhoConfirmacaoFlechaPrimary2DAxisClickEsquerdo);
+        return acaoConfirmarBotaoFlechaFallbackEsquerda;
+    }
+
+    private InputAction ObterAcaoConfirmarBotaoFlechaFallbackDireita()
+    {
+        if (acaoConfirmarBotaoFlechaFallbackDireita != null)
+            return acaoConfirmarBotaoFlechaFallbackDireita;
+
+        acaoConfirmarBotaoFlechaFallbackDireita = new InputAction("Confirmar Botao Flecha Direita", InputActionType.Button);
+        acaoConfirmarBotaoFlechaFallbackDireita.AddBinding(CaminhoConfirmacaoFlechaPrimaryButtonDireito);
+        acaoConfirmarBotaoFlechaFallbackDireita.AddBinding(CaminhoConfirmacaoFlechaPrimary2DAxisClickDireito);
+        return acaoConfirmarBotaoFlechaFallbackDireita;
     }
 
     private void ConfigurarAcaoConfirmarBotaoFlecha()
     {
-        ObterAcaoConfirmarBotaoFlecha();
+        ObterAcaoConfirmarBotaoFlechaFallbackEsquerda();
+        ObterAcaoConfirmarBotaoFlechaFallbackDireita();
     }
 
     private void DesabilitarAcaoConfirmarBotaoFlecha()
     {
-        if (acaoConfirmarBotaoFlechaAtual != null && acaoConfirmarBotaoFlechaHabilitadaPorEsteScript)
-            acaoConfirmarBotaoFlechaAtual.Disable();
+        for (int i = 0; i < acoesHabilitadasPorEsteScript.Count; i++)
+        {
+            InputAction acao = acoesHabilitadasPorEsteScript[i];
+            if (acao != null)
+                acao.Disable();
+        }
 
-        acaoConfirmarBotaoFlechaAtual = null;
-        acaoConfirmarBotaoFlechaHabilitadaPorEsteScript = false;
+        acoesHabilitadasPorEsteScript.Clear();
+    }
+
+    private bool EntradaMaoLivrePressionada(
+        InputActionReference acaoEsquerda,
+        InputActionReference acaoDireita,
+        InputActionReference acaoGenerica,
+        InputAction fallbackEsquerdo,
+        InputAction fallbackDireito,
+        string nomeEntrada)
+    {
+        MaoArcoUI maoLivre = ObterMaoLivreArco(arco);
+
+        if (maoLivre == MaoArcoUI.Esquerda)
+        {
+            return AcaoPressionada(acaoEsquerda, nomeEntrada + " esquerda") ||
+                   (acaoEsquerda == null && AcaoPressionada(acaoGenerica, nomeEntrada + " generica")) ||
+                   AcaoPressionada(fallbackEsquerdo, nomeEntrada + " fallback esquerda");
+        }
+
+        if (maoLivre == MaoArcoUI.Direita)
+        {
+            return AcaoPressionada(acaoDireita, nomeEntrada + " direita") ||
+                   (acaoDireita == null && AcaoPressionada(acaoGenerica, nomeEntrada + " generica")) ||
+                   AcaoPressionada(fallbackDireito, nomeEntrada + " fallback direita");
+        }
+
+        return AcaoPressionada(acaoGenerica, nomeEntrada + " generica") ||
+               AcaoPressionada(acaoEsquerda, nomeEntrada + " esquerda") ||
+               AcaoPressionada(acaoDireita, nomeEntrada + " direita") ||
+               AcaoPressionada(fallbackEsquerdo, nomeEntrada + " fallback esquerda") ||
+               AcaoPressionada(fallbackDireito, nomeEntrada + " fallback direita");
+    }
+
+    private bool EntradaMaoSegurandoPressionada(
+        InputActionReference acaoEsquerda,
+        InputActionReference acaoDireita,
+        InputActionReference acaoGenerica,
+        InputAction fallbackEsquerdo,
+        InputAction fallbackDireito,
+        string nomeEntrada)
+    {
+        MaoArcoUI maoSegurando = ObterMaoSegurandoArco(arco);
+
+        if (maoSegurando == MaoArcoUI.Esquerda)
+        {
+            return AcaoPressionada(acaoEsquerda, nomeEntrada + " esquerda segurando") ||
+                   (acaoEsquerda == null && AcaoPressionada(acaoGenerica, nomeEntrada + " generica")) ||
+                   AcaoPressionada(fallbackEsquerdo, nomeEntrada + " fallback esquerda segurando");
+        }
+
+        if (maoSegurando == MaoArcoUI.Direita)
+        {
+            return AcaoPressionada(acaoDireita, nomeEntrada + " direita segurando") ||
+                   (acaoDireita == null && AcaoPressionada(acaoGenerica, nomeEntrada + " generica")) ||
+                   AcaoPressionada(fallbackDireito, nomeEntrada + " fallback direita segurando");
+        }
+
+        return AcaoPressionada(acaoGenerica, nomeEntrada + " generica") ||
+               AcaoPressionada(acaoEsquerda, nomeEntrada + " esquerda") ||
+               AcaoPressionada(acaoDireita, nomeEntrada + " direita") ||
+               AcaoPressionada(fallbackEsquerdo, nomeEntrada + " fallback esquerda") ||
+               AcaoPressionada(fallbackDireito, nomeEntrada + " fallback direita");
+    }
+
+    private bool AcaoPressionada(InputActionReference referencia, string nomeEntrada)
+    {
+        return referencia != null && AcaoPressionada(referencia.action, nomeEntrada);
+    }
+
+    private bool AcaoPressionada(InputAction acao, string nomeEntrada)
+    {
+        if (acao == null)
+            return false;
+
+        try
+        {
+            GarantirAcaoHabilitada(acao);
+            bool pressionou = acao.WasPressedThisFrame();
+
+            if (pressionou)
+                diagnosticoUltimaAcaoEntrada = nomeEntrada;
+
+            return pressionou;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void GarantirAcaoHabilitada(InputAction acao)
+    {
+        if (acao == null || acao.enabled)
+            return;
+
+        acao.Enable();
+
+        if (!acoesHabilitadasPorEsteScript.Contains(acao))
+            acoesHabilitadasPorEsteScript.Add(acao);
+    }
+
+    private MaoArcoUI ObterMaoSegurandoArco(Arco arcoCandidato)
+    {
+        if (arcoCandidato == null)
+            return MaoArcoUI.Nenhuma;
+
+        ArmaAttachDuasMao attach = arcoCandidato.GetComponent<ArmaAttachDuasMao>();
+        if (attach == null || !attach.ArcoEstaSegurado())
+            return MaoArcoUI.Nenhuma;
+
+        if (attach.EstaSeguradoPelaDireita())
+            return MaoArcoUI.Direita;
+
+        if (attach.EstaSeguradoPelaEsquerda())
+            return MaoArcoUI.Esquerda;
+
+        return MaoArcoUI.Nenhuma;
+    }
+
+    private MaoArcoUI ObterMaoLivreArco(Arco arcoCandidato)
+    {
+        MaoArcoUI maoSegurando = ObterMaoSegurandoArco(arcoCandidato);
+
+        if (maoSegurando == MaoArcoUI.Direita)
+            return MaoArcoUI.Esquerda;
+
+        if (maoSegurando == MaoArcoUI.Esquerda)
+            return MaoArcoUI.Direita;
+
+        return MaoArcoUI.Nenhuma;
+    }
+
+    private void AtualizarDiagnosticoMaosArco()
+    {
+        diagnosticoMaoSegurandoArco = ObterMaoSegurandoArco(arco).ToString();
+        diagnosticoMaoLivreArco = ObterMaoLivreArco(arco).ToString();
     }
 
     private InventarioFlechas.FlechaInventarioInfo ObterInfoParaSlot(SlotFlechaVisual slot, bool[] flechasUsadas)
     {
         if (slot != null && slot.prefabFlecha != null)
         {
+            string idSlot = ObterIdFlechaDoPrefab(slot.prefabFlecha);
+
             for (int i = 0; i < cacheFlechas.Count; i++)
             {
                 InventarioFlechas.FlechaInventarioInfo info = cacheFlechas[i];
                 if (info == null || info.prefabFlecha == null)
                     continue;
 
-                if (info.prefabFlecha == slot.prefabFlecha)
+                if (InfoCorrespondeAoSlot(info, slot.prefabFlecha, idSlot))
                 {
                     if (flechasUsadas != null && i < flechasUsadas.Length)
                         flechasUsadas[i] = true;
@@ -666,6 +853,57 @@ public class InventarioArcoUI : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static bool InfoCorrespondeAoSlot(
+        InventarioFlechas.FlechaInventarioInfo info,
+        GameObject prefabSlot,
+        string idSlot)
+    {
+        if (info == null || prefabSlot == null)
+            return false;
+
+        if (info.prefabFlecha == prefabSlot)
+            return true;
+
+        if (IdsFlechaIguais(info.idTipoFlecha, idSlot))
+            return true;
+
+        if (info.prefabFlecha != null && IdsFlechaIguais(ObterIdFlechaDoPrefab(info.prefabFlecha), idSlot))
+            return true;
+
+        return IdsFlechaIguais(info.nomeExibicao, idSlot);
+    }
+
+    private static string ObterIdFlechaDoPrefab(GameObject prefabFlecha)
+    {
+        if (prefabFlecha == null)
+            return string.Empty;
+
+        ItemInventarioDados dados = prefabFlecha.GetComponent<ItemInventarioDados>();
+        if (dados != null)
+        {
+            string idDados = NormalizarIdFlechaUI(dados.ObterIdTipoFlecha());
+            if (!string.IsNullOrWhiteSpace(idDados))
+                return idDados;
+        }
+
+        return NormalizarIdFlechaUI(prefabFlecha.name);
+    }
+
+    private static bool IdsFlechaIguais(string a, string b)
+    {
+        string idA = NormalizarIdFlechaUI(a);
+        string idB = NormalizarIdFlechaUI(b);
+
+        return !string.IsNullOrWhiteSpace(idA) &&
+               !string.IsNullOrWhiteSpace(idB) &&
+               string.Equals(idA, idB, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizarIdFlechaUI(string id)
+    {
+        return string.IsNullOrWhiteSpace(id) ? string.Empty : SlotInventario.LimparNomeItem(id).Trim();
     }
 
     private void ConfigurarSlotVisual(int indice, InventarioFlechas.FlechaInventarioInfo info)
@@ -868,10 +1106,22 @@ public class InventarioArcoUI : MonoBehaviour
         Rigidbody[] rigidbodies = preview.GetComponentsInChildren<Rigidbody>(true);
         for (int i = 0; i < rigidbodies.Length; i++)
         {
-            if (rigidbodies[i] == null)
+            Rigidbody rb = rigidbodies[i];
+            if (rb == null)
                 continue;
 
-            DestruirComponenteSeguro(rigidbodies[i]);
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                rb.isKinematic = true;
+            }
+
+            if (rb.useGravity)
+                rb.useGravity = false;
+
+            if (rb.detectCollisions)
+                rb.detectCollisions = false;
         }
 
         AudioSource[] audios = preview.GetComponentsInChildren<AudioSource>(true);
@@ -1159,28 +1409,21 @@ public class InventarioArcoUI : MonoBehaviour
 
     private bool BotaoAbrirInventarioArcoPressionado()
     {
-        if (AcaoAbrirInventarioArcoPressionada())
+        if (EntradaMaoSegurandoPressionada(
+                acaoAbrirInventarioArcoMaoEsquerda,
+                acaoAbrirInventarioArcoMaoDireita,
+                acaoAbrirInventarioArco,
+                ObterAcaoAbrirInventarioArcoFallbackEsquerda(),
+                ObterAcaoAbrirInventarioArcoFallbackDireita(),
+                "Abrir inventario arco"))
+        {
             return true;
+        }
 
         return permitirTeclaXNoEditor &&
                Application.isEditor &&
                Keyboard.current != null &&
                Keyboard.current.xKey.wasPressedThisFrame;
-    }
-
-    private bool AcaoAbrirInventarioArcoPressionada()
-    {
-        if (acaoAbrirInventarioArco == null || acaoAbrirInventarioArco.action == null)
-            return false;
-
-        try
-        {
-            return acaoAbrirInventarioArco.action.WasPressedThisFrame();
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private Arco ObterArcoPermitidoParaAbrir()

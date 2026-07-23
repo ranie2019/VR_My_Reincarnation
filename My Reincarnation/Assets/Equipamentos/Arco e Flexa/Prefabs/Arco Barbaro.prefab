@@ -56,7 +56,7 @@ Transform:
   m_GameObject: {fileID: 375970892164908845}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -0.286, y: 0, z: -0.027}
+  m_LocalPosition: {x: -0.286, y: 0.077000044, z: -0.027}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -128,7 +128,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.0093354, y: -42.56}
+  m_AnchoredPosition: {x: 0.0093354, y: -28}
   m_SizeDelta: {x: 100.01, y: 14.87}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3318874681129858301
@@ -231,6 +231,68 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &910000000000000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000000000000002}
+  m_Layer: 0
+  m_Name: Ponto Direcao Disparo D
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &910000000000000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0.014, y: 0.077000044, z: -0.027}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3595557804323297469}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+--- !u!1 &910000000000000003
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000000000000004}
+  m_Layer: 0
+  m_Name: Ponto Direcao Disparo E
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &910000000000000004
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000003}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0.014, y: 0.07, z: 0.03}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3595557804323297469}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
 --- !u!1 &934949184696495841
 GameObject:
   m_ObjectHideFlags: 0
@@ -296,7 +358,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.0093354, y: -42.56}
+  m_AnchoredPosition: {x: 0.0093354, y: -28.2}
   m_SizeDelta: {x: 100.01, y: 14.87}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7019358355018550264
@@ -611,7 +673,7 @@ GameObject:
   - component: {fileID: 3218650878113083}
   - component: {fileID: 5488804442129439247}
   m_Layer: 5
-  m_Name: Button
+  m_Name: Button Activate
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -634,7 +696,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -62}
+  m_AnchoredPosition: {x: 0, y: -47.4}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &9117426262814152016
@@ -718,7 +780,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 3218650878113083}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: 
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &1993078525590842167
 GameObject:
   m_ObjectHideFlags: 0
@@ -897,7 +971,7 @@ Transform:
   m_GameObject: {fileID: 3092441105066320302}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0.013, y: 0, z: -0.043}
+  m_LocalPosition: {x: 0.013, y: 0.036, z: -0.043}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1211,7 +1285,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 518.847, y: 1.636, z: -399.81082}
-  m_LocalScale: {x: 0.8, y: 0.8, z: 0.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8322027587816081060}
@@ -1225,6 +1299,8 @@ Transform:
   - {fileID: 6696059741224164724}
   - {fileID: 1896173737533665204}
   - {fileID: 780970811467327460}
+  - {fileID: 910000000000000002}
+  - {fileID: 910000000000000004}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &9076613703498871574
@@ -1351,7 +1427,7 @@ MonoBehaviour:
   m_SmoothRotation: 0
   m_SmoothRotationAmount: 8
   m_TightenRotation: 0.1
-  m_TrackScale: 1
+  m_TrackScale: 0
   m_SmoothScale: 0
   m_SmoothScaleAmount: 8
   m_TightenScale: 0.1
@@ -1531,9 +1607,20 @@ MonoBehaviour:
   offsetLocalRotacaoFlechaNoArco: {x: 90, y: 0, z: 0}
   usarPontosDisparoPorMao: 1
   pontoFlechaDireita: {fileID: 5494059146350295244}
-  pontoDirecaoDisparoDireita: {fileID: 5494059146350295244}
+  pontoDirecaoDisparoDireita: {fileID: 910000000000000002}
   pontoFlechaEsquerda: {fileID: 3617313692936946288}
-  pontoDirecaoDisparoEsquerda: {fileID: 3617313692936946288}
+  pontoDirecaoDisparoEsquerda: {fileID: 910000000000000004}
+  diagnosticoOrigemEDirecaoMesmoTransform: 0
+  diagnosticoDistanciaOrigemDirecao: 0
+  diagnosticoDirecaoCalculada: {x: 0, y: 0, z: 0}
+  diagnosticoDirecaoVisualFlecha: {x: 0, y: 0, z: 0}
+  diagnosticoAnguloEntreDirecoes: 0
+  diagnosticoEscalaMundialAntesParent: {x: 0, y: 0, z: 0}
+  diagnosticoEscalaMundialDurantePreparo: {x: 0, y: 0, z: 0}
+  diagnosticoEscalaMundialAposDisparo: {x: 0, y: 0, z: 0}
+  diagnosticoQuantidadeCollidersIgnorados: 0
+  diagnosticoColliderSobrepondoArcoAntesDisparo: 0
+  diagnosticoUltimoMotivoCancelamentoDisparo: 
   usarMiraArco: 1
   tipoMiraArco: 2
   linhaMiraTrajetoria: {fileID: 0}
@@ -1625,6 +1712,8 @@ MonoBehaviour:
   somPuxarCorda: {fileID: 8300000, guid: 690fc563d7b085b4aa0f0e8aea06f263, type: 3}
   somSoltarFlecha: {fileID: 8300000, guid: 6cf6f4902194c3f45b4815dd54e3e918, type: 3}
   audioSource: {fileID: 584573056670765057}
+  audioTensaoAtivo: 0
+  tiroCanceladoAteSoltarCorda: 0
 --- !u!114 &8240472254943696805
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1692,29 +1781,75 @@ MonoBehaviour:
   arco: {fileID: 2122807168095672204}
   conteudoSlots: {fileID: 3595557804323297469}
   modeloSlotFlecha: {fileID: 9028362611957824186}
+  spritePadraoFlecha: {fileID: 0}
   slotsFlechas:
   - raiz: {fileID: 9028362611957824186}
     prefabFlecha: {fileID: 8264137675185652934, guid: 87a7691b577e73842977fe43683577b1, type: 3}
     imagemFlecha: {fileID: 4140238677258231443}
     textoQuantidade: {fileID: 2618315932043055666}
     botaoAtivar: {fileID: 5488804442129439247}
+    pontoPreviewPrefab: {fileID: 0}
   - raiz: {fileID: 7593807455343636968}
     prefabFlecha: {fileID: 299104432121230754, guid: 96711372ac71aa94d8ef04b40e9445f9, type: 3}
     imagemFlecha: {fileID: 4042057140583065960}
     textoQuantidade: {fileID: 1886003127137371428}
     botaoAtivar: {fileID: 7476404688470978264}
+    pontoPreviewPrefab: {fileID: 0}
   criarSlotsAutomaticamente: 1
   ocultarSlotsSemFlecha: 1
-  acaoAbrirInventarioArco: {fileID: -3599823989380923159, guid: b6d5c44ebe3244b7692e81ae8265eb22, type: 3}
+  usarPreviewPrefab3D: 1
+  posicaoLocalPreviewPrefab: {x: 0, y: 18, z: 0}
+  rotacaoLocalPreviewPrefab: {x: 0, y: 0, z: 0}
+  escalaBasePreviewPrefab: 1
+  ocupacaoPreviewPrefabNoSlot: 0.95
+  deslocamentoFrentePreviewPrefab: -0.03
+  aumentarEspessuraPreviewFlecha: 1
+  multiplicadorEscalaPreviewFlecha: 1.8
+  escalaNaoUniformePreviewFlecha: {x: 1.6, y: 1.6, z: 1}
+  usarEscalaNaoUniformePreviewFlecha: 0
+  rotacaoExtraPreviewFlecha: {x: 0, y: 0, z: 0}
+  acaoAbrirInventarioArco: {fileID: -5982496924579745919, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  acaoAbrirInventarioArcoMaoEsquerda: {fileID: -5982496924579745919, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  acaoAbrirInventarioArcoMaoDireita: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   abrirSomenteComArcoSegurado: 1
   permitirTeclaXNoEditor: 1
-  intervaloMinimoAlternarUI: 0.25
+  intervaloMinimoAlternarUI: 0.1
+  acaoConfirmarBotaoFlecha: {fileID: 0}
+  acaoConfirmarBotaoFlechaMaoEsquerda: {fileID: 0}
+  acaoConfirmarBotaoFlechaMaoDireita: {fileID: 0}
+  confirmarBotaoFlechaComAcao: 1
+  usarSelecionadoEventSystemParaBotaoFlecha: 1
+  intervaloMinimoConfirmacaoBotaoFlecha: 0.15
   desativarFisicaDaUI: 1
   diagnosticoLinhasPreenchidas: 0
   diagnosticoSlotsVisuaisDisponiveis: 0
   diagnosticoTiposFlechaEncontrados: 0
   diagnosticoPainelAberto: 0
+  diagnosticoArcoSegurado: 0
+  diagnosticoInputRecebido: 0
+  diagnosticoBloqueadoPorArcoNaoSegurado: 0
   diagnosticoFlechaAtivaNaUI: 
+  diagnosticoUltimaFlechaAtivada: 
+  diagnosticoUltimoBotaoAtivado: 
+  diagnosticoUltimoCliqueRecebido: 0
+  diagnosticoBotaoFlechaEmHover: 0
+  diagnosticoIdFlechaEmHover: 
+  diagnosticoConfirmacaoRecebida: 0
+  diagnosticoBotaoRecebeuPointerEnter: 0
+  diagnosticoBotaoRecebeuPointerClick: 0
+  diagnosticoCanvasTemGraphicRaycaster: 0
+  diagnosticoCanvasTemTrackedDeviceRaycaster: 0
+  diagnosticoTrackedDeviceRaycasterAdicionado: 0
+  diagnosticoCanvasRaycastXR: 
+  diagnosticoComponentesFisicaUIDesativados: 0
+  diagnosticoQuantidadePreviewsAtivos: 0
+  diagnosticoUltimaEscalaPreview: {x: 0, y: 0, z: 0}
+  diagnosticoUltimoPreviewCriado: 
+  diagnosticoUltimoPreviewDestruido: 
+  diagnosticoAtualizandoUI: 0
+  diagnosticoMaoSegurandoArco: 
+  diagnosticoMaoLivreArco: 
+  diagnosticoUltimaAcaoEntrada: 
 --- !u!82 &584573056670765057
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1837,7 +1972,7 @@ Transform:
   m_GameObject: {fileID: 4263245469348567990}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: -0.061}
+  m_LocalPosition: {x: -0.02, y: -0.05, z: -0.03}
   m_LocalScale: {x: 0.69213974, y: 0.6921397, z: 0.69213974}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2072,7 +2207,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -27.267456, y: 0, z: 0}
-  m_LocalScale: {x: 16.255667, y: 16.255667, z: 16.255667}
+  m_LocalScale: {x: 11.561843, y: 11.561843, z: 11.561843}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8322027587816081060}
@@ -2239,7 +2374,7 @@ Transform:
   m_GameObject: {fileID: 5988495088500364403}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: 0.079}
+  m_LocalPosition: {x: -0.02, y: -0.05, z: 0.03}
   m_LocalScale: {x: 0.69213974, y: 0.6921397, z: 0.69213974}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2270,7 +2405,7 @@ Transform:
   m_GameObject: {fileID: 6044583787689858362}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -0.286, y: 0, z: 0.03}
+  m_LocalPosition: {x: -0.286, y: 0.07, z: 0.03}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2289,7 +2424,7 @@ GameObject:
   - component: {fileID: 8968821552905807450}
   - component: {fileID: 7476404688470978264}
   m_Layer: 5
-  m_Name: Button
+  m_Name: Button Activate
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2312,7 +2447,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -62}
+  m_AnchoredPosition: {x: 0, y: -47.4}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8529107418094245732
@@ -2498,8 +2633,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 64, y: 0}
-  m_SizeDelta: {x: 100, y: 100}
+  m_AnchoredPosition: {x: 64, y: -10.78}
+  m_SizeDelta: {x: 100, y: 70.67}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3150448012091744360
 CanvasRenderer:
@@ -2522,7 +2657,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2735,8 +2870,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 100, y: 100}
+  m_AnchoredPosition: {x: 0, y: -10.68}
+  m_SizeDelta: {x: 100, y: 70.92}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6335026781288682790
 CanvasRenderer:
@@ -2759,7 +2894,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

@@ -4,6 +4,7 @@ using System;
 public class PlayerSaveData
 {
     public string sceneName;
+    public bool playerTransformSalvo;
     public float posX;
     public float posY;
     public float posZ;
@@ -12,6 +13,7 @@ public class PlayerSaveData
     public float rotZ;
     public int level;
     public int xp;
+    public int experienciaParaProximoNivel;
     public int vidaAtual;
     public int vidaMaxima;
     public int manaAtual;

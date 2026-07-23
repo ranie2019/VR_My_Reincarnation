@@ -27,6 +27,9 @@ public class ArmaAttachDuasMao : XRGrabInteractable
     [SerializeField] private Transform interactorMaoSegurando;
     [SerializeField] private Transform interactorMaoLivreParaPuxar;
 
+    private bool animacaoPegadaAtiva;
+    private bool animacaoPegadaDireita;
+
     protected override void Awake()
     {
         base.Awake();
@@ -147,6 +150,13 @@ public class ArmaAttachDuasMao : XRGrabInteractable
         return ladoMao != LadoMao.Desconhecida;
     }
 
+    public bool DetectarSeTransformEhMaoDireitaOuEsquerda(Transform mao, out bool maoDireita)
+    {
+        LadoMao ladoMao = DetectarLadoMao(mao);
+        maoDireita = ladoMao == LadoMao.Direita;
+        return ladoMao != LadoMao.Desconhecida;
+    }
+
     public bool EstaSeguradoPelaDireita()
     {
         return arcoEstaSegurado && seguradoPelaMaoDireita;
@@ -210,6 +220,7 @@ public class ArmaAttachDuasMao : XRGrabInteractable
         seguradoPelaMaoDireita = ladoMao == LadoMao.Direita;
         seguradoPelaMaoEsquerda = ladoMao == LadoMao.Esquerda;
         interactorMaoLivreParaPuxar = ObterReferenciaMaoOposta(ladoMao);
+        AtivarAnimacaoPegada(ladoMao == LadoMao.Direita);
     }
 
     private Transform ObterReferenciaMaoOposta(LadoMao ladoMaoSegurando)
@@ -411,11 +422,32 @@ public class ArmaAttachDuasMao : XRGrabInteractable
 
     private void LimparEstadoDuasMaos()
     {
+        DesativarAnimacaoPegada();
         seguradoPelaMaoDireita = false;
         seguradoPelaMaoEsquerda = false;
         arcoEstaSegurado = false;
         interactorMaoSegurando = null;
         interactorMaoLivreParaPuxar = null;
+    }
+
+    private void AtivarAnimacaoPegada(bool maoDireita)
+    {
+        if (animacaoPegadaAtiva && animacaoPegadaDireita == maoDireita)
+            return;
+
+        DesativarAnimacaoPegada();
+        animacaoPegadaDireita = maoDireita;
+        animacaoPegadaAtiva = true;
+        AnimacaoPegadaMaoVR.NotificarPegada(animacaoPegadaDireita, true);
+    }
+
+    private void DesativarAnimacaoPegada()
+    {
+        if (!animacaoPegadaAtiva)
+            return;
+
+        AnimacaoPegadaMaoVR.NotificarPegada(animacaoPegadaDireita, false);
+        animacaoPegadaAtiva = false;
     }
 
     private static string NormalizarNome(string nome)
