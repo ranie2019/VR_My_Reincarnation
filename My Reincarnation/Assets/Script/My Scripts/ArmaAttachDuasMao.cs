@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Attachment;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
@@ -41,6 +42,21 @@ public class ArmaAttachDuasMao : XRGrabInteractable
     {
         base.Reset();
         ConfigurarComportamentoBase();
+    }
+
+    private void OnValidate()
+    {
+        ConfigurarComportamentoBase();
+    }
+
+    protected override void OnSelectEntering(SelectEnterEventArgs args)
+    {
+        base.OnSelectEntering(args);
+
+        // Somente a primeira mão que segura move o arco. A mão oposta que
+        // manipula a corda continua sendo controlada exclusivamente por Arco.cs.
+        if (!arcoEstaSegurado && InteractorEhMao(args.interactorObject))
+            EncaixarImediatamenteNaMao(args.interactorObject);
     }
 
     protected override void OnSelectEntered(SelectEnterEventArgs args)
@@ -237,8 +253,28 @@ public class ArmaAttachDuasMao : XRGrabInteractable
     private void ConfigurarComportamentoBase()
     {
         useDynamicAttach = false;
+        attachEaseInTime = 0f;
+        farAttachMode = InteractableFarAttachMode.Near;
         selectMode = InteractableSelectMode.Multiple;
         throwOnDetach = false;
+    }
+
+    private void EncaixarImediatamenteNaMao(IXRSelectInteractor interactor)
+    {
+        if (interactor == null)
+            return;
+
+        Transform pontoObjeto = GetAttachTransform(interactor);
+        Transform pontoInteractor = interactor.GetAttachTransform(this);
+        if (pontoObjeto == null || pontoInteractor == null)
+            return;
+
+        Quaternion deltaRotacao = pontoInteractor.rotation * Quaternion.Inverse(pontoObjeto.rotation);
+        Quaternion rotacaoObjeto = deltaRotacao * transform.rotation;
+        transform.rotation = rotacaoObjeto;
+
+        Vector3 posicaoObjeto = transform.position + (pontoInteractor.position - pontoObjeto.position);
+        transform.SetPositionAndRotation(posicaoObjeto, rotacaoObjeto);
     }
 
     private void DefinirModoInventarioArco(bool noInventario)

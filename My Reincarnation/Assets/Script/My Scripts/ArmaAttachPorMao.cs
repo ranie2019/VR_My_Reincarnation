@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Attachment;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
@@ -15,14 +16,33 @@ public class ArmaAttachPorMao : XRGrabInteractable
     protected override void Awake()
     {
         base.Awake();
-        useDynamicAttach = false;
+        ConfigurarEncaixeImediato();
         CorrigirParentInteractableAutoReferencia();
+    }
+
+    protected override void Reset()
+    {
+        base.Reset();
+        ConfigurarEncaixeImediato();
+    }
+
+    private void OnValidate()
+    {
+        ConfigurarEncaixeImediato();
     }
 
     protected override void OnEnable()
     {
         CorrigirParentInteractableAutoReferencia();
         base.OnEnable();
+    }
+
+    protected override void OnSelectEntering(SelectEnterEventArgs args)
+    {
+        base.OnSelectEntering(args);
+
+        if (TentarDetectarLadoMao(args.interactorObject, out _))
+            EncaixarImediatamenteNaMao(args.interactorObject);
     }
 
     protected override void OnSelectEntered(SelectEnterEventArgs args)
@@ -116,6 +136,40 @@ public class ArmaAttachPorMao : XRGrabInteractable
         }
 
         return false;
+    }
+
+    private void ConfigurarEncaixeImediato()
+    {
+        // O ponto de pegada configurado no objeto deve ir direto ao attach da mão.
+        // Qualquer valor maior que zero faz o XR Grab Interactable interpolar a
+        // posição e a rotação desde o local distante até o controle.
+        useDynamicAttach = false;
+        attachEaseInTime = 0f;
+
+        // O Ray Interactor do jogador usa Force Grab desativado. Sem esta
+        // sobrescrita, ele move o próprio attach para o ponto atingido pelo raio
+        // e mantém a arma flutuando longe da mão.
+        farAttachMode = InteractableFarAttachMode.Near;
+    }
+
+    private void EncaixarImediatamenteNaMao(IXRSelectInteractor interactor)
+    {
+        if (interactor == null)
+            return;
+
+        Transform pontoObjeto = GetAttachTransform(interactor);
+        Transform pontoInteractor = interactor.GetAttachTransform(this);
+        if (pontoObjeto == null || pontoInteractor == null)
+            return;
+
+        // Primeiro iguala a rotação dos pontos de attach. Depois da rotação,
+        // recalcula a posição do ponto do objeto e elimina o deslocamento restante.
+        Quaternion deltaRotacao = pontoInteractor.rotation * Quaternion.Inverse(pontoObjeto.rotation);
+        Quaternion rotacaoObjeto = deltaRotacao * transform.rotation;
+        transform.rotation = rotacaoObjeto;
+
+        Vector3 posicaoObjeto = transform.position + (pontoInteractor.position - pontoObjeto.position);
+        transform.SetPositionAndRotation(posicaoObjeto, rotacaoObjeto);
     }
 
     private void LiberarAnimacoesAtivas()
