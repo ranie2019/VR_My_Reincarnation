@@ -839,6 +839,7 @@ GameObject:
   - component: {fileID: 1767256376856078143}
   - component: {fileID: 4132037270735385768}
   - component: {fileID: 840754252412632060}
+  - component: {fileID: 2876797342863584126}
   - component: {fileID: 1973030117582879867}
   m_Layer: 0
   m_Name: Picareta Velha
@@ -857,7 +858,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.70647013, y: 0.029998938, z: 0.029998938, w: 0.70647013}
   m_LocalPosition: {x: -0.68966, y: 0.46203, z: -0.51083}
-  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_LocalScale: {x: 0.44073573, y: 0.44073573, z: 0.4407357}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8888197224428401843}
@@ -1055,6 +1056,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioDados
   nomeItem: Picareta Velha
   prefabParaStack: {fileID: 8988177790854952263}
+  ehFlecha: 0
+  idTipoFlecha: 
+  prefabFlechaParaDisparo: {fileID: 0}
+  iconeFlecha: {fileID: 0}
+  nomeExibicaoFlecha: 
 --- !u!114 &840754252412632060
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1068,7 +1074,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Picareta
   danoPicareta: 1
-  impactForce: 0
+  impactForce: 2
   vidaMaxima: 20
   vidaAtual: 20
   desgastePorUso: 1
@@ -1094,6 +1100,29 @@ MonoBehaviour:
   volumeOutros: 1
   volumeQuebra: 1
   cooldownSomColisao: 0.1
+--- !u!114 &2876797342863584126
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8988177790854952263}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  itemId: Picareta Velha
+  nomeItem: Picareta Velha
+  prefabReferencia: {fileID: 8988177790854952263}
+  salvarNoInventario: 1
+  usarNomeDoObjetoSeIdVazio: 1
+  destruirOriginalAoCarregarSeEstiverNoInventario: 1
+  estaNoInventario: 0
+  salvarQuandoSoltoNaCena: 1
+  instanciaId: 
+  durabilidadeAtual: -1
+  dadosExtrasJson: 
 --- !u!82 &1973030117582879867
 AudioSource:
   m_ObjectHideFlags: 0
