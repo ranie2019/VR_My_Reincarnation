@@ -320,6 +320,9 @@ GameObject:
   - component: {fileID: 2812359729815196352}
   - component: {fileID: 3618016488420300564}
   - component: {fileID: 2612904831811311811}
+  - component: {fileID: 2699859328289283654}
+  - component: {fileID: 1928348148200784889}
+  - component: {fileID: 1384963512634809333}
   m_Layer: 5
   m_Name: Button Activate
   m_TagString: Untagged
@@ -428,19 +431,118 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 3618016488420300564}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: 
-        m_MethodName: 
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
+--- !u!65 &2699859328289283654
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1290433760649857001}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 159.44496, y: 26.557991, z: 2.598717}
+  m_Center: {x: -0.36602265, y: 0.46740064, z: -0.58361024}
+--- !u!114 &1928348148200784889
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1290433760649857001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a35f6cfbfba9b548aaa00d52cfe8a50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable
+  m_InteractionManager: {fileID: 0}
+  m_Colliders:
+  - {fileID: 2699859328289283654}
+  m_InteractionLayers:
+    m_Bits: 1
+  m_DistanceCalculationMode: 1
+  m_SelectMode: 0
+  m_FocusMode: 1
+  m_CustomReticle: {fileID: 0}
+  m_AllowGazeInteraction: 0
+  m_AllowGazeSelect: 0
+  m_OverrideGazeTimeToSelect: 0
+  m_GazeTimeToSelect: 0.5
+  m_OverrideTimeToAutoDeselectGaze: 0
+  m_TimeToAutoDeselectGaze: 3
+  m_AllowGazeAssistance: 0
+  m_FirstHoverEntered:
+    m_PersistentCalls:
+      m_Calls: []
+  m_LastHoverExited:
+    m_PersistentCalls:
+      m_Calls: []
+  m_HoverEntered:
+    m_PersistentCalls:
+      m_Calls: []
+  m_HoverExited:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FirstSelectEntered:
+    m_PersistentCalls:
+      m_Calls: []
+  m_LastSelectExited:
+    m_PersistentCalls:
+      m_Calls: []
+  m_SelectEntered:
+    m_PersistentCalls:
+      m_Calls: []
+  m_SelectExited:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FirstFocusEntered:
+    m_PersistentCalls:
+      m_Calls: []
+  m_LastFocusExited:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FocusEntered:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FocusExited:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Activated:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Deactivated:
+    m_PersistentCalls:
+      m_Calls: []
+  m_StartingHoverFilters: []
+  m_StartingSelectFilters: []
+  m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 592138004642725840}
+--- !u!114 &1384963512634809333
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1290433760649857001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4fdda954e7910a4bb9cb8f8f6e266c1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BotaoEquipar
+  equiparArmadura: {fileID: 1618013731050769609}
+  acaoConfirmarMaoEsquerda: {fileID: -5982496924579745919, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  acaoConfirmarMaoDireita: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!1 &1587609163791906711
 GameObject:
   m_ObjectHideFlags: 0
@@ -614,7 +716,7 @@ GameObject:
   - component: {fileID: 8230495252919362711}
   - component: {fileID: 7412142395320965448}
   - component: {fileID: 8577255727307088457}
-  - component: {fileID: 5386654901234437214}
+  - component: {fileID: 1618013731050769609}
   m_Layer: 0
   m_Name: Luva Medieval E
   m_TagString: Untagged
@@ -632,7 +734,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0.7071068, w: 0}
   m_LocalPosition: {x: 517.269, y: 1.002, z: -398.434}
-  m_LocalScale: {x: 0.2109589, y: 0.2109589, z: 0.2109589}
+  m_LocalScale: {x: 0.21095909, y: 0.210959, z: 0.210959}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6974375422349339019}
@@ -700,7 +802,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArmaAttachPorMao
   m_InteractionManager: {fileID: 0}
-  m_Colliders: []
+  m_Colliders:
+  - {fileID: 3458859974574350587}
   m_InteractionLayers:
     m_Bits: 1
   m_DistanceCalculationMode: 1
@@ -760,7 +863,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 0}
+  m_ParentInteractableObject: {fileID: 592138004642725840}
   m_AttachTransform: {fileID: 3409141429932358650}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -874,7 +977,7 @@ MonoBehaviour:
   instanciaId: 
   durabilidadeAtual: -1
   dadosExtrasJson: 
---- !u!114 &5386654901234437214
+--- !u!114 &1618013731050769609
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -883,9 +986,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 2595310052120142144}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2cf316853c79e684b9b2f1fabc01d8ff, type: 3}
+  m_Script: {fileID: 11500000, guid: 087613a00cfd7ed428214d1b8af6760b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EquiparArmadura
+  popupInfo: {fileID: 5418489189404554386}
+  tempoParaFecharPopup: 10
+  luvaVisual: {fileID: 2595310052120142144}
+  rendererMaoAvatar: {fileID: 5853591281552534480}
+  transformMaoAvatar: {fileID: 0}
 --- !u!1 &3182391559044368116
 GameObject:
   m_ObjectHideFlags: 0
@@ -1268,8 +1376,8 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5418489189404554386}
   m_LocalRotation: {x: 0.5, y: -0.5, z: -0.5, w: 0.5}
-  m_LocalPosition: {x: 0, y: 0, z: 0.45}
-  m_LocalScale: {x: 0.013940654, y: 0.023761053, z: 0.05973158}
+  m_LocalPosition: {x: 0, y: 0, z: 1.64}
+  m_LocalScale: {x: 0.036860403, y: 0.03387237, z: 0.085149854}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 9113890292308636514}
@@ -1278,7 +1386,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: -0.76}
+  m_AnchoredPosition: {x: 0, y: -1.41}
   m_SizeDelta: {x: 1, y: 1}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &7614943313020713755

@@ -137,7 +137,7 @@ public class SlimeIA : MonoBehaviour, IDano
     [SerializeField] private float volumeMorrer = 1f;
 
     [Header("Componentes opcionais")]
-    [SerializeField] private Animator animator;
+    [SerializeField] private SlimeAnimacao animacao;
     [SerializeField] private Rigidbody rb;
     [SerializeField] private bool usarNavMeshAgent = true;
     private NavMeshAgent agent;
@@ -146,20 +146,6 @@ public class SlimeIA : MonoBehaviour, IDano
     private const float VelocidadeRotacao = 8f;
     private const float IntervaloBuscaPlayer = 0.35f;
     private const BindingFlags FlagsMembrosDano = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-
-    private static readonly int AndarHash = Animator.StringToHash("Andar");
-    private static readonly int DanoHash = Animator.StringToHash("Dano");
-    private static readonly int MorrerHash = Animator.StringToHash("Morrer");
-    private static readonly int ObservaHash = Animator.StringToHash("Observa");
-    private static readonly int AtacarHash = Animator.StringToHash("Atacar");
-    private static readonly int PerseguirHash = Animator.StringToHash("Perseguir");
-    private static readonly int AlertaHash = Animator.StringToHash("Alerta");
-    private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
-    private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
-    private static readonly int IsDeadHash = Animator.StringToHash("IsDead");
-    private static readonly int AttackHash = Animator.StringToHash("Attack");
-    private static readonly int HitHash = Animator.StringToHash("Hit");
-    private static readonly int DieHash = Animator.StringToHash("Die");
 
     private EstadoSlime estadoAtual = EstadoSlime.Parado;
     private EstadoSlime estadoAntesDano = EstadoSlime.Parado;
@@ -176,19 +162,7 @@ public class SlimeIA : MonoBehaviour, IDano
     private bool agentUpdatePositionAntesInvestida;
     private bool somAndarTocando;
     private bool somMorteTocado;
-    private bool temAndar;
-    private bool temDano;
-    private bool temMorrer;
-    private bool temObserva;
-    private bool temAtacar;
-    private bool temPerseguir;
-    private bool temAlerta;
-    private bool temIsMoving;
-    private bool temIsRunning;
-    private bool temIsDead;
-    private bool temAttack;
-    private bool temHit;
-    private bool temDie;
+
     private bool morto;
     private bool experienciaJaEntregue;
     private bool recompensaReinJaPaga;
@@ -235,8 +209,8 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void Awake()
     {
-        if (animator == null)
-            animator = GetComponentInChildren<Animator>();
+        if (animacao == null)
+            animacao = GetComponent<SlimeAnimacao>();
 
         if (rb == null)
             rb = GetComponent<Rigidbody>();
@@ -262,8 +236,6 @@ public class SlimeIA : MonoBehaviour, IDano
             agent.updateRotation = false;
             agent.speed = velocidadePatrulha;
         }
-
-        AtualizarCacheParametrosAnimator();
     }
 
     private void OnEnable()
@@ -447,8 +419,6 @@ public class SlimeIA : MonoBehaviour, IDano
             Morrer();
             return;
         }
-
-        SetTriggerSeguro(HitHash, temHit);
 
         if (rotinaDano != null)
             StopCoroutine(rotinaDano);
@@ -914,7 +884,6 @@ public class SlimeIA : MonoBehaviour, IDano
 
         proximoAtaque = Time.time + cooldownAtaque;
         TocarSomUmaVez(somAtacar, volumeAtacar);
-        SetTriggerSeguro(AttackHash, temAttack);
 
         if (rotinaInvestidaAtaque != null)
             StopCoroutine(rotinaInvestidaAtaque);
@@ -1655,72 +1624,42 @@ public class SlimeIA : MonoBehaviour, IDano
         AtualizarAudioPorEstado();
     }
 
+    // ---------------------------------------------------------------
+    // Animacao: cada estado chama exatamente 1 metodo do SlimeAnimacao.
+    // Esse script (SlimeIA) nao mexe mais no Animator diretamente.
+    // ---------------------------------------------------------------
     private void AtualizarAnimatorPorEstado()
     {
+        if (animacao == null)
+            return;
+
         switch (estadoAtual)
         {
             case EstadoSlime.Patrulhando:
-                AtualizarAnimator(true, false, false, false, false, false, false, true, false, false);
+                animacao.AnimarPatrulhando();
                 break;
             case EstadoSlime.Observando:
-                AtualizarAnimator(false, true, false, false, false, false, false, false, false, false);
+                animacao.AnimarObservando();
                 break;
             case EstadoSlime.Alerta:
-                AtualizarAnimator(false, false, true, false, false, false, false, false, false, false);
+                animacao.AnimarAlerta();
                 break;
             case EstadoSlime.Perseguindo:
-                AtualizarAnimator(true, false, false, true, false, false, false, true, true, false);
+                animacao.AnimarPerseguindo();
                 break;
             case EstadoSlime.Atacando:
-                AtualizarAnimator(false, false, false, true, true, false, false, false, false, false);
+                animacao.AnimarAtacando();
                 break;
             case EstadoSlime.TomandoDano:
-                AtualizarAnimator(false, false, false, false, false, true, false, false, false, false);
+                animacao.AnimarTomandoDano();
                 break;
             case EstadoSlime.Morto:
-                AtualizarAnimator(false, false, false, false, false, false, true, false, false, true);
-                SetTriggerSeguro(DieHash, temDie);
+                animacao.AnimarMorto();
                 break;
             default:
-                AtualizarAnimator(false, false, false, false, false, false, false, false, false, false);
+                animacao.AnimarParado();
                 break;
         }
-    }
-
-    private void AtualizarAnimator(
-        bool andar,
-        bool observa,
-        bool alerta,
-        bool perseguir,
-        bool atacar,
-        bool dano,
-        bool morrer,
-        bool isMoving,
-        bool isRunning,
-        bool isDead)
-    {
-        SetBoolSeguro(AndarHash, temAndar, andar);
-        SetBoolSeguro(ObservaHash, temObserva, observa);
-        SetBoolSeguro(AlertaHash, temAlerta, alerta);
-        SetBoolSeguro(PerseguirHash, temPerseguir, perseguir);
-        SetBoolSeguro(AtacarHash, temAtacar, atacar);
-        SetBoolSeguro(DanoHash, temDano, dano);
-        SetBoolSeguro(MorrerHash, temMorrer, morrer);
-        SetBoolSeguro(IsMovingHash, temIsMoving, isMoving);
-        SetBoolSeguro(IsRunningHash, temIsRunning, isRunning);
-        SetBoolSeguro(IsDeadHash, temIsDead, isDead);
-    }
-
-    private void SetBoolSeguro(int hash, bool existeParametro, bool valor)
-    {
-        if (animator != null && existeParametro)
-            animator.SetBool(hash, valor);
-    }
-
-    private void SetTriggerSeguro(int hash, bool existeParametro)
-    {
-        if (animator != null && existeParametro)
-            animator.SetTrigger(hash);
     }
 
     private void AtualizarAudioPorEstado()
@@ -1812,10 +1751,6 @@ public class SlimeIA : MonoBehaviour, IDano
                 transform.position,
                 transform.rotation,
                 pontosPatrulha);
-        }
-        else
-        {
-            { }
         }
 
         if (esconderCanvasAoMorrer && canvasVida != null)
@@ -2170,58 +2105,6 @@ public class SlimeIA : MonoBehaviour, IDano
         return Vector3.Distance(a, b);
     }
 
-    private void AtualizarCacheParametrosAnimator()
-    {
-        temAndar = false;
-        temDano = false;
-        temMorrer = false;
-        temObserva = false;
-        temAtacar = false;
-        temPerseguir = false;
-        temAlerta = false;
-        temIsMoving = false;
-        temIsRunning = false;
-        temIsDead = false;
-        temAttack = false;
-        temHit = false;
-        temDie = false;
-
-        if (animator == null)
-            return;
-
-        AnimatorControllerParameter[] parametros = animator.parameters;
-        for (int i = 0; i < parametros.Length; i++)
-        {
-            AnimatorControllerParameter parametro = parametros[i];
-
-            if (parametro.nameHash == AndarHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temAndar = true;
-            else if (parametro.nameHash == DanoHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temDano = true;
-            else if (parametro.nameHash == MorrerHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temMorrer = true;
-            else if (parametro.nameHash == ObservaHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temObserva = true;
-            else if (parametro.nameHash == AtacarHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temAtacar = true;
-            else if (parametro.nameHash == PerseguirHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temPerseguir = true;
-            else if (parametro.nameHash == AlertaHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temAlerta = true;
-            else if (parametro.nameHash == IsMovingHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temIsMoving = true;
-            else if (parametro.nameHash == IsRunningHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temIsRunning = true;
-            else if (parametro.nameHash == IsDeadHash && parametro.type == AnimatorControllerParameterType.Bool)
-                temIsDead = true;
-            else if (parametro.nameHash == AttackHash && parametro.type == AnimatorControllerParameterType.Trigger)
-                temAttack = true;
-            else if (parametro.nameHash == HitHash && parametro.type == AnimatorControllerParameterType.Trigger)
-                temHit = true;
-            else if (parametro.nameHash == DieHash && parametro.type == AnimatorControllerParameterType.Trigger)
-                temDie = true;
-        }
-    }
     public void ReiniciarAposRespawn()
     {
         morto = false;
@@ -2282,7 +2165,8 @@ public class SlimeIA : MonoBehaviour, IDano
             }
         }
 
-        AtualizarCacheParametrosAnimator();
+        if (animacao != null)
+            animacao.AtualizarCacheParametros();
 
         if (QuantidadePontosValidos() == 0 && gerarPontosAutomaticamente)
             GerarPontosDePatrulhaAutomaticos();
