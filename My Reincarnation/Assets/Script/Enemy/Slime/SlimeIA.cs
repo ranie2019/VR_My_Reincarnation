@@ -168,6 +168,7 @@ public class SlimeIA : MonoBehaviour, IDano
     private bool recompensaReinJaPaga;
     private Transform ultimoPlayerResponsavel;
     private ExperienciaInimigo experienciaInimigo;
+    private GerenciadorMissoes gerenciadorMissoes;
     private static readonly string[] NomesMembrosDano =
     {
         "dano",
@@ -225,8 +226,7 @@ public class SlimeIA : MonoBehaviour, IDano
             audioSource = GetComponent<AudioSource>();
 
         experienciaInimigo = GetComponent<ExperienciaInimigo>();
-
-        vidaMaxima = Mathf.Max(1, vidaMaxima);
+        gerenciadorMissoes = FindFirstObjectByType<GerenciadorMissoes>();
         vidaAtual = Mathf.Clamp(vidaAtual <= 0 ? vidaMaxima : vidaAtual, 1, vidaMaxima);
         ConfigurarUIVida();
         AtualizarBarraVida();
@@ -1742,6 +1742,7 @@ public class SlimeIA : MonoBehaviour, IDano
         TocarSomMorrer();
         EntregarExperienciaAoMorrer();
         PagarRecompensaReinAoPrimeiroAtacante();
+        NotificarMissaoDeMorte();
         SpawnarPrefabsNormais();
         SpawnarPrefabsMissao();
         if (RespawnMonstro.Instancia != null)
@@ -1771,6 +1772,20 @@ public class SlimeIA : MonoBehaviour, IDano
 
         if (experienciaInimigo != null)
             experienciaInimigo.EntregarExperiencia();
+    }
+
+    /// <summary>
+    /// Avisa o GerenciadorMissoes que este inimigo morreu, para o progresso
+    /// de uma missao do tipo "MatarInimigos" avancar (ex: 5/10 -> 6/10).
+    /// Usa o mesmo idRespawnMonstro ja usado pelo sistema de respawn.
+    /// </summary>
+    private void NotificarMissaoDeMorte()
+    {
+        if (gerenciadorMissoes == null)
+            gerenciadorMissoes = FindFirstObjectByType<GerenciadorMissoes>();
+
+        if (gerenciadorMissoes != null)
+            gerenciadorMissoes.NotificarInimigoMorto(idRespawnMonstro);
     }
 
     private void PagarRecompensaReinAoPrimeiroAtacante()
