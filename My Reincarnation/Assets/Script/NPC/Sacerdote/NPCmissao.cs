@@ -9,7 +9,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 [RequireComponent(typeof(XRSimpleInteractable))]
 public class NPCMissao : MonoBehaviour
 {
-    [Tooltip("Se vazio, tenta encontrar automaticamente na cena.")]
+    [Tooltip("Arraste o GerenciadorMissoes DESTE NPC (Ferreiro ou Sacerdote). NÃO deixe vazio.")]
     [SerializeField] private GerenciadorMissoes gerenciador;
 
     private XRSimpleInteractable interactable;
@@ -18,8 +18,9 @@ public class NPCMissao : MonoBehaviour
     {
         interactable = GetComponent<XRSimpleInteractable>();
 
+        // Removido o FindFirstObjectByType para evitar pegar o gerenciador errado
         if (gerenciador == null)
-            gerenciador = FindFirstObjectByType<GerenciadorMissoes>();
+            Debug.LogWarning($"{gameObject.name}: GerenciadorMissoes não foi atribuído no Inspector!");
     }
 
     private void OnEnable()

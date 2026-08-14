@@ -4,11 +4,11 @@ using UnityEngine;
 /// <summary>
 /// Fica no Player (Canvas de missões).
 /// Mostra o progresso da missão ativa.
-/// 
+///
 /// O painel só fica visível enquanto houver missão:
 /// - Em andamento (EmAndamento)
 /// - Ou pronta para entregar (ProntaParaEntregar)
-/// 
+///
 /// Só some quando a missão for entregue no NPC.
 /// </summary>
 public class PlayerMissoes : MonoBehaviour
@@ -21,7 +21,7 @@ public class PlayerMissoes : MonoBehaviour
     [Tooltip("Título fixo (ex: MISSIONS). Não precisa ser preenchido pelo script.")]
     [SerializeField] private TMP_Text missaoTitulo;
 
-    [Tooltip("Descrição do que precisa ser feito (ex: Eliminate 10 green slimes).")]
+    [Tooltip("Descrição do que precisa ser feito (ex: Colete 10 madeiras).")]
     [SerializeField] private TMP_Text missaoTexto;
 
     [Tooltip("Valor atual do progresso (ex: 5).")]
@@ -30,46 +30,25 @@ public class PlayerMissoes : MonoBehaviour
     [Tooltip("Valor final necessário (ex: 10).")]
     [SerializeField] private TMP_Text missaoValorFinal;
 
-    [Header("Referência")]
-    [Tooltip("Se vazio, tenta encontrar automaticamente na cena.")]
-    [SerializeField] private GerenciadorMissoes gerenciador;
-
     private GerenciadorMissoes.MissaoDados missaoAtiva;
+    private GerenciadorMissoes gerenciadorAtual;
 
     private void Awake()
     {
-        if (gerenciador == null)
-            gerenciador = FindFirstObjectByType<GerenciadorMissoes>();
-
-        // Começa sempre desativado
         Esconder();
-    }
-
-    private void OnEnable()
-    {
-        if (gerenciador != null)
-        {
-            gerenciador.OnProgressoAtualizado += OnProgressoAtualizado;
-            gerenciador.OnMissaoProntaParaEntregar += OnMissaoProntaParaEntregar;
-        }
     }
 
     private void OnDisable()
     {
-        if (gerenciador != null)
-        {
-            gerenciador.OnProgressoAtualizado -= OnProgressoAtualizado;
-            gerenciador.OnMissaoProntaParaEntregar -= OnMissaoProntaParaEntregar;
-        }
+        DesinscreverDoGerenciadorAtual();
     }
 
     // =========================================================
-    //  API PÚBLICA (chamada pelo GerenciadorMissoes)
+    // API PÚBLICA (chamada pelo GerenciadorMissoes)
     // =========================================================
 
     /// <summary>
     /// Chamado quando o jogador ACEITA uma missão.
-    /// Ativa o painel e mostra os dados.
     /// </summary>
     public void MostrarMissao(GerenciadorMissoes.MissaoDados missao)
     {
@@ -84,8 +63,31 @@ public class PlayerMissoes : MonoBehaviour
     }
 
     /// <summary>
-    /// Atualiza o progresso (ex: 5/10).
-    /// Mantém o painel ativo.
+    /// Versão recomendada: registra o gerenciador de origem (Ferreiro/Sacerdote).
+    /// </summary>
+    public void MostrarMissao(GerenciadorMissoes.MissaoDados missao, GerenciadorMissoes origem)
+    {
+        if (missao == null) return;
+
+        DesinscreverDoGerenciadorAtual();
+
+        gerenciadorAtual = origem;
+        missaoAtiva = missao;
+
+        if (gerenciadorAtual != null)
+        {
+            gerenciadorAtual.OnProgressoAtualizado += OnProgressoAtualizado;
+            gerenciadorAtual.OnMissaoProntaParaEntregar += OnMissaoProntaParaEntregar;
+        }
+
+        if (painelMissoes != null)
+            painelMissoes.SetActive(true);
+
+        AtualizarUI(missao);
+    }
+
+    /// <summary>
+    /// Atualiza o progresso (ex: 5/10). Mantém o painel ativo.
     /// </summary>
     public void AtualizarProgresso(GerenciadorMissoes.MissaoDados missao)
     {
@@ -93,7 +95,6 @@ public class PlayerMissoes : MonoBehaviour
 
         missaoAtiva = missao;
 
-        // Garante que está visível
         if (painelMissoes != null && !painelMissoes.activeSelf)
             painelMissoes.SetActive(true);
 
@@ -101,8 +102,8 @@ public class PlayerMissoes : MonoBehaviour
     }
 
     /// <summary>
-    /// Chamado quando chega em 10/10.
-    /// O painel CONTINUA visível (só muda o texto).
+    /// Chamado quando chega no objetivo (ex: 10/10).
+    /// O painel CONTINUA visível.
     /// </summary>
     public void MostrarMissaoCompleta(GerenciadorMissoes.MissaoDados missao)
     {
@@ -114,17 +115,14 @@ public class PlayerMissoes : MonoBehaviour
             painelMissoes.SetActive(true);
 
         AtualizarUI(missao);
-
-        if (missaoTexto != null)
-            missaoTexto.text = GetDescricaoMissao(missao);
     }
 
     /// <summary>
     /// Só é chamado quando a missão é ENTREGUE no NPC.
-    /// Aí sim o painel some.
     /// </summary>
     public void Esconder()
     {
+        DesinscreverDoGerenciadorAtual();
         missaoAtiva = null;
 
         if (painelMissoes != null)
@@ -132,24 +130,33 @@ public class PlayerMissoes : MonoBehaviour
     }
 
     // =========================================================
-    //  LÓGICA INTERNA
+    // LÓGICA INTERNA
     // =========================================================
 
     private void AtualizarUI(GerenciadorMissoes.MissaoDados missao)
     {
+        if (missao == null) return;
+
         if (missaoTexto != null)
             missaoTexto.text = GetDescricaoMissao(missao);
 
+        // Trava visual no máximo da missão (nunca 20/10)
+        int atual = Mathf.Clamp(missao.quantidadeAtualObjetivo, 0, Mathf.Max(1, missao.quantidadeAlvo));
+        int final = Mathf.Max(1, missao.quantidadeAlvo);
+
         if (missaoValorAtual != null)
-            missaoValorAtual.text = missao.quantidadeAtualObjetivo.ToString();
+            missaoValorAtual.text = atual.ToString();
 
         if (missaoValorFinal != null)
-            missaoValorFinal.text = missao.quantidadeAlvo.ToString();
+            missaoValorFinal.text = final.ToString();
     }
 
     private string GetDescricaoMissao(GerenciadorMissoes.MissaoDados missao)
     {
         if (missao == null) return "";
+
+        if (!string.IsNullOrWhiteSpace(missao.enunciadoMissao))
+            return missao.enunciadoMissao.Trim();
 
         switch (missao.tipoObjetivo)
         {
@@ -176,8 +183,18 @@ public class PlayerMissoes : MonoBehaviour
         return $"Colete {missao.quantidadeAlvo} {nomeItem}.";
     }
 
+    private void DesinscreverDoGerenciadorAtual()
+    {
+        if (gerenciadorAtual != null)
+        {
+            gerenciadorAtual.OnProgressoAtualizado -= OnProgressoAtualizado;
+            gerenciadorAtual.OnMissaoProntaParaEntregar -= OnMissaoProntaParaEntregar;
+            gerenciadorAtual = null;
+        }
+    }
+
     // =========================================================
-    //  EVENTOS DO GERENCIADOR
+    // EVENTOS DO GERENCIADOR
     // =========================================================
 
     private void OnProgressoAtualizado(GerenciadorMissoes.MissaoDados missao)

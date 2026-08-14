@@ -5,11 +5,13 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
 /// Ativa um popup de interação quando o laser do controle VR (XR Ray Interactor)
-/// passa sobre o NPC. O popup contém um botão para abrir o inventário do NPC
-/// e um botão X para fechar.
+/// passa sobre o NPC. O popup contém um botão "Yes" que abre o Inventário do
+/// Ferreiro, e um botão X para fechar.
 ///
-/// O botão "Yes" só é confirmado quando o laser está em hover sobre ele
-/// E o botão do controle é pressionado (mesmo padrão usado no InventarioArcoUI).
+/// O botão "Yes" é filho do Canvas popup, então aparece automaticamente
+/// junto com o popup - não depende de nenhuma função estar associada a ele.
+/// A confirmação (hover + botão do controle) só decide QUANDO a ação de
+/// abrir o inventário acontece.
 /// </summary>
 [RequireComponent(typeof(XRSimpleInteractable))]
 public class NPCPopup : MonoBehaviour
@@ -29,9 +31,6 @@ public class NPCPopup : MonoBehaviour
     [SerializeField] private InputActionReference acaoConfirmarMaoDireita;
 
     [Header("Configurações")]
-    [Tooltip("Se marcado, o popup fecha automaticamente quando o laser sair do NPC.")]
-    [SerializeField] private bool fecharAoTirarLaser = false;
-
     [Tooltip("Tempo (em segundos) sem interação até o popup/inventário fecharem sozinhos.")]
     [SerializeField] private float tempoParaFecharPorInatividade = 30f;
 
@@ -43,11 +42,9 @@ public class NPCPopup : MonoBehaviour
     {
         interactable = GetComponent<XRSimpleInteractable>();
 
-        // Garante que o popup começa fechado
         if (popupCanvas != null)
             popupCanvas.SetActive(false);
 
-        // Garante que o inventário começa fechado
         if (inventarioFerreiroCanvas != null)
             inventarioFerreiroCanvas.SetActive(false);
     }
@@ -56,11 +53,16 @@ public class NPCPopup : MonoBehaviour
     {
         interactable.hoverEntered.AddListener(OnHoverEntered);
 
-        if (fecharAoTirarLaser)
-            interactable.hoverExited.AddListener(OnHoverExited);
-
         HabilitarAcao(acaoConfirmarMaoEsquerda);
         HabilitarAcao(acaoConfirmarMaoDireita);
+    }
+
+    private void OnDisable()
+    {
+        interactable.hoverEntered.RemoveListener(OnHoverEntered);
+
+        DesabilitarAcao(acaoConfirmarMaoEsquerda);
+        DesabilitarAcao(acaoConfirmarMaoDireita);
     }
 
     private static void HabilitarAcao(InputActionReference acaoRef)
@@ -73,17 +75,6 @@ public class NPCPopup : MonoBehaviour
     {
         if (acaoRef != null && acaoRef.action != null)
             acaoRef.action.Disable();
-    }
-
-    private void OnDisable()
-    {
-        interactable.hoverEntered.RemoveListener(OnHoverEntered);
-
-        if (fecharAoTirarLaser)
-            interactable.hoverExited.RemoveListener(OnHoverExited);
-
-        DesabilitarAcao(acaoConfirmarMaoEsquerda);
-        DesabilitarAcao(acaoConfirmarMaoDireita);
     }
 
     private void Update()
@@ -104,14 +95,6 @@ public class NPCPopup : MonoBehaviour
             FecharPopup();
     }
 
-    /// <summary>
-    /// Reseta o contador de inatividade do popup.
-    /// </summary>
-    public void RegistrarInteracaoPopup()
-    {
-        ultimaInteracaoPopup = Time.time;
-    }
-
     private void VerificarConfirmacaoBotaoYes()
     {
         if (!botaoYesEmHover)
@@ -120,13 +103,9 @@ public class NPCPopup : MonoBehaviour
         if (!BotaoConfirmarPressionado())
             return;
 
-        Debug.Log("[NPCPopup] Botão do controle pressionado com Yes em hover. Abrindo inventário...");
         AbrirInventario();
     }
 
-    /// <summary>
-    /// Retorna true se a mão esquerda ou a mão direita apertou o botão neste frame.
-    /// </summary>
     private bool BotaoConfirmarPressionado()
     {
         return AcaoFoiPressionada(acaoConfirmarMaoEsquerda) ||
@@ -158,28 +137,33 @@ public class NPCPopup : MonoBehaviour
 
     private void OnHoverEntered(HoverEnterEventArgs args)
     {
+        Debug.Log("[NPCPopup] Hover ENTROU no NPC. PopupAtivo antes: " + (popupCanvas != null && popupCanvas.activeSelf) +
+                   " | InventarioAtivo: " + InventarioEstaAberto());
         AbrirPopup();
-    }
-
-    private void OnHoverExited(HoverExitEventArgs args)
-    {
-        FecharPopup();
     }
 
     /// <summary>
     /// Abre o popup de interação com o NPC.
-    /// Não abre se o Inventário do Ferreiro já estiver ativo,
-    /// já que a função do popup é justamente abrir o inventário.
+    /// Não abre se o Inventário do Ferreiro já estiver ativo.
     /// </summary>
     public void AbrirPopup()
     {
         if (InventarioEstaAberto())
+        {
+            Debug.Log("[NPCPopup] AbrirPopup bloqueado: inventário ainda está ativo.");
             return;
+        }
 
         if (popupCanvas != null && !popupCanvas.activeSelf)
         {
             popupCanvas.SetActive(true);
             ultimaInteracaoPopup = Time.time;
+            Debug.Log("[NPCPopup] Popup ABERTO com sucesso.");
+        }
+        else
+        {
+            Debug.Log("[NPCPopup] Popup NÃO abriu. popupCanvas nulo? " + (popupCanvas == null) +
+                       " | já estava ativo? " + (popupCanvas != null && popupCanvas.activeSelf));
         }
     }
 
@@ -194,9 +178,7 @@ public class NPCPopup : MonoBehaviour
     public void FecharPopup()
     {
         if (popupCanvas != null && popupCanvas.activeSelf)
-        {
             popupCanvas.SetActive(false);
-        }
     }
 
     /// <summary>
@@ -205,9 +187,7 @@ public class NPCPopup : MonoBehaviour
     public void FecharInventario()
     {
         if (inventarioFerreiroCanvas != null && inventarioFerreiroCanvas.activeSelf)
-        {
             inventarioFerreiroCanvas.SetActive(false);
-        }
     }
 
     /// <summary>
