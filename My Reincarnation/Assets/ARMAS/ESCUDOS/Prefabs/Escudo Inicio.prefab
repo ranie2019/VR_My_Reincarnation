@@ -500,7 +500,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7661520030272131054}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -0.152}
   m_LocalScale: {x: 0.0042707855, y: 0.0042707855, z: 0.0042707855}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -511,7 +511,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: -0.798}
+  m_AnchoredPosition: {x: 0, y: -0.912}
   m_SizeDelta: {x: 100, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &2255316635257767167
@@ -590,9 +590,9 @@ GameObject:
   - component: {fileID: 1262660137644786128}
   - component: {fileID: 36848688782219482}
   - component: {fileID: 5945468085483426744}
-  - component: {fileID: 2444878456059821949}
   - component: {fileID: 6787994697900642961}
   - component: {fileID: 1746247114421675742}
+  - component: {fileID: 3984518498057254786}
   m_Layer: 0
   m_Name: Escudo Inicio
   m_TagString: Shield
@@ -811,40 +811,6 @@ MonoBehaviour:
   prefabFlechaParaDisparo: {fileID: 0}
   iconeFlecha: {fileID: 0}
   nomeExibicaoFlecha: 
---- !u!114 &2444878456059821949
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8483617478726453246}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5e31541b43394f4485ece6d426dafbe4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Escudo
-  vidaMaxima: 50
-  vidaAtual: 50
-  desgastePorBloqueio: 1
-  destruirQuandoVidaZerar: 1
-  textoValorAtual: {fileID: 1541123251029359212}
-  textoValorTotal: {fileID: 2559074995590840896}
-  corTextoA: {r: 1, g: 1, b: 1, a: 1}
-  corTextoB: {r: 0, g: 1, b: 1, a: 1}
-  velocidadePiscarTexto: 2
-  usarEfeitoLedTexto: 1
-  tagsQueDesgastamEscudo:
-  - Player
-  - Enemy
-  - Shield
-  - Sword
-  cooldownBloqueioMesmoObjeto: 0.25
-  tempoIgnorarDonoAposSoltar: 1
-  audioSource: {fileID: 6787994697900642961}
-  somBloqueio: {fileID: 8300000, guid: c01c7924b3cc3324aa79f6362974198f, type: 3}
-  somQuebrar: {fileID: 8300000, guid: e32e7100b0e8a594c8621a124e54048e, type: 3}
-  volumeBloqueio: 1
-  volumeQuebrar: 1
 --- !u!82 &6787994697900642961
 AudioSource:
   m_ObjectHideFlags: 0
@@ -965,6 +931,48 @@ MonoBehaviour:
   instanciaId: 
   durabilidadeAtual: -1
   dadosExtrasJson: 
+--- !u!114 &3984518498057254786
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8483617478726453246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21889104873fca54e98d9998234bcada, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Equipamento
+  tipo: 1
+  dano: 0
+  desgastePorDanoCausado: 1
+  tagsAlvoDano: []
+  cooldownDanoMesmoAlvo: 0.35
+  desgastePorBloqueio: 1
+  tagsQueDesgastamEscudo:
+  - Player
+  - Enemy
+  - Shield
+  - Sword
+  cooldownBloqueioMesmoObjeto: 0.25
+  vidaMaxima: 50
+  vidaAtual: 50
+  destruirQuandoVidaZerar: 1
+  textoValorAtual: {fileID: 1541123251029359212}
+  textoValorTotal: {fileID: 2559074995590840896}
+  corTextoA: {r: 1, g: 1, b: 1, a: 1}
+  corTextoB: {r: 0, g: 1, b: 1, a: 1}
+  velocidadePiscarTexto: 2
+  usarEfeitoLedTexto: 1
+  tempoIgnorarDonoAposSoltar: 1
+  audioSource: {fileID: 6787994697900642961}
+  somHit: {fileID: 8300000, guid: c01c7924b3cc3324aa79f6362974198f, type: 3}
+  somBloqueio: {fileID: 8300000, guid: e32e7100b0e8a594c8621a124e54048e, type: 3}
+  somQuebra: {fileID: 8300000, guid: e32e7100b0e8a594c8621a124e54048e, type: 3}
+  volumeHit: 1
+  volumeBloqueio: 1
+  volumeQuebra: 1
+  cooldownSomHit: 0.1
 --- !u!1001 &5868990132079703304
 PrefabInstance:
   m_ObjectHideFlags: 0

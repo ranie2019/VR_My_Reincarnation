@@ -13,10 +13,10 @@ GameObject:
   - component: {fileID: 7459788205906904487}
   - component: {fileID: 8588500975516845211}
   - component: {fileID: 8285459134019189034}
-  - component: {fileID: 4144142715800307485}
   - component: {fileID: 5878194417373095737}
   - component: {fileID: 4539714163934924368}
   - component: {fileID: 1239165292001847223}
+  - component: {fileID: 1895932690691688262}
   m_Layer: 0
   m_Name: Espada Longa
   m_TagString: Sword
@@ -694,7 +694,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 100
+  m_text: 50
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -965,9 +965,6 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 7163977760659707580, guid: 7fd2ae74fe89d3b43ae6824630fee408, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 4144142715800307485}
-    - targetCorrespondingSourceObject: {fileID: 7163977760659707580, guid: 7fd2ae74fe89d3b43ae6824630fee408, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 5878194417373095737}
     - targetCorrespondingSourceObject: {fileID: 7163977760659707580, guid: 7fd2ae74fe89d3b43ae6824630fee408, type: 3}
       insertIndex: -1
@@ -975,48 +972,13 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7163977760659707580, guid: 7fd2ae74fe89d3b43ae6824630fee408, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1239165292001847223}
+    - targetCorrespondingSourceObject: {fileID: 7163977760659707580, guid: 7fd2ae74fe89d3b43ae6824630fee408, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1895932690691688262}
     - targetCorrespondingSourceObject: {fileID: 4864522880415462193, guid: 7fd2ae74fe89d3b43ae6824630fee408, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5595285236161564089}
   m_SourcePrefab: {fileID: 100100000, guid: 7fd2ae74fe89d3b43ae6824630fee408, type: 3}
---- !u!114 &4144142715800307485
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 100000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0c3d50f62979452195e3e45e3994e9a7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Espada
-  danoEspada: 3
-  vidaMaxima: 100
-  vidaAtual: 100
-  desgastePorDanoCausado: 1
-  destruirQuandoVidaZerar: 1
-  textoValorAtual: {fileID: 3992647576844428801}
-  textoValorTotal: {fileID: 3341260386906412385}
-  corTextoA: {r: 1, g: 1, b: 1, a: 1}
-  corTextoB: {r: 0, g: 1, b: 1, a: 1}
-  velocidadePiscarTexto: 2
-  usarEfeitoLedTexto: 1
-  tagsAlvoDano:
-  - Player
-  - Shield
-  - Enemy
-  - Tree
-  - Rock
-  - Sword
-  cooldownDanoMesmoAlvo: 0.35
-  tempoIgnorarDonoAposSoltar: 1
-  audioSource: {fileID: 5878194417373095737}
-  somHit: {fileID: 8300000, guid: ec32f34594aae0342a933f0d794cb5db, type: 3}
-  somQuebra: {fileID: 8300000, guid: d425ba79c04329647a6a592fb4caa7e2, type: 3}
-  volumeHit: 1
-  volumeQuebra: 1
-  cooldownSomHit: 0.1
 --- !u!82 &5878194417373095737
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1159,6 +1121,50 @@ MonoBehaviour:
   mirarEsquerdaAtiva: 0
   statusMaoDireita: 
   statusMaoEsquerda: 
+--- !u!114 &1895932690691688262
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21889104873fca54e98d9998234bcada, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Equipamento
+  tipo: 0
+  dano: 3
+  desgastePorDanoCausado: 1
+  tagsAlvoDano:
+  - Player
+  - Shield
+  - Enemy
+  - Tree
+  - Rock
+  - Sword
+  cooldownDanoMesmoAlvo: 0.35
+  desgastePorBloqueio: 1
+  tagsQueDesgastamEscudo: []
+  cooldownBloqueioMesmoObjeto: 0.25
+  vidaMaxima: 100
+  vidaAtual: 50
+  destruirQuandoVidaZerar: 1
+  textoValorAtual: {fileID: 3992647576844428801}
+  textoValorTotal: {fileID: 3341260386906412385}
+  corTextoA: {r: 1, g: 1, b: 1, a: 1}
+  corTextoB: {r: 0, g: 1, b: 1, a: 1}
+  velocidadePiscarTexto: 2
+  usarEfeitoLedTexto: 1
+  tempoIgnorarDonoAposSoltar: 130
+  audioSource: {fileID: 5878194417373095737}
+  somHit: {fileID: 8300000, guid: ec32f34594aae0342a933f0d794cb5db, type: 3}
+  somBloqueio: {fileID: 8300000, guid: ec32f34594aae0342a933f0d794cb5db, type: 3}
+  somQuebra: {fileID: 8300000, guid: d425ba79c04329647a6a592fb4caa7e2, type: 3}
+  volumeHit: 1
+  volumeBloqueio: 1
+  volumeQuebra: 1
+  cooldownSomHit: 0.1
 --- !u!64 &5595285236161564089
 MeshCollider:
   m_ObjectHideFlags: 0

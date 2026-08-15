@@ -5,6 +5,12 @@ using System.Globalization;
 using TMPro;
 using UnityEngine;
 
+/// <summary>
+/// Cérebro do sistema de missões.
+///
+/// NotificarHoverNPC() é chamado pelo clique no botão "Missao"
+/// (BotaoMissao → Ao Confirmar), não pelo hover do NPC.
+/// </summary>
 public class GerenciadorMissoes : MonoBehaviour
 {
     public enum TipoObjetivo
@@ -77,7 +83,6 @@ public class GerenciadorMissoes : MonoBehaviour
     [SerializeField] private GameObject[] objetosExtrasParaFecharAoAceitar;
 
     [Header("Atualizacao automatica (coleta)")]
-    [Tooltip("A cada quantos segundos relê o inventário em missões de coleta.")]
     [SerializeField] private float intervaloChecagemInventario = 0.25f;
 
     public event Action<MissaoDados> OnProgressoAtualizado;
@@ -88,6 +93,7 @@ public class GerenciadorMissoes : MonoBehaviour
     private Coroutine rotinaDialogo;
     private Coroutine rotinaTimerInatividade;
     private float proximaChecagemInventario;
+    private InventarioVR inventarioJogadorCache;
 
     private void Awake()
     {
@@ -107,6 +113,73 @@ public class GerenciadorMissoes : MonoBehaviour
         ConferirInventarioEAtualizarSeMudou(missao);
     }
 
+    // =========================================================
+    // ABRIR / FECHAR (botão Missão)
+    // =========================================================
+
+    /// <summary>
+    /// Chamado pelo clique no botão "Missao".
+    /// Auto-corretivo: se canvasAtivoNoMomento aponta para um Canvas
+    /// já desativado por fora, limpa a referência e segue o fluxo.
+    /// </summary>
+    public void NotificarHoverNPC()
+    {
+        // Só bloqueia se REALMENTE tem algo aberto na tela
+        if (canvasAtivoNoMomento != null && canvasAtivoNoMomento.activeInHierarchy)
+            return;
+
+        // Estava preso ou não havia nada — reseta e continua
+        canvasAtivoNoMomento = null;
+
+        MissaoDados missaoAtual = ObterMissaoAtual();
+        if (missaoAtual == null)
+            return;
+
+        switch (missaoAtual.estado)
+        {
+            case EstadoMissao.NaoIniciada:
+                MostrarDialogo(missaoAtual);
+                break;
+
+            case EstadoMissao.EmAndamento:
+                MostrarCanvas(missaoAtual.canvasEmAndamento);
+                break;
+
+            case EstadoMissao.ProntaParaEntregar:
+                MostrarCanvas(missaoAtual.canvasConcluida);
+                break;
+
+            case EstadoMissao.Concluida:
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Alias opcional (mesmo comportamento).
+    /// </summary>
+    public void AbrirPainelMissao()
+    {
+        NotificarHoverNPC();
+    }
+
+    /// <summary>
+    /// Fecha todos os popups de missão de forma segura.
+    /// Ligue ao abrir o inventário e nos botões Criar / Reparar / Melhorar / X.
+    /// </summary>
+    public void FecharTodosPopupsMissao()
+    {
+        FecharCanvasAtivo();
+        EsconderTodosOsCanvas();
+    }
+
+    public void NotificarHoverSaiuNPC() { }
+
+    public void FecharPopupAtual() => FecharTodosPopupsMissao();
+
+    // =========================================================
+    // CANVAS / DIÁLOGO
+    // =========================================================
+
     private void EsconderTodosOsCanvas()
     {
         if (missoes == null) return;
@@ -122,6 +195,8 @@ public class GerenciadorMissoes : MonoBehaviour
             SetActiveSeguro(missao.botaoAceitar, false);
             SetActiveSeguro(missao.botaoRecusar, false);
         }
+
+        canvasAtivoNoMomento = null;
     }
 
     private static void SetActiveSeguro(GameObject alvo, bool ativo)
@@ -144,29 +219,6 @@ public class GerenciadorMissoes : MonoBehaviour
     }
 
     public MissaoDados ObterMissaoAtualPublica() => ObterMissaoAtual();
-
-    public void NotificarHoverNPC()
-    {
-        if (canvasAtivoNoMomento != null) return;
-
-        MissaoDados missaoAtual = ObterMissaoAtual();
-        if (missaoAtual == null) return;
-
-        switch (missaoAtual.estado)
-        {
-            case EstadoMissao.NaoIniciada:
-                MostrarDialogo(missaoAtual);
-                break;
-            case EstadoMissao.EmAndamento:
-                MostrarCanvas(missaoAtual.canvasEmAndamento);
-                break;
-            case EstadoMissao.ProntaParaEntregar:
-                MostrarCanvas(missaoAtual.canvasConcluida);
-                break;
-        }
-    }
-
-    public void NotificarHoverSaiuNPC() { }
 
     private void MostrarCanvas(GameObject canvas)
     {
@@ -193,8 +245,6 @@ public class GerenciadorMissoes : MonoBehaviour
 
         canvasAtivoNoMomento = null;
     }
-
-    public void FecharPopupAtual() => FecharCanvasAtivo();
 
     private void IniciarTimerInatividade()
     {
@@ -285,13 +335,15 @@ public class GerenciadorMissoes : MonoBehaviour
         if (missaoAtual.tipoObjetivo == TipoObjetivo.ColetarItens)
             AtualizarMissaoColetaAtiva();
 
-        FecharCanvasAtivo();
+        // Fecha de forma completa (evita canvas preso)
+        FecharTodosPopupsMissao();
         FecharObjetosExtrasAoAceitar();
     }
 
     public void RecusarMissaoAtual()
     {
-        FecharCanvasAtivo();
+        FecharTodosPopupsMissao();
+        FecharObjetosExtrasAoAceitar();
     }
 
     // =========================================================
@@ -385,12 +437,19 @@ public class GerenciadorMissoes : MonoBehaviour
             MarcarProntaParaEntregar(missao);
     }
 
+    private InventarioVR ObterInventarioJogador()
+    {
+        if (inventarioJogadorCache == null)
+            inventarioJogadorCache = FindFirstObjectByType<InventarioVR>();
+        return inventarioJogadorCache;
+    }
+
     public int ObterQuantidadeItemNoInventario(string nomeItem)
     {
         if (string.IsNullOrEmpty(nomeItem))
             return 0;
 
-        InventarioVR inventario = FindFirstObjectByType<InventarioVR>();
+        InventarioVR inventario = ObterInventarioJogador();
         if (inventario == null)
             return 0;
 
@@ -449,10 +508,6 @@ public class GerenciadorMissoes : MonoBehaviour
     // CONSUMIR ITENS NA ENTREGA
     // =========================================================
 
-    /// <summary>
-    /// Remove do inventário exatamente a quantidade da missão.
-    /// Ex: missão pede 10 Wood e o jogador tem 20 → destrói só 10.
-    /// </summary>
     private void ConsumirItensDaMissao(MissaoDados missao)
     {
         if (missao == null) return;
@@ -462,7 +517,7 @@ public class GerenciadorMissoes : MonoBehaviour
         int quantidadeParaConsumir = Mathf.Max(0, missao.quantidadeAlvo);
         if (quantidadeParaConsumir == 0) return;
 
-        InventarioVR inventario = FindFirstObjectByType<InventarioVR>();
+        InventarioVR inventario = ObterInventarioJogador();
         if (inventario == null)
         {
             Debug.LogWarning("[Missão] InventarioVR não encontrado ao consumir itens.");
@@ -514,10 +569,8 @@ public class GerenciadorMissoes : MonoBehaviour
         if (missaoAtual == null || missaoAtual.estado != EstadoMissao.ProntaParaEntregar)
             return;
 
-        // 1) Consome só a quantidade da missão no inventário
         ConsumirItensDaMissao(missaoAtual);
 
-        // 2) Spawna recompensa
         if (missaoAtual.prefabRecompensa != null)
         {
             Vector3 posicao = missaoAtual.pontoSpawnRecompensa != null
@@ -531,16 +584,14 @@ public class GerenciadorMissoes : MonoBehaviour
             Instantiate(missaoAtual.prefabRecompensa, posicao, rotacao);
         }
 
-        // 3) Dá REIN / XP
         EntregarRecompensasAoPlayer(missaoAtual);
 
-        // 4) Finaliza missão
         missaoAtual.estado = EstadoMissao.Concluida;
 
         if (uiProgresso != null)
             uiProgresso.Esconder();
 
-        FecharCanvasAtivo();
+        FecharTodosPopupsMissao();
         FecharObjetosExtrasAoAceitar();
 
         missaoAtualIndex++;
