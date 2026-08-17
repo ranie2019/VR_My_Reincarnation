@@ -2458,6 +2458,9 @@ public class Arco : MonoBehaviour
         if (outroCollider == null || Quebrado || ColliderPertenceAoProprioArco(outroCollider))
             return;
 
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(outroCollider))
+            return;
+
         if (!TagDanificaArco(outroCollider, out GameObject origemDano))
             return;
 

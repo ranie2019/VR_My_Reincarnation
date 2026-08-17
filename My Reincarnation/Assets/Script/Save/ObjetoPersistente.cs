@@ -124,6 +124,20 @@ public class ObjetoPersistente : MonoBehaviour, ISalvavel
         objectId = Guid.NewGuid().ToString("N");
     }
 
+    /// <summary>
+    /// Atribui um ID ja conhecido (por exemplo, vindo de um SceneObjectSaveData) a este
+    /// objeto instanciado em runtime. Use isto em spawners para que objetos criados
+    /// dinamicamente possam ser corretamente re-associados ao seu estado salvo, em vez
+    /// de receberem um GUID novo e aleatorio a cada sessao via GarantirId().
+    /// </summary>
+    public void DefinirId(string idExistente)
+    {
+        if (string.IsNullOrWhiteSpace(idExistente))
+            return;
+
+        objectId = idExistente.Trim();
+    }
+
     private static bool EscalaValida(Vector3 escala)
     {
         const float minimo = 0.0001f;

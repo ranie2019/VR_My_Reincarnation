@@ -1192,7 +1192,7 @@ public class InventarioArcoUI : MonoBehaviour
         if (tamanhoAlvo > 0f && maiorTamanho > 0.0001f)
         {
             float fator = tamanhoAlvo / maiorTamanho;
-            preview.localScale *= fator;
+            preview.localScale = Vector3.one * Mathf.Max(0.0001f, escalaBasePreviewPrefab) * fator;
 
             if (!TentarObterBoundsRenderers(slot.previewPrefabInstanciado, out bounds))
                 return;

@@ -12,8 +12,10 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
     }
 
     [SerializeField] private InventarioScrollVR inventarioScroll;
+    [SerializeField] private InventarioVR inventarioDono;
     [SerializeField, FormerlySerializedAs("direcao")] private DirecaoMovimentoSlots direcaoMovimentoSlots;
     [SerializeField] private float cooldown = 0.35f;
+    [SerializeField] private bool aceitarApenasTriggerDoPlayerDono = true;
     [SerializeField] private bool aceitarSomenteInteractorXR = true;
     [SerializeField] private bool aceitarComponentesXRRelacionados = true;
     [SerializeField] private bool procurarInteractorXRNosFilhos = true;
@@ -27,6 +29,7 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
     private void Reset()
     {
         inventarioScroll = GetComponentInParent<InventarioScrollVR>();
+        inventarioDono = GetComponentInParent<InventarioVR>();
     }
 
     private void Awake()
@@ -35,11 +38,13 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
             audioSource = GetComponent<AudioSource>();
 
         BuscarInventarioScrollSeNecessario();
+        BuscarInventarioDonoSeNecessario();
     }
 
     private void Start()
     {
         BuscarInventarioScrollSeNecessario();
+        BuscarInventarioDonoSeNecessario();
     }
 
     private void OnValidate()
@@ -55,16 +60,6 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
     private void OnTriggerStay(Collider other)
     {
         ProcessarContato(other, rolarEnquantoPermaneceEmContato);
-    }
-
-    private void OnCollisionEnter(Collision collision)
-    {
-        ProcessarContato(collision != null ? collision.collider : null, true);
-    }
-
-    private void OnCollisionStay(Collision collision)
-    {
-        ProcessarContato(collision != null ? collision.collider : null, rolarEnquantoPermaneceEmContato);
     }
 
     private void ProcessarContato(Collider other, bool podeRolar)
@@ -84,6 +79,9 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
             return;
 
         if (Time.time < proximoToquePermitido)
+            return;
+
+        if (!ColliderPassaFiltroDono(other))
             return;
 
         if (!ColliderPassaFiltroXR(other))
@@ -132,10 +130,83 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
     private bool BuscarInventarioScrollSeNecessario()
     {
         if (inventarioScroll != null)
+        {
+            BuscarInventarioDonoSeNecessario();
             return true;
+        }
 
         inventarioScroll = GetComponentInParent<InventarioScrollVR>();
+        BuscarInventarioDonoSeNecessario();
         return inventarioScroll != null;
+    }
+
+    private bool BuscarInventarioDonoSeNecessario()
+    {
+        if (inventarioDono != null)
+            return true;
+
+        inventarioDono = GetComponentInParent<InventarioVR>();
+        if (inventarioDono == null && inventarioScroll != null)
+            inventarioDono = inventarioScroll.GetComponentInParent<InventarioVR>();
+
+        return inventarioDono != null;
+    }
+
+    private bool ColliderPassaFiltroDono(Collider other)
+    {
+        if (!aceitarApenasTriggerDoPlayerDono)
+            return true;
+
+        if (other == null || !other.isTrigger)
+            return false;
+
+        Transform raizDono = ObterRaizPlayerDono();
+        if (raizDono == null)
+            return false;
+
+        if (TransformPertenceARaiz(other.transform, raizDono))
+            return true;
+
+        Rigidbody attachedRigidbody = other.attachedRigidbody;
+        return attachedRigidbody != null && TransformPertenceARaiz(attachedRigidbody.transform, raizDono);
+    }
+
+    private Transform ObterRaizPlayerDono()
+    {
+        if (BuscarInventarioDonoSeNecessario())
+            return ObterTransformPlayerResponsavel(inventarioDono.transform);
+
+        return ObterTransformPlayerResponsavel(transform);
+    }
+
+    private static Transform ObterTransformPlayerResponsavel(Transform origem)
+    {
+        if (origem == null)
+            return null;
+
+        Transform atual = origem;
+        while (atual != null)
+        {
+            if (atual.CompareTag("Player") || atual.GetComponent<CharacterController>() != null)
+                return atual;
+
+            atual = atual.parent;
+        }
+
+        return origem.parent != null ? origem.parent : origem;
+    }
+
+    private static bool TransformPertenceARaiz(Transform transformAtual, Transform raiz)
+    {
+        while (transformAtual != null)
+        {
+            if (transformAtual == raiz)
+                return true;
+
+            transformAtual = transformAtual.parent;
+        }
+
+        return false;
     }
 
     private bool ColliderPassaFiltroXR(Collider other)

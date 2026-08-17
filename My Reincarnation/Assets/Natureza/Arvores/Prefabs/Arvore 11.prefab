@@ -16,7 +16,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &1257895545969857279
 Transform:
@@ -106,7 +106,7 @@ GameObject:
   m_TagString: Tree
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &2807449429036539767
 Transform:
@@ -169,8 +169,11 @@ MonoBehaviour:
   tagMachado: Machado
   danoPorHit: 1
   cooldownHit: 0.25
-  prefabAoDestruir: {fileID: 1360994071702760, guid: 640e2e58c89e3714881006bd0c5eeabf, type: 3}
+  prefabAoDestruir: {fileID: 7155127707239254559, guid: d0e69296283e8614a825d0618c1b2e48, type: 3}
   offsetSpawn: {x: 1, y: 1, z: 1}
+  quantidadeNormalAoDestruir: 3
+  usarTipoMachadoParaQuantidade: 1
+  raioDistribuicaoSpawn: 0.25
   respawnId: Arvore 11
 --- !u!1 &7897144593525785336
 GameObject:
@@ -189,7 +192,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &8687903930291284306
 Transform:

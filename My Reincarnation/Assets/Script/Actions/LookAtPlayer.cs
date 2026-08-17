@@ -21,7 +21,10 @@ public class LookAtPlayer : MonoBehaviour
 
     private void Awake()
     {
-        cameraObject = FindObjectOfType<XROrigin>().Camera.gameObject;
+        XROrigin xrOrigin = FindFirstObjectByType<XROrigin>();
+        if (xrOrigin != null && xrOrigin.Camera != null)
+            cameraObject = xrOrigin.Camera.gameObject;
+
         originalRotation = transform.eulerAngles;
     }
 
@@ -32,6 +35,9 @@ public class LookAtPlayer : MonoBehaviour
 
     private void LookAt()
     {
+        if (cameraObject == null)
+            return;
+
         Vector3 direction = transform.position - cameraObject.transform.position;
         Vector3 newRotation =  Quaternion.LookRotation(direction, transform.up).eulerAngles;
 

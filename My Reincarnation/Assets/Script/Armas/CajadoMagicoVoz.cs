@@ -59,7 +59,7 @@ public class CajadoMagicoVoz : MonoBehaviour
     [SerializeField] private Transform ultimoInteractor;
 
     [Header("Diagnostico de Voz")]
-    [SerializeField] private bool mostrarDiagnosticoNoConsole = true;
+    [SerializeField] private bool mostrarDiagnosticoNoConsole = false;
     [SerializeField, TextArea(2, 5)] private string statusDiagnosticoVoz;
     [SerializeField] private string ultimoErroVoiceSDK;
     [SerializeField] private int quantidadeDispositivosMicrofone;
@@ -509,11 +509,6 @@ public class CajadoMagicoVoz : MonoBehaviour
         ultimaTranscricaoFinalProcessada = ultimaTranscricaoNormalizada;
         horarioUltimaTranscricaoFinalProcessada = Time.time;
         comandoBolaDeFogoOuvido = EhComandoBolaDeFogo(ultimaTranscricaoNormalizada);
-        Debug.Log(
-            comandoBolaDeFogoOuvido
-                ? $"[VOZ CAJADO] COMANDO RECEBIDO: \"{ultimaTranscricaoNormalizada}\" (Bola de Fogo reconhecida)."
-                : $"[VOZ CAJADO] FALA RECEBIDA: \"{ultimaTranscricaoNormalizada}\".",
-            this);
         DefinirStatus(EstadoVozCajado.Processando, $"Texto entendido via {origem}: {ultimaTranscricaoNormalizada}");
         comandoEntregueAoInterpretador = true;
         aoComandoVozRecebido?.Invoke(ultimaTranscricaoNormalizada);
@@ -539,9 +534,6 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         ultimaTranscricaoParcialProcessada = normalizada;
         horarioUltimaTranscricaoParcialProcessada = Time.time;
-
-        if (EhComandoBolaDeFogo(normalizada))
-            Debug.Log($"[VOZ CAJADO] COMANDO OUVIDO (parcial): \"{normalizada}\".", this);
 
         aoTextoParcialVozRecebido?.Invoke(normalizada);
     }
@@ -963,9 +955,6 @@ public class CajadoMagicoVoz : MonoBehaviour
         if (!vozDetectadaNoMicrofone && ultimoNivelMicrofone > 0.001f)
         {
             vozDetectadaNoMicrofone = true;
-            Debug.Log(
-                $"[VOZ CAJADO] AUDIO OUVIDO pelo microfone do Quest. Nivel: {ultimoNivelMicrofone:0.0000}.",
-                this);
         }
     }
 
@@ -1143,7 +1132,5 @@ public class CajadoMagicoVoz : MonoBehaviour
             ? novoEstado.ToString()
             : $"{novoEstado}: {mensagem}";
 
-        if (mostrarDiagnosticoNoConsole)
-            Debug.Log($"[VOZ CAJADO] {statusDiagnosticoVoz}", this);
     }
 }

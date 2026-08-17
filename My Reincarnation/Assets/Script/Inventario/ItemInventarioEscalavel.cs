@@ -39,8 +39,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
             if (!escalaComp.inicializado || !EscalaValida(escalaComp.escalaOriginal))
             {
-                escalaComp.escalaOriginal = escalaOriginalMundo;
-                escalaComp.inicializado = true;
+                escalaComp.DefinirEscalaOriginal(escalaOriginalMundo);
             }
 
             return;
@@ -54,9 +53,23 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
         if (escalaComp != null)
         {
-            escalaComp.escalaOriginal = escalaOriginal;
-            escalaComp.inicializado = true;
+            escalaComp.DefinirEscalaOriginal(escalaOriginal);
         }
+    }
+
+    public void ForcarEscalaOriginalMundo(Vector3 escalaOriginal)
+    {
+        if (!EscalaValida(escalaOriginal))
+            return;
+
+        escalaOriginalMundo = escalaOriginal;
+        escalaOriginalSalva = true;
+
+        var escalaComp = GetComponent<EscalaOriginalItem>();
+        if (escalaComp == null)
+            escalaComp = gameObject.AddComponent<EscalaOriginalItem>();
+
+        escalaComp.DefinirEscalaOriginal(escalaOriginal);
     }
 
     public bool AjustarParaSlot(BoxCollider slotCollider, float margemDeSeguranca, Transform pontoReferencia)
@@ -138,7 +151,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
             return false;
 
         if (EscalaValida(escalaBaseMundo))
-            DefinirEscalaOriginalMundo(escalaBaseMundo);
+            ForcarEscalaOriginalMundo(escalaBaseMundo);
 
         GarantirEscalaOriginal();
         if (!PossuiEscalaOriginalMundoValida())
@@ -212,8 +225,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
         if (escalaComp != null && !escalaComp.inicializado)
         {
-            escalaComp.escalaOriginal = escalaOriginalMundo;
-            escalaComp.inicializado = true;
+            escalaComp.DefinirEscalaOriginal(escalaOriginalMundo);
         }
     }
 

@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 5456440013711417979}
   - component: {fileID: 4828991945644028985}
   - component: {fileID: 7372217267715212598}
+  - component: {fileID: 739477640651165714}
   m_Layer: 0
   m_Name: Stone
   m_TagString: Stone
@@ -323,6 +324,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  tipoItemId: 751682349ef7b8546aff2c104411f6b3
   itemId: Stone
   nomeItem: Stone
   prefabReferencia: {fileID: 165230}
@@ -334,6 +336,25 @@ MonoBehaviour:
   instanciaId: 
   durabilidadeAtual: 0
   dadosExtrasJson: 
+--- !u!114 &739477640651165714
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 165230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a31aaef78a8ae6429093ec0b2516965, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Respawnitem
+  respawnId: Stone
+  usarNomeDoObjetoSeIdVazio: 1
+  considerarColetadoAoEntrarNoInventario: 1
+  considerarColetadoAoMudarParent: 1
+  considerarColetadoAoSairDaPosicao: 1
+  distanciaParaConsiderarColetado: 0.25
+  respawnSolicitado: 0
 --- !u!1 &3469338933817914625
 GameObject:
   m_ObjectHideFlags: 0

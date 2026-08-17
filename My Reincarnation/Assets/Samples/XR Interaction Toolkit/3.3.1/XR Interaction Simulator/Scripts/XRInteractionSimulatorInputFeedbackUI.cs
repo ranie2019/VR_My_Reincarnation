@@ -234,7 +234,7 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.InteractionSimulator
 #if HAS_FIND_FIRST_OBJECT_BY_TYPE
             var simulator = Object.FindFirstObjectByType<XRInteractionSimulator>();
 #else
-            var simulator = Object.FindObjectOfType<XRInteractionSimulator>();
+            var simulator = Object.FindFirstObjectByType<XRInteractionSimulator>();
 #endif
             if (simulator != null)
             {

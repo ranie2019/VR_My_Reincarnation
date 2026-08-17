@@ -8,7 +8,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 ///
 /// Ao equipar:
 /// - Move o luvaVisual para fora da hierarquia do item ANTES de desativar o item.
-/// - Desativa apenas BoxColliders e Rigidbody — SkinnedMeshRenderer permanece ativo.
+/// - Desativa apenas BoxColliders e Rigidbody ï¿½ SkinnedMeshRenderer permanece ativo.
 /// - Desativa o objeto raiz do item (Luva Medieval D/E). Como a luvaVisual
 ///   ja foi removida antes, ela continua ativa e visivel na mao.
 /// </summary>
@@ -24,14 +24,14 @@ public class EquiparManoplas : MonoBehaviour
     [Header("Visual da Luva")]
     [Tooltip(
         "Filho INTERNO da luva que contem o mesh (ex: o objeto 'Luva' dentro de 'Luva Medieval E').\n" +
-        "NAO arraste o objeto raiz 'Luva Medieval E' aqui — se fizer isso o codigo avisa no Console.")]
+        "NAO arraste o objeto raiz 'Luva Medieval E' aqui ï¿½ se fizer isso o codigo avisa no Console.")]
     [SerializeField] private GameObject luvaVisual;
 
     [Header("Mao do Avatar")]
     [Tooltip("Transform da mao do avatar (ex: 'Mao Esquerda' ou 'Mao Direita'). A luva vira filha deste Transform.")]
     [SerializeField] private Transform transformMaoAvatar;
 
-    [Tooltip("OPCIONAL — SkinnedMeshRenderer da mao nua. Se preenchido e 'Esconder Mao' marcado, so o renderer some.")]
+    [Tooltip("OPCIONAL ï¿½ SkinnedMeshRenderer da mao nua. Se preenchido e 'Esconder Mao' marcado, so o renderer some.")]
     [SerializeField] private SkinnedMeshRenderer rendererMaoAvatar;
 
     [Tooltip("Se marcado, esconde o renderer da mao nua ao equipar. Deixe desmarcado para ver mao + luva juntas.")]
@@ -80,7 +80,7 @@ public class EquiparManoplas : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Hover — popup
+    // Hover ï¿½ popup
     // -------------------------------------------------------------------------
 
     private void OnHoverEntered(HoverEnterEventArgs args)
@@ -124,7 +124,6 @@ public class EquiparManoplas : MonoBehaviour
     {
         if (jaEquipado)
         {
-            Debug.Log("[EquiparArmadura] Ja equipado, ignorando chamada.", this);
             return;
         }
 
@@ -149,7 +148,6 @@ public class EquiparManoplas : MonoBehaviour
         // 5. Desativa o item do chao. A luvaVisual ja foi removida, nao e afetada.
         DesativarItemDoChao();
 
-        Debug.Log("[EquiparArmadura] Equipado com sucesso. Luva agora e filha de: " + transformMaoAvatar.name, this);
     }
 
     private bool ValidarReferencias()
@@ -201,10 +199,9 @@ public class EquiparManoplas : MonoBehaviour
         luvaVisual.transform.localRotation = rotacaoOriginal;
         luvaVisual.transform.localScale = escalaOriginal;
 
-        // Garante ativo — pode ter vindo desativado do prefab.
+        // Garante ativo ï¿½ pode ter vindo desativado do prefab.
         luvaVisual.SetActive(true);
 
-        Debug.Log("[EquiparArmadura] Luva encaixada em: " + transformMaoAvatar.name, this);
     }
 
     /// <summary>
@@ -234,7 +231,6 @@ public class EquiparManoplas : MonoBehaviour
             return;
 
         rendererMaoAvatar.enabled = false;
-        Debug.Log("[EquiparArmadura] Renderer da mao desativado: " + rendererMaoAvatar.name, this);
     }
 
     private void AplicarAtributos()

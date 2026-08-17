@@ -16,7 +16,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &2529772164248252200
 Transform:
@@ -99,7 +99,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5440707293445741943}
-  - component: {fileID: 2572748512188004591}
   - component: {fileID: 7910077550965790617}
   - component: {fileID: 6859505267825579864}
   - component: {fileID: 6483796440100674412}
@@ -111,7 +110,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &5440707293445741943
 Transform:
@@ -130,29 +129,6 @@ Transform:
   - {fileID: 2529772164248252200}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!205 &2572748512188004591
-LODGroup:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5440707293445505367}
-  serializedVersion: 2
-  m_LocalReferencePoint: {x: -0.0023993924, y: 0.11494863, z: 0.0064293444}
-  m_Size: 0.22989726
-  m_FadeMode: 0
-  m_AnimateCrossFading: 0
-  m_LastLODIsBillboard: 0
-  m_LODs:
-  - screenRelativeHeight: 0.038085736
-    fadeTransitionWidth: 0
-    renderers:
-    - renderer: {fileID: 8360388102724702198}
-  - screenRelativeHeight: 0.01
-    fadeTransitionWidth: 0
-    renderers:
-    - renderer: {fileID: 174724175454802206}
-  m_Enabled: 1
 --- !u!54 &7910077550965790617
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -340,6 +316,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioDados
   nomeItem: Mushroom_02
   prefabParaStack: {fileID: 5440707293445505367}
+  ehFlecha: 0
+  idTipoFlecha: 
+  prefabFlechaParaDisparo: {fileID: 0}
+  iconeFlecha: {fileID: 0}
+  nomeExibicaoFlecha: 
 --- !u!114 &1555536748501877992
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -352,8 +333,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
-  itemId: Mushroom_02
-  nomeItem: Mushroom_02
+  tipoItemId: 494f6d43e170e9145bc7865d243ee00b
+  itemId: Mushroom 02
+  nomeItem: Mushroom 02
   prefabReferencia: {fileID: 5440707293445505367}
   salvarNoInventario: 1
   usarNomeDoObjetoSeIdVazio: 1
@@ -375,10 +357,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 41aa1b673da5e1e479e88a43c2ad8696, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Cocumelo
-  idCocumelo: Mushroom_02
-  distanciaParaConsiderarColetado: 0.25
-  foiColetado: 0
-  respawnSolicitado: 0
+  respawnId: Mushroom 02
 --- !u!1 &8258542438926114849
 GameObject:
   m_ObjectHideFlags: 0
@@ -396,7 +375,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &1278986278819212698
 Transform:

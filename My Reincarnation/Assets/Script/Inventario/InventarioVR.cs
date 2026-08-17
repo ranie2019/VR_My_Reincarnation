@@ -76,16 +76,15 @@ public class InventarioVR : MonoBehaviour
     {
         aberto = estado;
 
-        if (painelInventario != null && !painelInventario.activeSelf)
-            painelInventario.SetActive(true);
-
         if (aberto)
         {
+            AtualizarSlots(true);
+            if (painelInventario != null && !painelInventario.activeSelf)
+                painelInventario.SetActive(true);
             RestaurarPosicaoInventarioAberto();
             DefinirFisicaInventario(true);
             AtualizarBotoesRolagem(true);
             SetPainelVisivel(true);
-            AtualizarSlots(true);
             return;
         }
 
@@ -121,6 +120,9 @@ public class InventarioVR : MonoBehaviour
         {
             Collider colliderAtual = collidersInventario[i];
             if (colliderAtual == null)
+                continue;
+
+            if (ComponentePertenceAItemInventario(colliderAtual))
                 continue;
 
             if (ativo)
@@ -184,6 +186,9 @@ public class InventarioVR : MonoBehaviour
         {
             Rigidbody rigidbodyAtual = rigidbodies[i];
             if (rigidbodyAtual == null)
+                continue;
+
+            if (ComponentePertenceAItemInventario(rigidbodyAtual))
                 continue;
 
             if (ativo)

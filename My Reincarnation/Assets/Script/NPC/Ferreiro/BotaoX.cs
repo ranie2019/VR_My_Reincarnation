@@ -3,11 +3,11 @@ using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
-/// Script genérico para qualquer botão "X" de fechar.
+/// Script genï¿½rico para qualquer botï¿½o "X" de fechar.
 /// Usa XRSimpleInteractable (hover do laser) para desativar
-/// o Canvas mais próximo na hierarquia acima dele (seu "pai").
+/// o Canvas mais prï¿½ximo na hierarquia acima dele (seu "pai").
 ///
-/// Funciona em qualquer Canvas (Popup, Inventário, etc), sem precisar
+/// Funciona em qualquer Canvas (Popup, Inventï¿½rio, etc), sem precisar
 /// de um script diferente para cada um.
 ///
 /// Requisito: o objeto precisa ter um Collider (BoxCollider) do tamanho do botao.
@@ -22,7 +22,7 @@ public class BotaoX : MonoBehaviour
     {
         interactable = GetComponent<XRSimpleInteractable>();
 
-        // Procura o Canvas mais próximo na hierarquia acima deste botão
+        // Procura o Canvas mais prï¿½ximo na hierarquia acima deste botï¿½o
         canvasPai = GetComponentInParent<Canvas>(true);
 
         if (canvasPai == null)
@@ -46,7 +46,6 @@ public class BotaoX : MonoBehaviour
         if (canvasPai == null)
             return;
 
-        Debug.Log("[BotaoFecharCanvasXR] Fechando Canvas: " + canvasPai.gameObject.name);
         canvasPai.gameObject.SetActive(false);
     }
 }

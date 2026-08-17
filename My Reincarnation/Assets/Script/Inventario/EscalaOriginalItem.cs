@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Componente auxiliar que armazena a escala original real do item.
 /// Adicionado automaticamente pelo SlotInventario na primeira vez que o item entra num slot.
-/// Nunca sobrescrito após inicializado.
+/// Pode ser redefinido quando o inventario encontra uma base limpa do prefab.
 /// </summary>
 public class EscalaOriginalItem : MonoBehaviour
 {
@@ -12,6 +12,15 @@ public class EscalaOriginalItem : MonoBehaviour
     [HideInInspector] public SlotInventario slotComEscalaAplicada;
     [HideInInspector] public bool escalaAplicadaNoSlot = false;
     [HideInInspector] public float margemDeSegurancaAplicada = -1f;
+
+    public void DefinirEscalaOriginal(Vector3 novaEscalaOriginal)
+    {
+        escalaOriginal = novaEscalaOriginal;
+        inicializado = true;
+        slotComEscalaAplicada = null;
+        escalaAplicadaNoSlot = false;
+        margemDeSegurancaAplicada = -1f;
+    }
 
     public bool EscalaJaAplicadaPara(SlotInventario slot)
     {

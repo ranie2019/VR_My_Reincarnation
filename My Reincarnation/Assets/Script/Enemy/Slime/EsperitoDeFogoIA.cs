@@ -28,7 +28,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
     [SerializeField] private float distanciaChegadaPonto = 0.35f;
     [SerializeField] private float tempoObservando = 2f;
 
-    [Header("Campo de Visão")]
+    [Header("Campo de Visï¿½o")]
     [SerializeField] private string tagPlayer = "Player";
     [SerializeField] private float distanciaVisao = 10f;
     [SerializeField, Range(1f, 360f)] private float anguloVisao = 120f;
@@ -36,7 +36,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
     [SerializeField] private float tempoMemoriaJogador = 4f;
 
     [Header("Combate")]
-    [Tooltip("Distância em que o Espírito para de correr e começa a atacar")]
+    [Tooltip("Distï¿½ncia em que o Espï¿½rito para de correr e comeï¿½a a atacar")]
     public float distanciaAtaque = 1.6f;
 
     [SerializeField] private float velocidadePerseguicao = 4.0f;
@@ -47,8 +47,8 @@ public class EsperitoDeFogoIA : MonoBehaviour
     [Header("Morte")]
     [SerializeField] private float tempoParaDestruir = 2f;
 
-    [Header("Referências")]
-    [SerializeField] private EsperitoDeFogoAnimacao animacao; // Você pode criar depois
+    [Header("Referï¿½ncias")]
+    [SerializeField] private EsperitoDeFogoAnimacao animacao; // Vocï¿½ pode criar depois
 
     // Internos
     private Transform player;
@@ -96,7 +96,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
     {
         if (morto) return;
 
-        // Memória do jogador
+        // Memï¿½ria do jogador
         if (viuJogador)
         {
             timerMemoria -= Time.deltaTime;
@@ -104,7 +104,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
                 viuJogador = false;
         }
 
-        // Detecção pelo Campo de Visão
+        // Detecï¿½ï¿½o pelo Campo de Visï¿½o
         if (PodeVerJogador())
         {
             viuJogador = true;
@@ -113,7 +113,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
                 ultimaPosicaoConhecida = player.position;
         }
 
-        // Máquina de estados
+        // Mï¿½quina de estados
         switch (estadoAtual)
         {
             case Estado.Parado:      ExecutarParado();      break;
@@ -123,13 +123,13 @@ public class EsperitoDeFogoIA : MonoBehaviour
             case Estado.Atacando:    ExecutarAtaque();      break;
         }
 
-        // Transições de combate
+        // Transiï¿½ï¿½es de combate
         if (estadoAtual != Estado.Perseguindo && estadoAtual != Estado.Atacando && viuJogador)
             MudarEstado(Estado.Perseguindo);
         else if (estadoAtual == Estado.Perseguindo && !viuJogador)
             MudarEstado(QuantidadePontosValidos() > 0 ? Estado.Patrulhando : Estado.Parado);
 
-        // Animação de locomoção
+        // Animaï¿½ï¿½o de locomoï¿½ï¿½o
         AtualizarAnimacaoLocomocao();
     }
 
@@ -220,14 +220,14 @@ public class EsperitoDeFogoIA : MonoBehaviour
                 break;
 
             case Estado.Morto:
-                // Tratado no método Morrer()
+                // Tratado no mï¿½todo Morrer()
                 break;
         }
     }
 
     #endregion
 
-    #region Animação de Locomoção
+    #region Animaï¿½ï¿½o de Locomoï¿½ï¿½o
 
     private void AtualizarAnimacaoLocomocao()
     {
@@ -288,7 +288,6 @@ public class EsperitoDeFogoIA : MonoBehaviour
         if (player == null) return;
         if (DistanciaXZ(transform.position, player.position) > distanciaAtaque + 0.4f) return;
 
-        Debug.Log($"Espírito de Fogo causou {danoAtaque} de dano");
         // Coloque aqui a chamada real do sistema de dano do player
         // Ex: player.GetComponent<StatusPlayer>()?.ReceberDano(danoAtaque);
     }
@@ -413,7 +412,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
 
     #endregion
 
-    #region Campo de Visão
+    #region Campo de Visï¿½o
 
     private bool PodeVerJogador()
     {

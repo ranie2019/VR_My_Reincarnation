@@ -171,6 +171,9 @@ public class Escudo : MonoBehaviour
         if (!EstaProtegendoPlayer(playerAlvo) || origemDano == null)
             return false;
 
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(origemDano))
+            return false;
+
         if (EhParteDoProprioEscudo(origemDano))
             return false;
 
@@ -194,6 +197,9 @@ public class Escudo : MonoBehaviour
     public bool RegistrarBloqueio(GameObject origemDano, bool tocarSom)
     {
         if (Quebrado || origemDano == null)
+            return false;
+
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(origemDano))
             return false;
 
         if (EhParteDoProprioEscudo(origemDano))

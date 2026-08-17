@@ -47,7 +47,7 @@ public class ComandosMagiaVoz : MonoBehaviour
     [SerializeField, Min(1)] private int tamanhoMinimoPalavraParaTolerancia = 3;
 
     [Header("Diagnostico do Comando")]
-    [SerializeField] private bool mostrarDiagnosticoNoConsole = true;
+    [SerializeField] private bool mostrarDiagnosticoNoConsole = false;
     [SerializeField] private bool transcricaoRecebida;
     [SerializeField] private bool comandoIdentificado;
     [SerializeField] private bool magiaAtivada;
@@ -463,8 +463,6 @@ public class ComandosMagiaVoz : MonoBehaviour
 
         if (aviso)
             Debug.LogWarning($"[COMANDO VOZ CAJADO] {statusDiagnosticoComando}", this);
-        else
-            Debug.Log($"[COMANDO VOZ CAJADO] {statusDiagnosticoComando}", this);
     }
 
     private static string NormalizarFrase(string texto)

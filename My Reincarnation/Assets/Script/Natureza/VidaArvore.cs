@@ -17,12 +17,16 @@ public class VidaArvore : MonoBehaviour
     [Header("Spawn ao destruir")]
     [SerializeField] private GameObject prefabAoDestruir;
     [SerializeField] private Vector3 offsetSpawn = Vector3.zero;
+    [SerializeField, Min(1)] private int quantidadeNormalAoDestruir = 3;
+    [SerializeField] private bool usarTipoMachadoParaQuantidade = true;
+    [SerializeField, Min(0f)] private float raioDistribuicaoSpawn = 0.25f;
 
     [Header("Respawn")]
     [SerializeField] private string respawnId = "";
 
     private bool emCooldown;
     private bool morreu;
+    private Machado ultimoMachadoQueCausouDano;
 
     private class RepassadorFisica : MonoBehaviour
     {
@@ -58,6 +62,9 @@ public class VidaArvore : MonoBehaviour
         tagMachado = "Machado";
         danoPorHit = 1;
         cooldownHit = 0.25f;
+        quantidadeNormalAoDestruir = 3;
+        usarTipoMachadoParaQuantidade = true;
+        raioDistribuicaoSpawn = 0.25f;
     }
 
     private void Awake()
@@ -73,6 +80,8 @@ public class VidaArvore : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 1, vidaMax);
         danoPorHit = Mathf.Max(1, danoPorHit);
         cooldownHit = Mathf.Max(0f, cooldownHit);
+        quantidadeNormalAoDestruir = Mathf.Max(1, quantidadeNormalAoDestruir);
+        raioDistribuicaoSpawn = Mathf.Max(0f, raioDistribuicaoSpawn);
     }
 
     private void InstalarRepassadoresNosFilhos()
@@ -159,8 +168,25 @@ public class VidaArvore : MonoBehaviour
         if (morreu)
             return false;
 
+        ultimoMachadoQueCausouDano = BuscarMachadoNaOrigem(origem);
         TomarDano(Mathf.Max(1, dano));
         return true;
+    }
+
+    private Machado BuscarMachadoNaOrigem(GameObject origem)
+    {
+        if (origem == null)
+            return null;
+
+        Machado machado = origem.GetComponent<Machado>();
+        if (machado != null)
+            return machado;
+
+        machado = origem.GetComponentInParent<Machado>();
+        if (machado != null)
+            return machado;
+
+        return origem.GetComponentInChildren<Machado>(true);
     }
 
     private void TomarDano(int dano)
@@ -193,8 +219,7 @@ public class VidaArvore : MonoBehaviour
 
         morreu = true;
 
-        if (prefabAoDestruir != null)
-            Instantiate(prefabAoDestruir, transform.position + offsetSpawn, transform.rotation);
+        SpawnarItensAoDestruir();
 
         if (RespawnNatureza.Instancia != null && !string.IsNullOrWhiteSpace(respawnId))
         {
@@ -213,5 +238,34 @@ public class VidaArvore : MonoBehaviour
         }
 
         Destroy(gameObject);
+    }
+
+    private void SpawnarItensAoDestruir()
+    {
+        if (prefabAoDestruir == null)
+            return;
+
+        int quantidade = CalcularQuantidadeSpawnAoDestruir();
+        Vector3 posicaoBase = transform.position + offsetSpawn;
+
+        for (int i = 0; i < quantidade; i++)
+            Instantiate(prefabAoDestruir, posicaoBase + CalcularOffsetDistribuicao(i, quantidade), transform.rotation);
+    }
+
+    private int CalcularQuantidadeSpawnAoDestruir()
+    {
+        if (!usarTipoMachadoParaQuantidade || ultimoMachadoQueCausouDano == null)
+            return Mathf.Max(1, quantidadeNormalAoDestruir);
+
+        return ultimoMachadoQueCausouDano.CalcularQuantidadeColetaPorRaridade(quantidadeNormalAoDestruir);
+    }
+
+    private Vector3 CalcularOffsetDistribuicao(int indice, int total)
+    {
+        if (total <= 1 || raioDistribuicaoSpawn <= 0f)
+            return Vector3.zero;
+
+        float angulo = (360f / total) * indice * Mathf.Deg2Rad;
+        return new Vector3(Mathf.Cos(angulo), 0f, Mathf.Sin(angulo)) * raioDistribuicaoSpawn;
     }
 }

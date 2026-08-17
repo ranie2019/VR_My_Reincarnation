@@ -178,6 +178,37 @@ public class Espada : MonoBehaviour, IDano
         return GetDonoAtual();
     }
 
+    // ===== Propriedades p�blicas (usadas pelo Reparar) =====
+    public int VidaAtual => vidaAtual;
+    public int VidaMaxima => vidaMaxima;
+    public float VidaFaltando => Mathf.Max(0, vidaMaxima - vidaAtual);
+    public bool EstaQuebrada => quebrada || vidaAtual <= 0;
+
+    // ===================== REPARO (usado pelo script Reparar) =====================
+
+    /// <summary>Chamado pelo Reparar.cs quando o jogador paga para reparar a espada.</summary>
+    public void RepararCompleto()
+    {
+        quebrada = false;
+        vidaAtual = vidaMaxima;
+        AtualizarTextoDurabilidade(true);
+    }
+
+    /// <summary>Usado ao restaurar um save (ver ItemPersistente.AplicarSaveData/EscreverDurabilidade).</summary>
+    public void DefinirVida(int atual, int maxima)
+    {
+        vidaMaxima = Mathf.Max(1, maxima);
+        vidaAtual = Mathf.Clamp(atual, 0, vidaMaxima);
+        quebrada = vidaAtual <= 0;
+        AtualizarTextoDurabilidade(true);
+    }
+
+    /// <summary>Chamado via reflexao pelo ItemPersistente apos escrever a durabilidade.</summary>
+    public void AtualizarDurabilidadeVisual()
+    {
+        AtualizarTextoDurabilidade(true);
+    }
+
     public StatusPlayer GetStatusPlayerDonoAtual()
     {
         GameObject dono = GetDonoAtual();
@@ -200,6 +231,9 @@ public class Espada : MonoBehaviour, IDano
     private void ProcessarPossivelDano(Collider outroCollider)
     {
         if (outroCollider == null || quebrada || vidaAtual <= 0)
+            return;
+
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(outroCollider))
             return;
 
         GameObject objetoTocado = outroCollider.gameObject;
@@ -706,7 +740,7 @@ public class Espada : MonoBehaviour, IDano
                     metodoComOrigem.Invoke(componente, new object[] { dano, gameObject });
                     return true;
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     { }
                     return false;
@@ -728,7 +762,7 @@ public class Espada : MonoBehaviour, IDano
                 metodo.Invoke(componente, new object[] { dano });
                 return true;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 { }
                 return false;

@@ -15,6 +15,9 @@ public class Picareta : MonoBehaviour, IDano
     [Header("Dano da picareta")]
     [SerializeField] private int danoPicareta = 1;
 
+    [Header("Tipo / Raridade")]
+    [SerializeField] private RaridadeItem tipoPicareta = RaridadeItem.Normal;
+
     [Header("Impacto opcional")]
     [SerializeField] private float impactForce = 0f;
 
@@ -72,6 +75,10 @@ public class Picareta : MonoBehaviour, IDano
     public int VidaAtual => vidaAtual;
     public int VidaMaxima => vidaMaxima;
     public bool Quebrada => quebrada || vidaAtual <= 0;
+    public RaridadeItem TipoPicareta => tipoPicareta;
+    public int MultiplicadorColetaPorRaridade => RaridadeItemUtil.ObterMultiplicadorProgressivo(tipoPicareta);
+    public int CalcularQuantidadeColetaPorRaridade(int quantidadeNormal) =>
+        RaridadeItemUtil.CalcularQuantidadePorRaridade(quantidadeNormal, tipoPicareta);
 
     private void Awake()
     {
@@ -145,6 +152,9 @@ public class Picareta : MonoBehaviour, IDano
             return;
 
         Collider other = collision.collider;
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(other))
+            return;
+
         bool podeTocarSom = AudioColisaoFiltro.PodeTocarSomDeColisao(collision);
         if (podeTocarSom)
             TentarTocarAudioColisao(other, "OnCollisionEnter", EstaSendoSegurada());
@@ -163,6 +173,9 @@ public class Picareta : MonoBehaviour, IDano
             return;
 
         Collider other = collision.collider;
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(other))
+            return;
+
         if (other == null)
         {
             LogAudioFerramenta("OnCollisionStay", null, "collider nulo", false, false);
@@ -203,6 +216,9 @@ public class Picareta : MonoBehaviour, IDano
     private void OnTriggerEnter(Collider other)
     {
         if (Quebrada)
+            return;
+
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(other))
             return;
 
         TentarAplicarDanoPorEntradaTrigger(other);

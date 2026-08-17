@@ -4,34 +4,34 @@ using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
-/// Ativa um popup de interação quando o laser do controle VR (XR Ray Interactor)
-/// passa sobre o NPC. O popup contém um botão "Yes" que abre o Inventário do
-/// Ferreiro, e um botão X para fechar.
+/// Ativa um popup de interaï¿½ï¿½o quando o laser do controle VR (XR Ray Interactor)
+/// passa sobre o NPC. O popup contï¿½m um botï¿½o "Yes" que abre o Inventï¿½rio do
+/// Ferreiro, e um botï¿½o X para fechar.
 ///
-/// O botão "Yes" é filho do Canvas popup, então aparece automaticamente
-/// junto com o popup - não depende de nenhuma função estar associada a ele.
-/// A confirmação (hover + botão do controle) só decide QUANDO a ação de
-/// abrir o inventário acontece.
+/// O botï¿½o "Yes" ï¿½ filho do Canvas popup, entï¿½o aparece automaticamente
+/// junto com o popup - nï¿½o depende de nenhuma funï¿½ï¿½o estar associada a ele.
+/// A confirmaï¿½ï¿½o (hover + botï¿½o do controle) sï¿½ decide QUANDO a aï¿½ï¿½o de
+/// abrir o inventï¿½rio acontece.
 /// </summary>
 [RequireComponent(typeof(XRSimpleInteractable))]
 public class NPCPopup : MonoBehaviour
 {
-    [Header("Referências do Popup")]
-    [Tooltip("Canvas do popup, deve começar desativado na cena.")]
+    [Header("Referï¿½ncias do Popup")]
+    [Tooltip("Canvas do popup, deve comeï¿½ar desativado na cena.")]
     [SerializeField] private GameObject popupCanvas;
 
-    [Tooltip("Canvas do Inventário do Ferreiro, deve começar desativado na cena.")]
+    [Tooltip("Canvas do Inventï¿½rio do Ferreiro, deve comeï¿½ar desativado na cena.")]
     [SerializeField] private GameObject inventarioFerreiroCanvas;
 
-    [Header("Confirmação do Botão Yes (Hover + Botão do Controle)")]
-    [Tooltip("Ação do controle esquerdo que confirma o botão em hover.")]
+    [Header("Confirmaï¿½ï¿½o do Botï¿½o Yes (Hover + Botï¿½o do Controle)")]
+    [Tooltip("Aï¿½ï¿½o do controle esquerdo que confirma o botï¿½o em hover.")]
     [SerializeField] private InputActionReference acaoConfirmarMaoEsquerda;
 
-    [Tooltip("Ação do controle direito que confirma o botão em hover.")]
+    [Tooltip("Aï¿½ï¿½o do controle direito que confirma o botï¿½o em hover.")]
     [SerializeField] private InputActionReference acaoConfirmarMaoDireita;
 
-    [Header("Configurações")]
-    [Tooltip("Tempo (em segundos) sem interação até o popup/inventário fecharem sozinhos.")]
+    [Header("Configuraï¿½ï¿½es")]
+    [Tooltip("Tempo (em segundos) sem interaï¿½ï¿½o atï¿½ o popup/inventï¿½rio fecharem sozinhos.")]
     [SerializeField] private float tempoParaFecharPorInatividade = 30f;
 
     private XRSimpleInteractable interactable;
@@ -128,7 +128,7 @@ public class NPCPopup : MonoBehaviour
     }
 
     /// <summary>
-    /// Chamado pelo BotaoYesHover quando o laser entra/sai do botão Yes.
+    /// Chamado pelo BotaoYesHover quando o laser entra/sai do botï¿½o Yes.
     /// </summary>
     public void DefinirBotaoYesEmHover(bool emHover)
     {
@@ -137,20 +137,17 @@ public class NPCPopup : MonoBehaviour
 
     private void OnHoverEntered(HoverEnterEventArgs args)
     {
-        Debug.Log("[NPCPopup] Hover ENTROU no NPC. PopupAtivo antes: " + (popupCanvas != null && popupCanvas.activeSelf) +
-                   " | InventarioAtivo: " + InventarioEstaAberto());
         AbrirPopup();
     }
 
     /// <summary>
-    /// Abre o popup de interação com o NPC.
-    /// Não abre se o Inventário do Ferreiro já estiver ativo.
+    /// Abre o popup de interaï¿½ï¿½o com o NPC.
+    /// Nï¿½o abre se o Inventï¿½rio do Ferreiro jï¿½ estiver ativo.
     /// </summary>
     public void AbrirPopup()
     {
         if (InventarioEstaAberto())
         {
-            Debug.Log("[NPCPopup] AbrirPopup bloqueado: inventário ainda está ativo.");
             return;
         }
 
@@ -158,12 +155,6 @@ public class NPCPopup : MonoBehaviour
         {
             popupCanvas.SetActive(true);
             ultimaInteracaoPopup = Time.time;
-            Debug.Log("[NPCPopup] Popup ABERTO com sucesso.");
-        }
-        else
-        {
-            Debug.Log("[NPCPopup] Popup NÃO abriu. popupCanvas nulo? " + (popupCanvas == null) +
-                       " | já estava ativo? " + (popupCanvas != null && popupCanvas.activeSelf));
         }
     }
 
@@ -173,7 +164,7 @@ public class NPCPopup : MonoBehaviour
     }
 
     /// <summary>
-    /// Fecha o popup. Chamado pelo botão X.
+    /// Fecha o popup. Chamado pelo botï¿½o X.
     /// </summary>
     public void FecharPopup()
     {
@@ -182,7 +173,7 @@ public class NPCPopup : MonoBehaviour
     }
 
     /// <summary>
-    /// Fecha o Canvas do Inventário do Ferreiro. Chamado pelo botão X do inventário.
+    /// Fecha o Canvas do Inventï¿½rio do Ferreiro. Chamado pelo botï¿½o X do inventï¿½rio.
     /// </summary>
     public void FecharInventario()
     {
@@ -191,8 +182,8 @@ public class NPCPopup : MonoBehaviour
     }
 
     /// <summary>
-    /// Chamado pelo botão "Yes" do popup. Fecha o popup e abre
-    /// o Canvas do Inventário do Ferreiro.
+    /// Chamado pelo botï¿½o "Yes" do popup. Fecha o popup e abre
+    /// o Canvas do Inventï¿½rio do Ferreiro.
     /// </summary>
     public void AbrirInventario()
     {

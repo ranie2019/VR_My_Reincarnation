@@ -14,12 +14,60 @@ public class ItemDatabaseLocal : MonoBehaviour
     [Serializable]
     public class EntradaItem
     {
-        public string itemId;
+        [HideInInspector] public string tipoItemId;
+        [HideInInspector] public string itemId;
         public GameObject prefab;
     }
 
     [SerializeField] private bool ignorarMaiusculasMinusculas = false;
     [SerializeField] private List<EntradaItem> itens = new List<EntradaItem>();
+
+    private Dictionary<string, GameObject> cachePorId;
+
+    private void ConstruirCacheSeNecessario()
+    {
+        if (cachePorId != null)
+            return;
+
+        cachePorId = new Dictionary<string, GameObject>(ObterComparador());
+
+        if (itens == null)
+            return;
+
+        for (int i = 0; i < itens.Count; i++)
+        {
+            EntradaItem entrada = itens[i];
+            if (entrada == null || entrada.prefab == null)
+                continue;
+
+            RegistrarNoCache(entrada.tipoItemId, entrada.prefab);
+            RegistrarNoCache(entrada.itemId, entrada.prefab);
+            RegistrarNoCache(entrada.prefab.name, entrada.prefab);
+
+            ItemPersistente persistente = entrada.prefab.GetComponentInChildren<ItemPersistente>(true);
+            if (persistente != null)
+            {
+                RegistrarNoCache(persistente.ObterTipoItemId(), entrada.prefab);
+                RegistrarNoCache(persistente.ObterItemIdLegado(), entrada.prefab);
+                RegistrarNoCache(persistente.ObterNomeItem(), entrada.prefab);
+            }
+        }
+    }
+
+    private void RegistrarNoCache(string id, GameObject prefab)
+    {
+        if (cachePorId == null || prefab == null || string.IsNullOrWhiteSpace(id))
+            return;
+
+        string normalizado = id.Trim();
+        if (!cachePorId.ContainsKey(normalizado))
+            cachePorId[normalizado] = prefab;
+    }
+
+    private void InvalidarCache()
+    {
+        cachePorId = null;
+    }
 
     private void Awake()
     {
@@ -42,6 +90,7 @@ public class ItemDatabaseLocal : MonoBehaviour
 
     private void OnValidate()
     {
+        InvalidarCache();
         ValidarDatabaseInterno(false);
     }
 
@@ -50,19 +99,10 @@ public class ItemDatabaseLocal : MonoBehaviour
         if (string.IsNullOrWhiteSpace(itemId) || itens == null)
             return null;
 
+        ConstruirCacheSeNecessario();
+
         string idNormalizado = itemId.Trim();
-
-        for (int i = 0; i < itens.Count; i++)
-        {
-            EntradaItem entrada = itens[i];
-            if (entrada == null || string.IsNullOrWhiteSpace(entrada.itemId))
-                continue;
-
-            if (string.Equals(entrada.itemId.Trim(), idNormalizado, ObterComparacao()))
-                return entrada.prefab;
-        }
-
-        return null;
+        return cachePorId.TryGetValue(idNormalizado, out GameObject prefab) ? prefab : null;
     }
 
     public bool ExisteItem(string itemId)
@@ -89,22 +129,25 @@ public class ItemDatabaseLocal : MonoBehaviour
             if (entrada == null)
             {
                 if (validarCamposObrigatorios)
-                    { }
+                    Debug.LogWarning($"[ItemDatabaseLocal] Entrada nula no indice {i}.", this);
                 continue;
             }
+
+            SincronizarIdsDaEntrada(entrada);
 
             if (string.IsNullOrWhiteSpace(entrada.itemId))
             {
                 if (validarCamposObrigatorios)
-                    { }
+                    Debug.LogWarning($"[ItemDatabaseLocal] Entrada no indice {i} esta sem itemId.", this);
                 continue;
             }
 
             if (validarCamposObrigatorios && entrada.prefab == null)
-                { }
+                Debug.LogWarning($"[ItemDatabaseLocal] Entrada '{entrada.itemId}' esta sem prefab atribuido.", this);
+
             string id = entrada.itemId.Trim();
             if (!ids.Add(id))
-                { }
+                Debug.LogWarning($"[ItemDatabaseLocal] itemId duplicado: '{id}'. Apenas a primeira entrada sera usada por ObterPrefab().", this);
         }
     }
 
@@ -122,6 +165,7 @@ public class ItemDatabaseLocal : MonoBehaviour
                 continue;
 
             entrada.itemId = entrada.prefab.name;
+            SincronizarIdsDaEntrada(entrada);
             alterados++;
         }
 
@@ -130,6 +174,7 @@ public class ItemDatabaseLocal : MonoBehaviour
             EditorUtility.SetDirty(this);
 #endif
 
+        InvalidarCache();
         ValidarDatabase();
     }
 
@@ -145,5 +190,22 @@ public class ItemDatabaseLocal : MonoBehaviour
         return ignorarMaiusculasMinusculas
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
+    }
+
+    private void SincronizarIdsDaEntrada(EntradaItem entrada)
+    {
+        if (entrada == null || entrada.prefab == null)
+            return;
+
+        ItemPersistente persistente = entrada.prefab.GetComponentInChildren<ItemPersistente>(true);
+        if (persistente != null)
+        {
+            entrada.tipoItemId = persistente.ObterTipoItemId();
+            if (string.IsNullOrWhiteSpace(entrada.itemId))
+                entrada.itemId = persistente.ObterItemIdLegado();
+        }
+
+        if (string.IsNullOrWhiteSpace(entrada.itemId))
+            entrada.itemId = entrada.prefab.name;
     }
 }

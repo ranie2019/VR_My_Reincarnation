@@ -5,18 +5,47 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+[InitializeOnLoad]
 public static class ItemPersistenteIdEditorUtility
 {
+    private const string CampoTipoItemId = "tipoItemId";
     private const string CampoItemId = "itemId";
     private const string CampoInstanciaId = "instanciaId";
     private const string CampoItensDatabase = "itens";
     private const string CampoDatabaseItemId = "itemId";
     private const string CampoDatabasePrefab = "prefab";
+    private static readonly string[] PastasIgnoradasNaSincronizacaoPrefabs =
+    {
+        "Assets/Samples/",
+        "Assets/VRTemplateAssets/"
+    };
+
+    static ItemPersistenteIdEditorUtility()
+    {
+        EditorApplication.delayCall += SincronizarIdentidadesAutomaticamente;
+    }
+
+    private static void SincronizarIdentidadesAutomaticamente()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+            return;
+
+        SincronizarIdsDosPrefabs(false);
+        GerarIdsDaCenaInterno(false);
+    }
 
     [MenuItem("Tools/Save/Gerar IDs dos Itens Persistentes da Cena")]
     public static void GerarIdsDosItensPersistentesDaCena()
     {
         if (!PodeExecutarFerramentaDeCena("Gerar IDs dos Itens Persistentes da Cena"))
+            return;
+
+        GerarIdsDaCenaInterno(true);
+    }
+
+    private static void GerarIdsDaCenaInterno(bool registrarUndo)
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
             return;
 
         Scene cena = SceneManager.GetActiveScene();
@@ -36,13 +65,14 @@ public static class ItemPersistenteIdEditorUtility
             ItemPersistente item = itens[i];
             string instanciaId = LerStringSerializada(item, CampoInstanciaId);
 
-            if (!string.IsNullOrWhiteSpace(instanciaId) && idsUsados.Add(instanciaId))
+            if (ItemPersistente.InstanciaIdEhGuidValido(instanciaId) && idsUsados.Add(instanciaId))
                 continue;
 
             bool eraDuplicado = !string.IsNullOrWhiteSpace(instanciaId);
             string novoId = CriarGuidUnico(idsUsados);
 
-            Undo.RecordObject(item, "Gerar instanciaId persistente");
+            if (registrarUndo)
+                Undo.RecordObject(item, "Gerar instanciaId persistente");
             DefinirStringSerializada(item, CampoInstanciaId, novoId);
             EditorUtility.SetDirty(item);
 
@@ -63,6 +93,14 @@ public static class ItemPersistenteIdEditorUtility
         if (!PodeExecutarForaDoPlayMode("Limpar IDs dos Prefabs ItemPersistente"))
             return;
 
+        SincronizarIdsDosPrefabs(true);
+    }
+
+    private static void SincronizarIdsDosPrefabs(bool salvarAssets)
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+            return;
+
         string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" });
         int prefabsAlterados = 0;
         int idsLimpados = 0;
@@ -73,6 +111,10 @@ public static class ItemPersistenteIdEditorUtility
             for (int i = 0; i < guids.Length; i++)
             {
                 string caminho = AssetDatabase.GUIDToAssetPath(guids[i]);
+                if (DeveIgnorarPrefabNaSincronizacao(caminho) || !PrefabContemItemPersistente(caminho))
+                    continue;
+
+                string tipoIdAutomatico = AssetDatabase.AssetPathToGUID(caminho);
                 GameObject raiz = PrefabUtility.LoadPrefabContents(caminho);
                 if (raiz == null)
                     continue;
@@ -83,6 +125,13 @@ public static class ItemPersistenteIdEditorUtility
                     ItemPersistente[] itens = raiz.GetComponentsInChildren<ItemPersistente>(true);
                     for (int j = 0; j < itens.Length; j++)
                     {
+                        string tipoAtual = LerStringSerializada(itens[j], CampoTipoItemId);
+                        if (!string.Equals(tipoAtual, tipoIdAutomatico, StringComparison.Ordinal))
+                        {
+                            DefinirStringSerializada(itens[j], CampoTipoItemId, tipoIdAutomatico);
+                            alterouPrefab = true;
+                        }
+
                         string instanciaId = LerStringSerializada(itens[j], CampoInstanciaId);
                         if (string.IsNullOrWhiteSpace(instanciaId))
                             continue;
@@ -109,10 +158,35 @@ public static class ItemPersistenteIdEditorUtility
             AssetDatabase.StopAssetEditing();
         }
 
-        if (prefabsAlterados > 0)
+        if (salvarAssets && prefabsAlterados > 0)
             AssetDatabase.SaveAssets();
 
         { }
+    }
+
+    private static bool DeveIgnorarPrefabNaSincronizacao(string caminho)
+    {
+        if (string.IsNullOrWhiteSpace(caminho))
+            return true;
+
+        string caminhoNormalizado = caminho.Replace('\\', '/');
+        for (int i = 0; i < PastasIgnoradasNaSincronizacaoPrefabs.Length; i++)
+        {
+            string pastaIgnorada = PastasIgnoradasNaSincronizacaoPrefabs[i];
+            if (!string.IsNullOrWhiteSpace(pastaIgnorada) &&
+                caminhoNormalizado.StartsWith(pastaIgnorada, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool PrefabContemItemPersistente(string caminho)
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(caminho);
+        return prefab != null && prefab.GetComponentInChildren<ItemPersistente>(true) != null;
     }
 
     [MenuItem("Tools/Save/Validar IDs Persistentes")]
@@ -130,7 +204,7 @@ public static class ItemPersistenteIdEditorUtility
         for (int i = 0; i < itens.Count; i++)
         {
             ItemPersistente item = itens[i];
-            string itemId = LerStringSerializada(item, CampoItemId);
+            string itemId = item.ObterTipoItemId();
             string instanciaId = LerStringSerializada(item, CampoInstanciaId);
 
             if (string.IsNullOrWhiteSpace(itemId))
@@ -144,7 +218,7 @@ public static class ItemPersistenteIdEditorUtility
                 { }
             }
 
-            if (string.IsNullOrWhiteSpace(instanciaId))
+            if (!ItemPersistente.InstanciaIdEhGuidValido(instanciaId))
             {
                 avisos++;
                 { }
@@ -227,7 +301,10 @@ public static class ItemPersistenteIdEditorUtility
         for (int i = 0; i < itens.arraySize; i++)
         {
             SerializedProperty entrada = itens.GetArrayElementAtIndex(i);
+            SerializedProperty tipoItemId = entrada.FindPropertyRelative(CampoTipoItemId);
             SerializedProperty itemId = entrada.FindPropertyRelative(CampoDatabaseItemId);
+            if (tipoItemId != null && !string.IsNullOrWhiteSpace(tipoItemId.stringValue))
+                ids.Add(tipoItemId.stringValue.Trim());
             if (itemId != null && !string.IsNullOrWhiteSpace(itemId.stringValue))
                 ids.Add(itemId.stringValue.Trim());
         }

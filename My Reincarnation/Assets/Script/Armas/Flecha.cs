@@ -315,6 +315,9 @@ public class Flecha : MonoBehaviour, IDano
         if (outroCollider == null)
             return;
 
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(outroCollider))
+            return;
+
         if (!foiLancada)
             return;
 

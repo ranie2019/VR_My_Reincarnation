@@ -60,7 +60,7 @@ public class Equipamento : MonoBehaviour, IDano
     [SerializeField] private float volumeQuebra = 1f;
     [SerializeField] private float cooldownSomHit = 0.1f;
 
-    // ===== Propriedades públicas (usadas pelo Reparar) =====
+    // ===== Propriedades pï¿½blicas (usadas pelo Reparar) =====
     public int VidaAtual => vidaAtual;
     public int VidaMaxima => vidaMaxima;
     public float VidaFaltando => Mathf.Max(0, vidaMaxima - vidaAtual);
@@ -264,11 +264,14 @@ public class Equipamento : MonoBehaviour, IDano
         return null;
     }
 
-    // ===================== LÓGICA DE ARMA (dano) =====================
+    // ===================== Lï¿½GICA DE ARMA (dano) =====================
 
     private void ProcessarPossivelDano(Collider outroCollider)
     {
         if (outroCollider == null || quebrado || vidaAtual <= 0) return;
+
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(outroCollider))
+            return;
 
         GameObject objetoTocado = outroCollider.gameObject;
         if (EhParteDoProprioEquipamento(objetoTocado)) return;
@@ -378,7 +381,7 @@ public class Equipamento : MonoBehaviour, IDano
         return false;
     }
 
-    // ===================== LÓGICA DE ESCUDO (bloqueio) =====================
+    // ===================== Lï¿½GICA DE ESCUDO (bloqueio) =====================
 
     public bool EstaProtegendoPlayer(Transform player)
     {
@@ -393,6 +396,9 @@ public class Equipamento : MonoBehaviour, IDano
         if (tipo != TipoEquipamento.Escudo || !EstaProtegendoPlayer(playerAlvo) || origemDano == null)
             return false;
 
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(origemDano))
+            return false;
+
         if (EhParteDoProprioEquipamento(origemDano)) return false;
         if (!TagPodeDesgastarEscudo(origemDano, out GameObject origemResolvida)) return false;
         if (PertenceAoDonoAtual(origemResolvida) || PertenceAoDonoRecente(origemResolvida) ||
@@ -405,6 +411,10 @@ public class Equipamento : MonoBehaviour, IDano
     public bool RegistrarBloqueio(GameObject origemDano, bool tocarSom = true)
     {
         if (tipo != TipoEquipamento.Escudo || EstaQuebrado || origemDano == null) return false;
+
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(origemDano))
+            return false;
+
         if (EhParteDoProprioEquipamento(origemDano)) return false;
         if (!TagPodeDesgastarEscudo(origemDano, out GameObject origemResolvida)) return false;
         if (origemResolvida == null || EhParteDoProprioEquipamento(origemResolvida)) return false;
@@ -660,7 +670,7 @@ public class Equipamento : MonoBehaviour, IDano
         return FindFirstObjectByType<Camera>();
     }
 
-    // ===================== ÁUDIO =====================
+    // ===================== ï¿½UDIO =====================
 
     private void TocarSomHit()
     {
@@ -682,7 +692,7 @@ public class Equipamento : MonoBehaviour, IDano
             AudioSource.PlayClipAtPoint(somQuebra, transform.position, volumeQuebra);
     }
 
-    // ===================== UTILITÁRIOS =====================
+    // ===================== UTILITï¿½RIOS =====================
 
     private bool EhParteDoProprioEquipamento(GameObject obj)
     {

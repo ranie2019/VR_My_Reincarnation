@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -20,11 +21,12 @@ public class RespawnNatureza : MonoBehaviour
     [Header("Configuracoes de respawn por natureza")]
     [SerializeField] private ConfiguracaoRespawnNatureza[] configuracoesNatureza;
 
+    private readonly HashSet<string> respawnsAgendados = new();
+
     private void Awake()
     {
         if (Instancia != null && Instancia != this)
         {
-            { }
             enabled = false;
             return;
         }
@@ -36,6 +38,8 @@ public class RespawnNatureza : MonoBehaviour
     {
         if (Instancia == this)
             Instancia = null;
+
+        respawnsAgendados.Clear();
     }
 
     private void OnValidate()
@@ -58,24 +62,15 @@ public class RespawnNatureza : MonoBehaviour
         string idNormalizado = idNatureza == null ? string.Empty : idNatureza.Trim();
 
         if (string.IsNullOrWhiteSpace(idNormalizado))
-        {
-            { }
             return;
-        }
 
         ConfiguracaoRespawnNatureza config = BuscarConfiguracao(idNormalizado);
 
         if (config == null)
-        {
-            { }
             return;
-        }
 
         if (config.prefabRespawn == null)
-        {
-            { }
             return;
-        }
 
         float tempoRespawn = Mathf.Max(0f, config.tempoRespawn);
         Vector3 posicaoFinal = posicaoMorte + config.offsetRespawn;
@@ -83,15 +78,19 @@ public class RespawnNatureza : MonoBehaviour
             ? rotacaoMorte
             : config.prefabRespawn.transform.rotation;
 
-        StartCoroutine(RotinaRespawn(config, idNormalizado, tempoRespawn, posicaoFinal, rotacaoFinal));
+        string chaveRespawn = CriarChaveRespawn(idNormalizado, posicaoFinal);
+        if (!respawnsAgendados.Add(chaveRespawn))
+            return;
+
+        StartCoroutine(RotinaRespawn(config, tempoRespawn, posicaoFinal, rotacaoFinal, chaveRespawn));
     }
 
     private IEnumerator RotinaRespawn(
         ConfiguracaoRespawnNatureza config,
-        string idNatureza,
         float tempoRespawn,
         Vector3 posicaoFinal,
-        Quaternion rotacaoFinal)
+        Quaternion rotacaoFinal,
+        string chaveRespawn)
     {
         if (tempoRespawn > 0f)
             yield return new WaitForSeconds(tempoRespawn);
@@ -100,11 +99,34 @@ public class RespawnNatureza : MonoBehaviour
 
         if (config.prefabRespawn == null)
         {
-            { }
+            respawnsAgendados.Remove(chaveRespawn);
             yield break;
         }
 
-        Instantiate(config.prefabRespawn, posicaoFinal, rotacaoFinal);
+        GameObject instancia = Instantiate(config.prefabRespawn, posicaoFinal, rotacaoFinal);
+        PrepararItensRespawnados(instancia);
+        respawnsAgendados.Remove(chaveRespawn);
+    }
+
+    private void PrepararItensRespawnados(GameObject instancia)
+    {
+        if (instancia == null)
+            return;
+
+        Respawnitem[] itens = instancia.GetComponentsInChildren<Respawnitem>(true);
+        for (int i = 0; i < itens.Length; i++)
+        {
+            if (itens[i] != null)
+                itens[i].PrepararComoRecursoDisponivelNoMundo();
+        }
+    }
+
+    private static string CriarChaveRespawn(string idNatureza, Vector3 posicao)
+    {
+        int x = Mathf.RoundToInt(posicao.x * 1000f);
+        int y = Mathf.RoundToInt(posicao.y * 1000f);
+        int z = Mathf.RoundToInt(posicao.z * 1000f);
+        return idNatureza + "|" + x + "|" + y + "|" + z;
     }
 
     private ConfiguracaoRespawnNatureza BuscarConfiguracao(string idNatureza)

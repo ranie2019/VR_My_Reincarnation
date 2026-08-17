@@ -23,7 +23,12 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     [Header("Limite visual final do item")]
     [SerializeField] private Vector3 tamanhoVisualMaximoSlot = Vector3.zero;
-    [SerializeField] private bool debugEscalaInventario = true;
+
+    [Header("Retirada pelo Slot")]
+    [SerializeField] private bool permitirRetiradaPorLaserNoSlot = true;
+    [SerializeField] private XRSimpleInteractable interactableRetiradaPorSlot;
+    [SerializeField] private Collider[] collidersRetiradaPorSlot;
+    [SerializeField] private BoxCollider areaRetiradaLaserSlot;
 
     [Header("Contador")]
     [SerializeField] private TMP_Text contadorTMP;
@@ -49,6 +54,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private readonly HashSet<XRGrabInteractable> itensRestauradosDoSave = new();
     private readonly HashSet<XRGrabInteractable> itensComEscalaVisualPendente = new();
     private readonly Dictionary<XRGrabInteractable, Vector3> escalasVisuaisInventario = new();
+    private static readonly Dictionary<string, Vector3> escalasVisuaisCanonicasPorTipo = new();
+    private static readonly List<SlotInventario> slotsAtivosParaEscala = new();
 
     private XRGrabInteractable itemGuardado;
     private XRGrabInteractable itemComListenerRetiradaExterna;
@@ -60,6 +67,14 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private bool atualizandoTopo;
     private bool aguardarFrameVisualParaEscala;
     private Coroutine rotinaRecalculoEscalaQuandoVisivel;
+    private const string NomeAreaRetiradaLaserSlot = "__AreaRetiradaLaserSlot";
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void LimparCacheEstatico()
+    {
+        escalasVisuaisCanonicasPorTipo.Clear();
+        slotsAtivosParaEscala.Clear();
+    }
 
     private void Awake()
     {
@@ -67,6 +82,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             socketInteractor = GetComponent<XRSocketInteractor>();
 
         SincronizarPontoEncaixeDoSocket();
+        ConfigurarInteractableRetiradaPorSlot();
 
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
@@ -79,6 +95,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private void OnEnable()
     {
+        RegistrarSlotAtivoParaEscala();
+        ConfigurarInteractableRetiradaPorSlot();
+
         if (socketInteractor != null)
         {
             socketInteractor.selectEntered.AddListener(OnItemEncaixado);
@@ -87,13 +106,22 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             RegistrarFiltrosInteracao();
         }
 
+        RegistrarEventoRetiradaPorSlot();
         RegistrarFiltroNoItemGuardado();
     }
 
     private void OnDisable()
     {
+        slotsAtivosParaEscala.Remove(this);
         RemoverFiltroDoItemGuardado();
         RemoverListenerRetiradaExterna();
+        RemoverEventoRetiradaPorSlot();
+
+        if (interactableRetiradaPorSlot != null)
+            interactableRetiradaPorSlot.enabled = false;
+
+        if (areaRetiradaLaserSlot != null)
+            areaRetiradaLaserSlot.enabled = false;
 
         if (socketInteractor != null)
         {
@@ -112,13 +140,223 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (socketInteractor == null)
             socketInteractor = GetComponent<XRSocketInteractor>();
 
+        if (interactableRetiradaPorSlot == null)
+            interactableRetiradaPorSlot = GetComponent<XRSimpleInteractable>();
+
+        if ((collidersRetiradaPorSlot == null || collidersRetiradaPorSlot.Length == 0) &&
+            TryGetComponent(out Collider colliderSlot))
+        {
+            collidersRetiradaPorSlot = new[] { colliderSlot };
+        }
+
         SincronizarPontoEncaixeDoSocket();
+    }
+
+    private void ConfigurarInteractableRetiradaPorSlot()
+    {
+        if (!permitirRetiradaPorLaserNoSlot)
+        {
+            if (interactableRetiradaPorSlot != null)
+                interactableRetiradaPorSlot.enabled = false;
+
+            if (areaRetiradaLaserSlot != null)
+                areaRetiradaLaserSlot.enabled = false;
+
+            return;
+        }
+
+        if (interactableRetiradaPorSlot == null)
+            interactableRetiradaPorSlot = GetComponent<XRSimpleInteractable>();
+
+        if (interactableRetiradaPorSlot == null && GetComponent<XRBaseInteractable>() == null)
+            interactableRetiradaPorSlot = gameObject.AddComponent<XRSimpleInteractable>();
+
+        if (interactableRetiradaPorSlot == null)
+            return;
+
+        bool estavaHabilitado = interactableRetiradaPorSlot.enabled;
+        if (estavaHabilitado)
+            interactableRetiradaPorSlot.enabled = false;
+
+        GarantirAreaRetiradaLaserSlot();
+        SincronizarCollidersRetiradaPorSlot();
+        AtualizarEstadoInteractableRetiradaPorSlot();
+    }
+
+    private void RegistrarEventoRetiradaPorSlot()
+    {
+        if (!permitirRetiradaPorLaserNoSlot || interactableRetiradaPorSlot == null)
+            return;
+
+        interactableRetiradaPorSlot.selectEntered.RemoveListener(AoSlotSelecionadoParaRetirada);
+        interactableRetiradaPorSlot.selectEntered.AddListener(AoSlotSelecionadoParaRetirada);
+    }
+
+    private void RemoverEventoRetiradaPorSlot()
+    {
+        if (interactableRetiradaPorSlot != null)
+            interactableRetiradaPorSlot.selectEntered.RemoveListener(AoSlotSelecionadoParaRetirada);
+    }
+
+    private void SincronizarCollidersRetiradaPorSlot()
+    {
+        if (interactableRetiradaPorSlot == null)
+            return;
+
+        List<Collider> collidersInteractable = interactableRetiradaPorSlot.colliders;
+        for (int i = collidersInteractable.Count - 1; i >= 0; i--)
+        {
+            if (collidersInteractable[i] == null || ComponentePertenceAItemInventario(collidersInteractable[i]))
+                collidersInteractable.RemoveAt(i);
+        }
+
+        if (collidersRetiradaPorSlot == null || collidersRetiradaPorSlot.Length == 0)
+            collidersRetiradaPorSlot = GetComponents<Collider>();
+
+        bool possuiCollider = AdicionarColliderRetirada(areaRetiradaLaserSlot, collidersInteractable);
+        possuiCollider |= AdicionarCollidersRetirada(collidersRetiradaPorSlot, collidersInteractable);
+
+        if (!possuiCollider && visualSlot != null)
+            AdicionarCollidersRetirada(visualSlot.GetComponentsInChildren<Collider>(true), collidersInteractable);
+    }
+
+    private void GarantirAreaRetiradaLaserSlot()
+    {
+        if (areaRetiradaLaserSlot == null)
+        {
+            Transform existente = transform.Find(NomeAreaRetiradaLaserSlot);
+            if (existente != null)
+                areaRetiradaLaserSlot = existente.GetComponent<BoxCollider>();
+        }
+
+        if (areaRetiradaLaserSlot == null)
+        {
+            GameObject area = new GameObject(NomeAreaRetiradaLaserSlot);
+            area.transform.SetParent(transform, false);
+            areaRetiradaLaserSlot = area.AddComponent<BoxCollider>();
+        }
+
+        BoxCollider origem = ObterBoxColliderBaseDoSlot();
+        Transform areaTransform = areaRetiradaLaserSlot.transform;
+        Transform parentAlvo = origem != null ? origem.transform : transform;
+        if (areaTransform.parent != parentAlvo)
+            areaTransform.SetParent(parentAlvo, false);
+
+        areaTransform.localPosition = Vector3.zero;
+        areaTransform.localRotation = Quaternion.identity;
+        areaTransform.localScale = Vector3.one;
+        areaRetiradaLaserSlot.gameObject.layer = parentAlvo.gameObject.layer;
+        areaRetiradaLaserSlot.isTrigger = false;
+        areaRetiradaLaserSlot.enabled = false;
+
+        if (origem != null)
+        {
+            areaRetiradaLaserSlot.center = origem.center;
+            areaRetiradaLaserSlot.size = origem.size;
+            return;
+        }
+
+        areaRetiradaLaserSlot.center = Vector3.zero;
+        areaRetiradaLaserSlot.size = Vector3.one * 0.5f;
+    }
+
+    private BoxCollider ObterBoxColliderBaseDoSlot()
+    {
+        if (collidersRetiradaPorSlot != null)
+        {
+            for (int i = 0; i < collidersRetiradaPorSlot.Length; i++)
+            {
+                BoxCollider box = collidersRetiradaPorSlot[i] as BoxCollider;
+                if (box != null && box != areaRetiradaLaserSlot && !ComponentePertenceAItemInventario(box))
+                    return box;
+            }
+        }
+
+        BoxCollider boxLocal = GetComponent<BoxCollider>();
+        if (boxLocal != null && boxLocal != areaRetiradaLaserSlot)
+            return boxLocal;
+
+        if (visualSlot == null)
+            return null;
+
+        BoxCollider[] boxesVisuais = visualSlot.GetComponentsInChildren<BoxCollider>(true);
+        for (int i = 0; i < boxesVisuais.Length; i++)
+        {
+            BoxCollider box = boxesVisuais[i];
+            if (box != null && box != areaRetiradaLaserSlot && !ComponentePertenceAItemInventario(box))
+                return box;
+        }
+
+        return null;
+    }
+
+    private bool AdicionarColliderRetirada(Collider colliderSlot, List<Collider> destino)
+    {
+        if (colliderSlot == null || destino == null || ComponentePertenceAItemInventario(colliderSlot))
+            return false;
+
+        if (!destino.Contains(colliderSlot))
+            destino.Add(colliderSlot);
+
+        return true;
+    }
+
+    private bool AdicionarCollidersRetirada(Collider[] origem, List<Collider> destino)
+    {
+        if (origem == null || destino == null)
+            return false;
+
+        bool adicionou = false;
+        for (int i = 0; i < origem.Length; i++)
+        {
+            Collider colliderSlot = origem[i];
+            if (colliderSlot == null || ComponentePertenceAItemInventario(colliderSlot))
+                continue;
+
+            if (!destino.Contains(colliderSlot))
+                destino.Add(colliderSlot);
+
+            adicionou = true;
+        }
+
+        return adicionou;
+    }
+
+    private void AtualizarEstadoInteractableRetiradaPorSlot()
+    {
+        if (interactableRetiradaPorSlot == null)
+            return;
+
+        bool deveFicarAtivo = permitirRetiradaPorLaserNoSlot &&
+                              inventarioAberto &&
+                              visivelNaRolagem &&
+                              itemGuardado != null &&
+                              TopoDaPilha() == itemGuardado;
+
+        if (areaRetiradaLaserSlot != null && areaRetiradaLaserSlot.enabled != deveFicarAtivo)
+            areaRetiradaLaserSlot.enabled = deveFicarAtivo;
+
+        if (interactableRetiradaPorSlot.enabled != deveFicarAtivo)
+            interactableRetiradaPorSlot.enabled = deveFicarAtivo;
     }
 
     private void LateUpdate()
     {
         if (DeveManterPivotNoPontoEncaixe())
+        {
             PosicionarItemNoPontoDoSlot(itemGuardado.transform);
+            ReaplicarEscalaVisualFixaDoItemGuardado();
+            AtualizarEstadoInteractableRetiradaPorSlot();
+            return;
+        }
+
+        if (inventarioAberto && visivelNaRolagem && itemGuardado != null)
+        {
+            PosicionarItemNoPontoDoSlot(itemGuardado.transform);
+            ReaplicarEscalaVisualFixaDoItemGuardado();
+        }
+
+        AtualizarEstadoInteractableRetiradaPorSlot();
     }
 
     public bool canProcess => isActiveAndEnabled;
@@ -213,7 +451,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         for (int i = 0; i < filtros.count; i++)
         {
-            if (filtros.GetAt(i) == this)
+            if (ReferenceEquals(filtros.GetAt(i), this))
                 return;
         }
 
@@ -226,7 +464,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         for (int i = 0; i < filtros.count; i++)
         {
-            if (filtros.GetAt(i) == this)
+            if (ReferenceEquals(filtros.GetAt(i), this))
                 return;
         }
 
@@ -243,7 +481,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         var filtros = itemGuardado.selectFilters;
         for (int i = 0; i < filtros.count; i++)
         {
-            if (filtros.GetAt(i) == this)
+            if (ReferenceEquals(filtros.GetAt(i), this))
                 return;
         }
 
@@ -497,6 +735,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         XRGrabInteractable topoAnterior = TopoDaPilha();
         pilhaItens.Add(itemExtra);
+        InvalidarEscalaVisualParaRecalculo(itemExtra);
+        InvalidarEscalaVisualParaRecalculo(topoAnterior);
         AtualizarContadorTMP();
 
         TrocarTopoSelecionado(topoAnterior, itemExtra);
@@ -523,7 +763,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             if (topoAnterior != null && topoAnterior != novoTopo)
                 EsconderItemNaPilha(topoAnterior);
 
-            AplicarVisualNoSlot(novoTopo);
+            AplicarVisualNoSlot(novoTopo, true);
 
             SelecionarTopoNoSocket(novoTopo);
             RegistrarFiltroNoItemGuardado();
@@ -544,7 +784,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         SalvarEstadoOriginalSeNecessario(item);
         EstadoOriginalItem estado = estadosOriginais[item];
         ParentarItemNoSlot(item);
-        RestaurarEscalaOriginalDoEstado(item, estado, false);
+        ReaplicarEscalaBaseRestauradaDoSave(item, estado);
         PosicionarItemNoPontoDoSlot(item.transform);
 
         foreach (var estadoRenderer in estado.Renderers)
@@ -555,12 +795,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         SetUiDoItemVisivel(estado, false);
 
-        foreach (var estadoCollider in estado.Colliders)
-        {
-            if (estadoCollider.Collider != null)
-                estadoCollider.Collider.enabled = false;
-        }
-
+        AplicarCollidersDoItemDaPilha(item, estado, false);
         AplicarFisicaDoItemDaPilha(item, estado, false);
 
         MarcarItemComoEscondidoNaPilha(item);
@@ -580,7 +815,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         ParentarItemNoSlot(item);
 
-        RestaurarEscalaOriginalDoEstado(item, estado, false);
+        ReaplicarEscalaBaseRestauradaDoSave(item, estado);
 
         foreach (var estadoRenderer in estado.Renderers)
         {
@@ -590,12 +825,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         SetUiDoItemVisivel(estado, false);
 
-        foreach (var estadoCollider in estado.Colliders)
-        {
-            if (estadoCollider.Collider != null)
-                estadoCollider.Collider.enabled = estadoCollider.Enabled;
-        }
-
+        AplicarCollidersDoItemDaPilha(item, estado, true);
         AplicarFisicaDoItemDaPilha(item, estado, true);
 
         bool forcarRecalculo = forcarEscalaMesmoInvisivel ||
@@ -612,7 +842,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (item == null || estado == null)
             return;
 
-        RestaurarEscalaOriginalDoEstado(item, estado, false);
+        ReaplicarEscalaBaseRestauradaDoSave(item, estado);
         GarantirEscalaOriginal(item.transform);
         PrepararEscalaParaSlot(item.transform, estado);
         PosicionarItemNoPontoDoSlot(item.transform);
@@ -725,6 +955,14 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
         }
 
+        if (!forcarRecalculo && TentarAplicarEscalaVisualCanonica(item))
+        {
+            PosicionarItemNoPontoDoSlot(item.transform);
+            itensComEscalaVisualPendente.Remove(item);
+            itensRestauradosDoSave.Remove(item);
+            return;
+        }
+
         if (!forcarRecalculo && TentarAplicarEscalaVisualInventario(item, estado))
         {
             PosicionarItemNoPontoDoSlot(item.transform);
@@ -732,7 +970,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         escalasVisuaisInventario.Remove(item);
-        RestaurarEscalaOriginalDoEstado(item, estado, false);
+        ReaplicarEscalaBaseRestauradaDoSave(item, estado);
         GarantirEscalaOriginal(item.transform);
         PosicionarItemNoPontoDoSlot(item.transform);
         PrepararEscalaParaSlot(item.transform, estado);
@@ -916,7 +1154,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (escalaComp != null && escalaComp.inicializado)
             escalaComp.LimparTravaDoSlot(this);
 
-        Vector3 escalaOriginalMundo = ObterEscalaOriginalMundo(item, estado);
+        Vector3 escalaOriginalMundo = ObterEscalaOriginalMundoDoEstado(item, estado);
         item.transform.localScale = escalaOriginalMundo;
         item.SetTargetLocalScale(escalaOriginalMundo);
     }
@@ -932,7 +1170,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (escalaComp != null && escalaComp.inicializado)
             escalaComp.LimparTravaDoSlot(this);
 
-        Vector3 escalaOriginalMundo = ObterEscalaOriginalMundo(item, estado);
+        Vector3 escalaOriginalMundo = ObterEscalaOriginalMundoDoEstado(item, estado);
         Vector3 escalaLocalOriginal = ConverterEscalaMundoParaLocal(escalaOriginalMundo, itemTransform.parent);
 
         itemTransform.localScale = escalaLocalOriginal;
@@ -974,18 +1212,13 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (escalaComp == null)
             escalaComp = item.gameObject.AddComponent<EscalaOriginalItem>();
 
-        if (!escalaComp.inicializado || !EscalaValida(escalaComp.escalaOriginal))
-        {
-            if (EscalaValida(estado.LossyScaleOriginal))
-            {
-                escalaComp.escalaOriginal = estado.LossyScaleOriginal;
-                escalaComp.inicializado = true;
-            }
-        }
+        Vector3 escalaOriginalMundo = ObterEscalaBaseLimpaParaInventario(item, estado);
+        if (EscalaValida(escalaOriginalMundo))
+            escalaComp.DefinirEscalaOriginal(escalaOriginalMundo);
 
         var itemEscalavel = item.GetComponent<ItemInventarioEscalavel>();
-        if (itemEscalavel != null && EscalaValida(escalaComp.escalaOriginal))
-            itemEscalavel.DefinirEscalaOriginalMundo(escalaComp.escalaOriginal);
+        if (itemEscalavel != null && EscalaValida(escalaOriginalMundo))
+            itemEscalavel.ForcarEscalaOriginalMundo(escalaOriginalMundo);
     }
 
     private void SalvarEstadoOriginalSeItem(Transform itemTransform)
@@ -1148,6 +1381,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         itensRestauradosDoSave.Add(item);
         escalasVisuaisInventario.Remove(item);
 
+        DesarmarRespawnItemColetado(item);
         MarcarItemAceitoPeloSlot(item, esconderNaPilha, "restauracao save");
         pilhaItens.Add(item);
         nomeItemAtual = nomeItem;
@@ -1172,6 +1406,19 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         AtualizarContadorTMP();
         AtualizarVisibilidadeVisual();
         return true;
+    }
+
+    private static void DesarmarRespawnItemColetado(XRGrabInteractable item)
+    {
+        if (item == null)
+            return;
+
+        Respawnitem[] respawns = item.GetComponentsInChildren<Respawnitem>(true);
+        for (int i = 0; i < respawns.Length; i++)
+        {
+            if (respawns[i] != null)
+                respawns[i].DesarmarComoItemColetado();
+        }
     }
 
     public void FinalizarRestauracaoDoSave()
@@ -1339,9 +1586,10 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         MarcarItemAceitoPeloSlot(item, false, "primeiro item do slot");
 
         pilhaItens.Add(item);
+        InvalidarEscalaVisualParaRecalculo(item);
         nomeItemAtual = ObterNomeItem(item);
 
-        AplicarVisualNoSlot(item);
+        AplicarVisualNoSlot(item, true);
         RegistrarFiltroNoItemGuardado();
         AtualizarContadorTMP();
         TocarSom(somAdicionarItem);
@@ -1453,6 +1701,66 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         RetirarItemGuardadoParaInteractorExterno(itemGuardado);
     }
 
+    private void AoSlotSelecionadoParaRetirada(SelectEnterEventArgs args)
+    {
+        if (args == null)
+            return;
+
+        TentarRetirarItemPeloSlot(args.interactorObject);
+    }
+
+    private void TentarRetirarItemPeloSlot(IXRSelectInteractor interactor)
+    {
+        if (!PodeRetirarItemPeloSlot(interactor))
+            return;
+
+        XRGrabInteractable itemRemovido = itemGuardado;
+        XRInteractionManager manager = ObterInteractionManagerParaRetirada(interactor);
+        if (itemRemovido == null || manager == null)
+            return;
+
+        IXRSelectInteractable slotInteractable = interactableRetiradaPorSlot;
+        if (slotInteractable != null && interactor.IsSelecting(slotInteractable))
+            manager.SelectExit(interactor, slotInteractable);
+
+        RetirarItemGuardadoParaInteractorExterno(itemRemovido);
+
+        if (itemRemovido == null ||
+            pilhaItens.Contains(itemRemovido) ||
+            !itemRemovido.gameObject.activeInHierarchy ||
+            !itemRemovido.enabled)
+        {
+            return;
+        }
+
+        manager.SelectEnterUnconditionally(interactor, (IXRSelectInteractable)itemRemovido);
+    }
+
+    private bool PodeRetirarItemPeloSlot(IXRSelectInteractor interactor)
+    {
+        return permitirRetiradaPorLaserNoSlot &&
+               inventarioAberto &&
+               visivelNaRolagem &&
+               !operacaoInternaSocket &&
+               !atualizandoTopo &&
+               itemGuardado != null &&
+               TopoDaPilha() == itemGuardado &&
+               interactor != null &&
+               !EhSocketDoSlot(interactor) &&
+               !EhOutroSocket(interactor);
+    }
+
+    private XRInteractionManager ObterInteractionManagerParaRetirada(IXRSelectInteractor interactor)
+    {
+        if (interactableRetiradaPorSlot != null && interactableRetiradaPorSlot.interactionManager != null)
+            return interactableRetiradaPorSlot.interactionManager;
+
+        if (socketInteractor != null && socketInteractor.interactionManager != null)
+            return socketInteractor.interactionManager;
+
+        return interactor is XRBaseInteractor baseInteractor ? baseInteractor.interactionManager : null;
+    }
+
     private void RetirarItemGuardadoParaInteractorExterno(XRGrabInteractable itemRemovido)
     {
         if (itemRemovido == null || TopoDaPilha() != itemRemovido)
@@ -1515,7 +1823,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         try
         {
-            AplicarVisualNoSlot(novoTopo);
+            InvalidarEscalaVisualParaRecalculo(novoTopo);
+            AplicarVisualNoSlot(novoTopo, true);
             SelecionarTopoNoSocket(novoTopo);
             RegistrarFiltroNoItemGuardado();
             AtualizarContadorTMP();
@@ -1545,25 +1854,17 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (escalaComp == null)
             escalaComp = item.gameObject.AddComponent<EscalaOriginalItem>();
 
-        bool escalaCompValida = escalaComp.inicializado && EscalaValida(escalaComp.escalaOriginal);
-        Vector3 escalaOriginalMundo = escalaCompValida
-            ? escalaComp.escalaOriginal
-            : ObterEscalaOriginalMundoDoEstado(item, estado);
+        Vector3 escalaOriginalMundo = ObterEscalaBaseLimpaParaInventario(item, estado);
 
         if (!EscalaValida(escalaOriginalMundo))
             return;
 
-        if (!escalaCompValida)
-        {
-            escalaComp.escalaOriginal = escalaOriginalMundo;
-            escalaComp.inicializado = true;
-        }
-
+        escalaComp.DefinirEscalaOriginal(escalaOriginalMundo);
         escalaComp.LimparTravaDoSlot(this);
 
         var itemEscalavel = item.GetComponent<ItemInventarioEscalavel>();
         if (itemEscalavel != null)
-            itemEscalavel.DefinirEscalaOriginalMundo(escalaOriginalMundo);
+            itemEscalavel.ForcarEscalaOriginalMundo(escalaOriginalMundo);
 
         Vector3 escalaLocalOriginal = ConverterEscalaMundoParaLocal(escalaOriginalMundo, item.transform.parent);
         item.transform.localScale = escalaLocalOriginal;
@@ -1576,11 +1877,49 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (item == null || !EscalaValida(item.transform.localScale))
             return;
 
-        escalasVisuaisInventario[item] = item.transform.localScale;
+        Vector3 escalaVisualMundo = RegistrarOuObterEscalaCanonica(item, item.transform.lossyScale);
+        AplicarEscalaMundoNoItem(item, escalaVisualMundo);
+        escalasVisuaisInventario[item] = escalaVisualMundo;
+    }
+
+    private void ReaplicarEscalaVisualFixaDoItemGuardado()
+    {
+        if (itemGuardado == null)
+            return;
+
+        if (!escalasVisuaisInventario.ContainsKey(itemGuardado) &&
+            TentarAplicarEscalaVisualCanonica(itemGuardado))
+        {
+            return;
+        }
+
+        if (!escalasVisuaisInventario.TryGetValue(itemGuardado, out Vector3 escalaVisualMundo))
+            return;
+
+        if (!EscalaValida(escalaVisualMundo))
+            return;
+
+        AplicarEscalaMundoNoItem(itemGuardado, escalaVisualMundo);
+    }
+
+    private void InvalidarEscalaVisualParaRecalculo(XRGrabInteractable item)
+    {
+        if (item == null)
+            return;
+
+        escalasVisuaisInventario.Remove(item);
+        itensComEscalaVisualPendente.Add(item);
+
+        var escalaComp = item.GetComponent<EscalaOriginalItem>();
+        if (escalaComp != null && escalaComp.inicializado)
+            escalaComp.LimparTravaDoSlot(this);
     }
 
     private bool TentarAplicarEscalaVisualInventario(XRGrabInteractable item, EstadoOriginalItem estado)
     {
+        if (TentarAplicarEscalaVisualCanonica(item))
+            return true;
+
         if (item == null || !escalasVisuaisInventario.TryGetValue(item, out Vector3 escalaVisual))
             return false;
 
@@ -1590,10 +1929,203 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (!EscalaValida(escalaVisual))
             return false;
 
-        item.transform.localScale = escalaVisual;
-        item.SetTargetLocalScale(escalaVisual);
-        Physics.SyncTransforms();
+        AplicarEscalaMundoNoItem(item, escalaVisual);
         return true;
+    }
+
+    private bool TentarAplicarEscalaVisualCanonica(XRGrabInteractable item)
+    {
+        if (item == null)
+            return false;
+
+        string chave = CriarChaveEscalaVisual(item);
+        if (string.IsNullOrEmpty(chave))
+            return false;
+
+        if (!escalasVisuaisCanonicasPorTipo.TryGetValue(chave, out Vector3 escalaVisual))
+            return false;
+
+        if (!EscalaValida(escalaVisual))
+        {
+            escalasVisuaisCanonicasPorTipo.Remove(chave);
+            return false;
+        }
+
+        AplicarEscalaMundoNoItem(item, escalaVisual);
+        escalasVisuaisInventario[item] = escalaVisual;
+        return true;
+    }
+
+    private Vector3 RegistrarOuObterEscalaCanonica(XRGrabInteractable item, Vector3 escalaVisual)
+    {
+        if (!EscalaValida(escalaVisual))
+            return escalaVisual;
+
+        string chave = CriarChaveEscalaVisual(item);
+        if (string.IsNullOrEmpty(chave))
+            return escalaVisual;
+
+        if (!escalasVisuaisCanonicasPorTipo.TryGetValue(chave, out Vector3 escalaAtual) ||
+            !EscalaValida(escalaAtual))
+        {
+            escalasVisuaisCanonicasPorTipo[chave] = escalaVisual;
+            return escalaVisual;
+        }
+
+        Vector3 escalaSegura = EscolherEscalaVisualMaisSegura(escalaAtual, escalaVisual);
+        escalasVisuaisCanonicasPorTipo[chave] = escalaSegura;
+
+        if (!VetoresQuaseIguais(escalaSegura, escalaAtual))
+            AplicarEscalaCanonicaNosSlotsAtivos(chave, escalaSegura);
+
+        return escalaSegura;
+    }
+
+    private void RegistrarSlotAtivoParaEscala()
+    {
+        if (!slotsAtivosParaEscala.Contains(this))
+            slotsAtivosParaEscala.Add(this);
+    }
+
+    private static void AplicarEscalaCanonicaNosSlotsAtivos(string chave, Vector3 escalaVisual)
+    {
+        if (string.IsNullOrEmpty(chave) || !EscalaValida(escalaVisual))
+            return;
+
+        for (int i = slotsAtivosParaEscala.Count - 1; i >= 0; i--)
+        {
+            SlotInventario slot = slotsAtivosParaEscala[i];
+            if (slot == null)
+            {
+                slotsAtivosParaEscala.RemoveAt(i);
+                continue;
+            }
+
+            slot.AplicarEscalaCanonicaSeForMesmoTipo(chave, escalaVisual);
+        }
+    }
+
+    private void AplicarEscalaCanonicaSeForMesmoTipo(string chave, Vector3 escalaVisual)
+    {
+        XRGrabInteractable topo = TopoDaPilha();
+        if (topo == null || !EscalaValida(escalaVisual))
+            return;
+
+        if (!string.Equals(CriarChaveEscalaVisual(topo), chave, System.StringComparison.Ordinal))
+            return;
+
+        AplicarEscalaMundoNoItem(topo, escalaVisual);
+        escalasVisuaisInventario[topo] = escalaVisual;
+
+        if (inventarioAberto && visivelNaRolagem)
+            PosicionarItemNoPontoDoSlot(topo.transform);
+    }
+
+    private string CriarChaveEscalaVisual(XRGrabInteractable item)
+    {
+        if (item == null)
+            return string.Empty;
+
+        ItemInventarioDados dados = item.GetComponent<ItemInventarioDados>();
+        if (dados != null && dados.PrefabParaStack != null)
+            return "tipo:" + LimparNomeItemParaEscala(dados.PrefabParaStack.name);
+
+        ItemPersistente persistente = item.GetComponent<ItemPersistente>();
+        if (persistente != null && persistente.PrefabReferencia != null)
+            return "tipo:" + LimparNomeItemParaEscala(persistente.PrefabReferencia.name);
+
+        if (dados != null && !string.IsNullOrWhiteSpace(dados.NomeItem))
+            return "tipo:" + LimparNomeItemParaEscala(dados.NomeItem);
+
+        if (persistente != null)
+        {
+            string nomePersistente = persistente.ObterNomeItem();
+            if (!string.IsNullOrWhiteSpace(nomePersistente))
+                return "tipo:" + LimparNomeItemParaEscala(nomePersistente);
+        }
+
+        string nome = LimparNomeItemParaEscala(item.name);
+        if (string.IsNullOrWhiteSpace(nome))
+            return string.Empty;
+
+        return "tipo:" + nome;
+    }
+
+    private static string LimparNomeItemParaEscala(string nome)
+    {
+        string limpo = LimparNomeItem(nome);
+        if (string.IsNullOrEmpty(limpo))
+            return string.Empty;
+
+        int abreParenteses = limpo.LastIndexOf('(');
+        int fechaParenteses = limpo.EndsWith(")") ? limpo.Length - 1 : -1;
+
+        if (abreParenteses > 0 && fechaParenteses > abreParenteses)
+        {
+            string conteudo = limpo.Substring(abreParenteses + 1, fechaParenteses - abreParenteses - 1).Trim();
+            if (EhNumeroInteiroPositivo(conteudo))
+                limpo = limpo.Substring(0, abreParenteses).Trim();
+        }
+
+        return limpo;
+    }
+
+    private static bool EhNumeroInteiroPositivo(string texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+            return false;
+
+        for (int i = 0; i < texto.Length; i++)
+        {
+            if (!char.IsDigit(texto[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static Vector3 EscolherEscalaVisualMaisSegura(Vector3 atual, Vector3 nova)
+    {
+        if (!EscalaValida(atual))
+            return nova;
+
+        if (!EscalaValida(nova))
+            return atual;
+
+        return MaiorComponenteAbsoluta(nova) < MaiorComponenteAbsoluta(atual)
+            ? nova
+            : atual;
+    }
+
+    private static float MaiorComponenteAbsoluta(Vector3 escala)
+    {
+        return Mathf.Max(Mathf.Abs(escala.x), Mathf.Abs(escala.y), Mathf.Abs(escala.z));
+    }
+
+    private static bool VetoresQuaseIguais(Vector3 a, Vector3 b)
+    {
+        return Mathf.Approximately(a.x, b.x) &&
+               Mathf.Approximately(a.y, b.y) &&
+               Mathf.Approximately(a.z, b.z);
+    }
+
+    private static void AplicarEscalaLocalNoItem(XRGrabInteractable item, Vector3 escalaLocal)
+    {
+        if (item == null || !EscalaValida(escalaLocal))
+            return;
+
+        item.transform.localScale = escalaLocal;
+        item.SetTargetLocalScale(escalaLocal);
+        Physics.SyncTransforms();
+    }
+
+    private static void AplicarEscalaMundoNoItem(XRGrabInteractable item, Vector3 escalaMundo)
+    {
+        if (item == null || !EscalaValida(escalaMundo))
+            return;
+
+        Vector3 escalaLocal = ConverterEscalaMundoParaLocal(escalaMundo, item.transform.parent);
+        AplicarEscalaLocalNoItem(item, escalaLocal);
     }
 
     private void LimparEscalaVisualInventario(XRGrabInteractable item)
@@ -1621,15 +2153,13 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (comp == null)
         {
             comp = item.gameObject.AddComponent<EscalaOriginalItem>();
-            comp.escalaOriginal = item.lossyScale;
-            comp.inicializado = true;
+            comp.DefinirEscalaOriginal(item.lossyScale);
             return;
         }
 
         if (!comp.inicializado || !EscalaValida(comp.escalaOriginal))
         {
-            comp.escalaOriginal = item.lossyScale;
-            comp.inicializado = true;
+            comp.DefinirEscalaOriginal(item.lossyScale);
         }
     }
 
@@ -1670,9 +2200,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return false;
 
         XRGrabInteractable grab = item.GetComponent<XRGrabInteractable>();
-        Vector3 escalaOriginal = ObterEscalaOriginalMundo(grab, estado);
+        Vector3 escalaOriginal = ObterEscalaBaseLimpaParaInventario(grab, estado);
         if (EscalaValida(escalaOriginal))
-            itemEscalavel.DefinirEscalaOriginalMundo(escalaOriginal);
+            itemEscalavel.ForcarEscalaOriginalMundo(escalaOriginal);
 
         return itemEscalavel.AjustarRenderersParaSlotVisual(transform, boundsPermitido, escalaOriginal);
     }
@@ -1781,40 +2311,30 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
 
         var escalaComp = item.GetComponent<EscalaOriginalItem>();
+        if (escalaComp == null)
+            escalaComp = item.gameObject.AddComponent<EscalaOriginalItem>();
+
         var itemEscalavel = item.GetComponent<ItemInventarioEscalavel>();
-
-        bool escalaCompValida = escalaComp != null &&
-                                escalaComp.inicializado &&
-                                EscalaValida(escalaComp.escalaOriginal);
-        bool escalaEscalavelValida = itemEscalavel != null &&
-                                     itemEscalavel.PossuiEscalaOriginalMundoValida();
-
-        Vector3 escalaOriginalMundo = escalaCompValida
-            ? escalaComp.escalaOriginal
-            : escalaEscalavelValida
-                ? itemEscalavel.ObterEscalaOriginalMundo()
-                : ObterEscalaOriginalMundo(item.GetComponent<XRGrabInteractable>(), estado);
+        Vector3 escalaOriginalMundo = ObterEscalaBaseLimpaParaInventario(
+            item.GetComponent<XRGrabInteractable>(),
+            estado);
 
         if (!EscalaValida(escalaOriginalMundo))
             return;
 
-        if (escalaComp != null)
-        {
-            if (!escalaCompValida)
-            {
-                escalaComp.escalaOriginal = escalaOriginalMundo;
-                escalaComp.inicializado = true;
-            }
-
-            escalaComp.LimparTravaDoSlot(this);
-        }
+        escalaComp.DefinirEscalaOriginal(escalaOriginalMundo);
+        escalaComp.LimparTravaDoSlot(this);
 
         if (itemEscalavel != null)
-            itemEscalavel.DefinirEscalaOriginalMundo(escalaOriginalMundo);
+            itemEscalavel.ForcarEscalaOriginalMundo(escalaOriginalMundo);
     }
 
     private Vector3 ObterEscalaOriginalMundo(XRGrabInteractable item, EstadoOriginalItem estado)
     {
+        Vector3 escalaBaseLimpa = ObterEscalaBaseLimpaParaInventario(item, estado);
+        if (EscalaValida(escalaBaseLimpa))
+            return escalaBaseLimpa;
+
         if (item != null)
         {
             var escalaComp = item.GetComponent<EscalaOriginalItem>();
@@ -1831,6 +2351,104 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         Vector3 escalaAtual = item != null ? item.transform.lossyScale : Vector3.one;
         return EscalaValida(escalaAtual) ? escalaAtual : Vector3.one;
+    }
+
+    private Vector3 ObterEscalaBaseLimpaParaInventario(XRGrabInteractable item, EstadoOriginalItem estado)
+    {
+        if (item != null && TentarObterEscalaBaseDeReferencia(item, out Vector3 escalaReferencia))
+            return escalaReferencia;
+
+        if (item != null)
+        {
+            var escalaComp = item.GetComponent<EscalaOriginalItem>();
+            if (escalaComp != null && escalaComp.inicializado && EscalaValida(escalaComp.escalaOriginal))
+                return escalaComp.escalaOriginal;
+
+            var itemEscalavel = item.GetComponent<ItemInventarioEscalavel>();
+            if (itemEscalavel != null && itemEscalavel.PossuiEscalaOriginalMundoValida())
+                return itemEscalavel.ObterEscalaOriginalMundo();
+        }
+
+        if (estado != null && EscalaValida(estado.LossyScaleOriginal))
+            return estado.LossyScaleOriginal;
+
+        if (item != null)
+        {
+            Vector3 escalaAtual = item.transform.lossyScale;
+            if (EscalaValida(escalaAtual))
+                return escalaAtual;
+        }
+
+        return Vector3.one;
+    }
+
+    private static bool TentarObterEscalaBaseDeReferencia(XRGrabInteractable item, out Vector3 escalaReferencia)
+    {
+        escalaReferencia = Vector3.one;
+        if (item == null)
+            return false;
+
+        ItemInventarioDados dados = item.GetComponent<ItemInventarioDados>();
+        if (dados != null && TentarObterEscalaDoPrefab(dados.PrefabParaStack, out escalaReferencia))
+            return true;
+
+        ItemPersistente persistente = item.GetComponent<ItemPersistente>();
+        if (persistente != null && TentarObterEscalaDoPrefab(persistente.PrefabReferencia, out escalaReferencia))
+            return true;
+
+        if (TentarObterEscalaDoDatabase(item, dados, persistente, out escalaReferencia))
+            return true;
+
+        return false;
+    }
+
+    private static bool TentarObterEscalaDoDatabase(
+        XRGrabInteractable item,
+        ItemInventarioDados dados,
+        ItemPersistente persistente,
+        out Vector3 escalaReferencia)
+    {
+        escalaReferencia = Vector3.one;
+
+        ItemDatabaseLocal database = ItemDatabaseLocal.Instancia != null
+            ? ItemDatabaseLocal.Instancia
+            : UnityEngine.Object.FindFirstObjectByType<ItemDatabaseLocal>();
+
+        if (database == null)
+            return false;
+
+        return TentarObterEscalaDoDatabasePorId(database, dados != null ? dados.NomeItem : null, out escalaReferencia) ||
+               TentarObterEscalaDoDatabasePorId(database, persistente != null ? persistente.ObterTipoItemId() : null, out escalaReferencia) ||
+               TentarObterEscalaDoDatabasePorId(database, persistente != null ? persistente.ObterItemIdLegado() : null, out escalaReferencia) ||
+               TentarObterEscalaDoDatabasePorId(database, persistente != null ? persistente.ObterNomeItem() : null, out escalaReferencia) ||
+               TentarObterEscalaDoDatabasePorId(database, item != null ? LimparNomeItemParaEscala(item.name) : null, out escalaReferencia);
+    }
+
+    private static bool TentarObterEscalaDoDatabasePorId(
+        ItemDatabaseLocal database,
+        string id,
+        out Vector3 escalaReferencia)
+    {
+        escalaReferencia = Vector3.one;
+
+        if (database == null || string.IsNullOrWhiteSpace(id))
+            return false;
+
+        return TentarObterEscalaDoPrefab(database.ObterPrefab(id), out escalaReferencia);
+    }
+
+    private static bool TentarObterEscalaDoPrefab(GameObject prefab, out Vector3 escala)
+    {
+        escala = Vector3.one;
+        if (prefab == null)
+            return false;
+
+        Vector3 escalaPrefab = prefab.transform.lossyScale;
+        if (!EscalaValida(escalaPrefab))
+            return false;
+
+        escala = escalaPrefab;
+        return true;
     }
 
     private Vector3 ObterEscalaOriginalMundoDoEstado(XRGrabInteractable item, EstadoOriginalItem estado)
@@ -1985,6 +2603,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         AtualizarContadorTMP();
+        AtualizarEstadoInteractableRetiradaPorSlot();
     }
 
     private void AtualizarVisibilidadeDaPilha()
@@ -2142,9 +2761,10 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             diagnosticoAlteracoesFisicasReais++;
         }
 
-        if (rb.detectCollisions != ehTopo)
+        bool colisaoNecessariaParaInteracao = grabAtivo;
+        if (rb.detectCollisions != colisaoNecessariaParaInteracao)
         {
-            rb.detectCollisions = ehTopo;
+            rb.detectCollisions = colisaoNecessariaParaInteracao;
             diagnosticoAlteracoesFisicasReais++;
         }
     }
@@ -2207,10 +2827,10 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private void AtualizarContadorTMP()
     {
-        if (contadorTMP == null)
-            return;
+        if (contadorTMP != null)
+            contadorTMP.text = pilhaItens.Count.ToString();
 
-        contadorTMP.text = pilhaItens.Count.ToString();
+        AtualizarEstadoInteractableRetiradaPorSlot();
     }
 
     public void SetVisivelNaRolagem(bool visivel)
@@ -2247,6 +2867,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             {
                 bool forcarRecalculo = itensRestauradosDoSave.Contains(item) ||
                                        itensComEscalaVisualPendente.Contains(item) ||
+                                       aguardarFrameVisualParaEscala ||
                                        !escalasVisuaisInventario.ContainsKey(item);
                 AplicarOuAgendarEscalaVisual(item, estado, forcarRecalculo);
             }
@@ -2263,7 +2884,10 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     public void SetInventarioAberto(bool aberto)
     {
         if (inventarioAberto == aberto)
+        {
+            AtualizarEstadoInteractableRetiradaPorSlot();
             return;
+        }
 
         inventarioAberto = aberto;
 

@@ -10,6 +10,24 @@ public class EstadoItemInventario : MonoBehaviour
 
     public event System.Action<bool> EstadoInventarioAlterado;
 
+    public static bool EstaNoInventario(Component componente)
+    {
+        if (componente == null)
+            return false;
+
+        EstadoItemInventario estado = componente.GetComponentInParent<EstadoItemInventario>(true);
+        return estado != null && estado.estaNoInventario;
+    }
+
+    public static bool EstaNoInventario(GameObject objeto)
+    {
+        if (objeto == null)
+            return false;
+
+        EstadoItemInventario estado = objeto.GetComponentInParent<EstadoItemInventario>(true);
+        return estado != null && estado.estaNoInventario;
+    }
+
     public void MarcarAceito(SlotInventario slot, bool escondido)
     {
         bool estavaNoInventario = estaNoInventario;

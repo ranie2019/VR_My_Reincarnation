@@ -19,12 +19,16 @@ public class VidaRecursoMineral : MonoBehaviour
     [Header("Spawn ao destruir")]
     [SerializeField] private GameObject prefabAoDestruir;
     [SerializeField] private Vector3 offsetSpawn = Vector3.zero;
+    [SerializeField, Min(1)] private int quantidadeNormalAoDestruir = 3;
+    [SerializeField] private bool usarTipoPicaretaParaQuantidade = true;
+    [SerializeField, Min(0f)] private float raioDistribuicaoSpawn = 0.25f;
 
     [Header("Respawn")]
     [SerializeField] private string respawnId = "";
 
     private bool emCooldown;
     private bool morreu;
+    private Picareta ultimaPicaretaQueCausouDano;
 
     private class RepassadorFisicaMineral : MonoBehaviour
     {
@@ -63,6 +67,9 @@ public class VidaRecursoMineral : MonoBehaviour
         danoPorHit = 1;
         cooldownHit = 0.25f;
         aplicarDanoPorTriggerDireto = true;
+        quantidadeNormalAoDestruir = 3;
+        usarTipoPicaretaParaQuantidade = true;
+        raioDistribuicaoSpawn = 0.25f;
     }
 
     private void Awake()
@@ -78,6 +85,8 @@ public class VidaRecursoMineral : MonoBehaviour
         vidaAtual = Mathf.Clamp(vidaAtual, 1, vidaMax);
         danoPorHit = Mathf.Max(1, danoPorHit);
         cooldownHit = Mathf.Max(0f, cooldownHit);
+        quantidadeNormalAoDestruir = Mathf.Max(1, quantidadeNormalAoDestruir);
+        raioDistribuicaoSpawn = Mathf.Max(0f, raioDistribuicaoSpawn);
     }
 
     private void InstalarRepassadoresNosFilhos()
@@ -120,6 +129,7 @@ public class VidaRecursoMineral : MonoBehaviour
 
         if (colliderEhPicareta || transformEhPicareta)
         {
+            ultimaPicaretaQueCausouDano = BuscarPicaretaNoCollider(collision.collider);
             TomarDano(danoPorHit);
             return;
         }
@@ -149,6 +159,7 @@ public class VidaRecursoMineral : MonoBehaviour
         {
             if (aplicarDanoPorTriggerDireto)
             {
+                ultimaPicaretaQueCausouDano = BuscarPicaretaNoCollider(other);
                 TomarDano(danoPorHit);
                 return;
             }
@@ -234,8 +245,54 @@ public class VidaRecursoMineral : MonoBehaviour
         if (morreu || emCooldown)
             return false;
 
+        ultimaPicaretaQueCausouDano = BuscarPicaretaNaOrigem(origem);
         TomarDano(Mathf.Max(1, dano));
         return true;
+    }
+
+    private Picareta BuscarPicaretaNaOrigem(GameObject origem)
+    {
+        if (origem == null)
+            return null;
+
+        Picareta picareta = origem.GetComponent<Picareta>();
+        if (picareta != null)
+            return picareta;
+
+        picareta = origem.GetComponentInParent<Picareta>();
+        if (picareta != null)
+            return picareta;
+
+        return origem.GetComponentInChildren<Picareta>(true);
+    }
+
+    private Picareta BuscarPicaretaNoCollider(Collider colliderContato)
+    {
+        if (colliderContato == null)
+            return null;
+
+        Picareta picareta = BuscarPicaretaNoTransform(colliderContato.transform);
+        if (picareta != null)
+            return picareta;
+
+        Rigidbody rb = colliderContato.attachedRigidbody;
+        return rb != null ? BuscarPicaretaNoTransform(rb.transform) : null;
+    }
+
+    private Picareta BuscarPicaretaNoTransform(Transform alvo)
+    {
+        Transform atual = alvo;
+
+        while (atual != null)
+        {
+            Picareta picareta = atual.GetComponent<Picareta>();
+            if (picareta != null)
+                return picareta;
+
+            atual = atual.parent;
+        }
+
+        return null;
     }
 
     private void TomarDano(int dano)
@@ -268,8 +325,7 @@ public class VidaRecursoMineral : MonoBehaviour
 
         morreu = true;
 
-        if (prefabAoDestruir != null)
-            Instantiate(prefabAoDestruir, transform.position + offsetSpawn, transform.rotation);
+        SpawnarItensAoDestruir();
 
         if (RespawnNatureza.Instancia != null && !string.IsNullOrWhiteSpace(respawnId))
         {
@@ -288,5 +344,34 @@ public class VidaRecursoMineral : MonoBehaviour
         }
 
         Destroy(gameObject);
+    }
+
+    private void SpawnarItensAoDestruir()
+    {
+        if (prefabAoDestruir == null)
+            return;
+
+        int quantidade = CalcularQuantidadeSpawnAoDestruir();
+        Vector3 posicaoBase = transform.position + offsetSpawn;
+
+        for (int i = 0; i < quantidade; i++)
+            Instantiate(prefabAoDestruir, posicaoBase + CalcularOffsetDistribuicao(i, quantidade), transform.rotation);
+    }
+
+    private int CalcularQuantidadeSpawnAoDestruir()
+    {
+        if (!usarTipoPicaretaParaQuantidade || ultimaPicaretaQueCausouDano == null)
+            return Mathf.Max(1, quantidadeNormalAoDestruir);
+
+        return ultimaPicaretaQueCausouDano.CalcularQuantidadeColetaPorRaridade(quantidadeNormalAoDestruir);
+    }
+
+    private Vector3 CalcularOffsetDistribuicao(int indice, int total)
+    {
+        if (total <= 1 || raioDistribuicaoSpawn <= 0f)
+            return Vector3.zero;
+
+        float angulo = (360f / total) * indice * Mathf.Deg2Rad;
+        return new Vector3(Mathf.Cos(angulo), 0f, Mathf.Sin(angulo)) * raioDistribuicaoSpawn;
     }
 }

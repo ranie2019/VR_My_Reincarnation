@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -556,7 +556,6 @@ public class GerenciadorMissoes : MonoBehaviour
         }
         while (houveProgresso && consumidos < quantidadeParaConsumir);
 
-        Debug.Log($"[Missão] Consumidos {consumidos}/{quantidadeParaConsumir} de \"{missao.idAlvo}\".");
     }
 
     // =========================================================

@@ -10,7 +10,10 @@ using UnityEditor;
 public class ItemPersistente : MonoBehaviour
 {
     [Header("Identificacao do Item")]
-    [SerializeField] private string itemId = "";
+    [Tooltip("ID automatico e imutavel do TIPO do item. Objetos do mesmo prefab compartilham este valor.")]
+    [SerializeField, HideInInspector] private string tipoItemId = "";
+    [Tooltip("Nome/ID antigo mantido somente para migrar saves existentes.")]
+    [SerializeField, HideInInspector] private string itemId = "";
     [SerializeField] private string nomeItem = "";
     [SerializeField] private GameObject prefabReferencia;
 
@@ -22,7 +25,8 @@ public class ItemPersistente : MonoBehaviour
     [Header("Estado Runtime")]
     [SerializeField] private bool estaNoInventario;
     [SerializeField] private bool salvarQuandoSoltoNaCena = true;
-    [SerializeField] private string instanciaId = "";
+    [Tooltip("GUID exclusivo desta copia. Prefabs devem manter este campo vazio.")]
+    [SerializeField, HideInInspector] private string instanciaId = "";
 
     [Header("Estado")]
     [SerializeField] private float durabilidadeAtual = -1f;
@@ -45,10 +49,12 @@ public class ItemPersistente : MonoBehaviour
         public string instanciaId;
         public float durabilidade;
         public string dadosExtrasJson;
+        public bool respawnItemDesarmado;
     }
 
     private void Awake()
     {
+        GarantirTipoItemId();
         GarantirInstanciaIdRuntime();
         ValidarIdentificacaoRuntime();
     }
@@ -56,14 +62,43 @@ public class ItemPersistente : MonoBehaviour
     private void Reset()
     {
         PreencherReferenciaPrefab();
+        GarantirTipoItemId();
     }
 
     private void OnValidate()
     {
         PreencherReferenciaPrefab();
+        GarantirTipoItemId();
     }
 
     public string ObterItemId()
+    {
+        return ObterTipoItemId();
+    }
+
+    public string ObterTipoItemId()
+    {
+        GarantirTipoItemId();
+        return string.IsNullOrWhiteSpace(tipoItemId) ? string.Empty : tipoItemId.Trim();
+    }
+
+    public string ObterItemIdLegado()
+    {
+        return string.IsNullOrWhiteSpace(itemId) ? string.Empty : itemId.Trim();
+    }
+
+    public bool CorrespondeAoItemId(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return false;
+
+        string normalizado = id.Trim();
+        return string.Equals(ObterTipoItemId(), normalizado, StringComparison.Ordinal) ||
+               string.Equals(ObterItemIdLegado(), normalizado, StringComparison.Ordinal) ||
+               string.Equals(ObterNomeItem(), normalizado, StringComparison.Ordinal);
+    }
+
+    private string ObterFonteLegadaDoTipo()
     {
         if (!string.IsNullOrWhiteSpace(itemId))
             return itemId.Trim();
@@ -71,7 +106,7 @@ public class ItemPersistente : MonoBehaviour
         if (!usarNomeDoObjetoSeIdVazio)
             return string.Empty;
 
-        string idFallback = gameObject.name.Trim();
+        string idFallback = gameObject.name.Replace("(Clone)", string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(idFallback))
             return string.Empty;
 
@@ -86,7 +121,7 @@ public class ItemPersistente : MonoBehaviour
 
     public string ObterItemIdSemFallback()
     {
-        return string.IsNullOrWhiteSpace(itemId) ? string.Empty : itemId.Trim();
+        return ObterTipoItemId();
     }
 
     public string ObterInstanciaId()
@@ -97,7 +132,7 @@ public class ItemPersistente : MonoBehaviour
 
     public bool PossuiInstanciaIdValido()
     {
-        return !string.IsNullOrWhiteSpace(instanciaId);
+        return InstanciaIdEhGuidValido(instanciaId);
     }
 
     public bool InstanciaIdFoiGeradoEmRuntime()
@@ -107,14 +142,15 @@ public class ItemPersistente : MonoBehaviour
 
     public string ObterInstanciaIdSemGerar()
     {
-        return string.IsNullOrWhiteSpace(instanciaId) ? string.Empty : instanciaId.Trim();
+        return InstanciaIdEhGuidValido(instanciaId) ? instanciaId.Trim() : string.Empty;
     }
 
     public void DefinirInstanciaId(string novoId)
     {
-        if (string.IsNullOrWhiteSpace(novoId))
+        if (!InstanciaIdEhGuidValido(novoId))
         {
-            { }
+            instanciaId = Guid.NewGuid().ToString("N");
+            instanciaIdGeradoEmRuntime = true;
             return;
         }
 
@@ -155,6 +191,7 @@ public class ItemPersistente : MonoBehaviour
             nomeItem = ObterNomeItem(),
             instanciaId = ObterInstanciaId(),
             instanciaIds = new System.Collections.Generic.List<string> { ObterInstanciaId() },
+            instanciaCriadaEmRuntime = InstanciaIdFoiGeradoEmRuntime(),
             quantidade = Mathf.Max(1, quantidade),
             slot = slot,
             estaNoInventario = true,
@@ -169,8 +206,7 @@ public class ItemPersistente : MonoBehaviour
         if (data == null)
             return;
 
-        if (!string.IsNullOrWhiteSpace(data.itemId))
-            itemId = data.itemId;
+        AplicarItemIdLegadoSeNecessario(data.itemId);
 
         if (!string.IsNullOrWhiteSpace(data.nomeItem))
             nomeItem = data.nomeItem;
@@ -214,7 +250,8 @@ public class ItemPersistente : MonoBehaviour
             nomeItem = ObterNomeItem(),
             instanciaId = ObterInstanciaId(),
             durabilidade = LerDurabilidade(),
-            dadosExtrasJson = dadosExtrasJson
+            dadosExtrasJson = dadosExtrasJson,
+            respawnItemDesarmado = RespawnItemEstaDesarmado()
         };
     }
 
@@ -223,8 +260,7 @@ public class ItemPersistente : MonoBehaviour
         if (estado == null)
             return;
 
-        if (!string.IsNullOrWhiteSpace(estado.itemId))
-            itemId = estado.itemId.Trim();
+        AplicarItemIdLegadoSeNecessario(estado.itemId);
 
         if (!string.IsNullOrWhiteSpace(estado.nomeItem))
             nomeItem = estado.nomeItem.Trim();
@@ -237,6 +273,9 @@ public class ItemPersistente : MonoBehaviour
 
         if (durabilidadeAtual >= 0f)
             EscreverDurabilidade(durabilidadeAtual);
+
+        if (estado.respawnItemDesarmado)
+            AplicarRespawnItemDesarmado();
     }
 
     public void AplicarEstadoCenaJson(string estadoJsonCena)
@@ -253,24 +292,11 @@ public class ItemPersistente : MonoBehaviour
         {
             return JsonUtility.FromJson<EstadoCenaItem>(estadoJsonCena);
         }
-        catch (Exception erro)
+        catch (Exception)
         {
             { }
             return null;
         }
-    }
-
-    [ContextMenu("Usar Nome Do Objeto Como ID")]
-    private void UsarNomeDoObjetoComoId()
-    {
-        itemId = gameObject.name.Trim();
-    }
-
-    [ContextMenu("Limpar ID")]
-    private void LimparId()
-    {
-        itemId = string.Empty;
-        avisoFallbackIdMostrado = false;
     }
 
     [ContextMenu("Mostrar ID No Console")]
@@ -285,7 +311,7 @@ public class ItemPersistente : MonoBehaviour
 
     private void GarantirInstanciaIdRuntime()
     {
-        if (!Application.isPlaying || !string.IsNullOrWhiteSpace(instanciaId))
+        if (!Application.isPlaying || InstanciaIdEhGuidValido(instanciaId))
             return;
 
         instanciaId = Guid.NewGuid().ToString("N");
@@ -298,12 +324,48 @@ public class ItemPersistente : MonoBehaviour
         }
     }
 
+    public static bool InstanciaIdEhGuidValido(string id)
+    {
+        return !string.IsNullOrWhiteSpace(id) &&
+               Guid.TryParseExact(id.Trim(), "N", out _);
+    }
+
+    private void GarantirTipoItemId()
+    {
+#if UNITY_EDITOR
+        string guidPrefab = ObterGuidPrefabNoEditor();
+        if (!string.IsNullOrWhiteSpace(guidPrefab))
+        {
+            tipoItemId = guidPrefab;
+            return;
+        }
+#endif
+
+        if (!string.IsNullOrWhiteSpace(tipoItemId))
+            return;
+
+        string fonte = ObterFonteLegadaDoTipo();
+        if (!string.IsNullOrWhiteSpace(fonte))
+            tipoItemId = Hash128.Compute("ItemTipo:" + fonte.Trim().ToLowerInvariant()).ToString();
+    }
+
+    private void AplicarItemIdLegadoSeNecessario(string idSalvo)
+    {
+        if (string.IsNullOrWhiteSpace(idSalvo) || CorrespondeAoItemId(idSalvo))
+            return;
+
+        if (string.IsNullOrWhiteSpace(itemId))
+            itemId = idSalvo.Trim();
+
+        GarantirTipoItemId();
+    }
+
     private void ValidarIdentificacaoRuntime()
     {
         if (!Application.isPlaying)
             return;
 
-        if (string.IsNullOrWhiteSpace(itemId) && !avisoItemIdVazioMostrado)
+        if (string.IsNullOrWhiteSpace(ObterTipoItemId()) && !avisoItemIdVazioMostrado)
         {
             { }
             avisoItemIdVazioMostrado = true;
@@ -321,6 +383,23 @@ public class ItemPersistente : MonoBehaviour
         }
 #endif
     }
+
+#if UNITY_EDITOR
+    private string ObterGuidPrefabNoEditor()
+    {
+        string caminho = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+
+        if (string.IsNullOrWhiteSpace(caminho) && EditorUtility.IsPersistent(gameObject))
+            caminho = AssetDatabase.GetAssetPath(gameObject);
+
+        if (string.IsNullOrWhiteSpace(caminho) && prefabReferencia != null)
+            caminho = AssetDatabase.GetAssetPath(prefabReferencia);
+
+        return string.IsNullOrWhiteSpace(caminho)
+            ? string.Empty
+            : AssetDatabase.AssetPathToGUID(caminho);
+    }
+#endif
 
     private float LerDurabilidadePorReflexao()
     {
@@ -344,6 +423,19 @@ public class ItemPersistente : MonoBehaviour
             return valor;
 
         return -1f;
+    }
+
+    private bool RespawnItemEstaDesarmado()
+    {
+        Respawnitem respawnItem = GetComponent<Respawnitem>();
+        return respawnItem != null && respawnItem.EstaDesarmadoComoItemColetado();
+    }
+
+    private void AplicarRespawnItemDesarmado()
+    {
+        Respawnitem respawnItem = GetComponent<Respawnitem>();
+        if (respawnItem != null)
+            respawnItem.DesarmarComoItemColetado();
     }
 
     private void EscreverDurabilidade(float valor)
@@ -370,7 +462,8 @@ public class ItemPersistente : MonoBehaviour
 
     private Component ObterComponenteDuravel()
     {
-        return GetComponent("Espada") ??
+        return GetComponent("Equipamento") ??
+               GetComponent("Espada") ??
                GetComponent("Machado") ??
                GetComponent("Picareta") ??
                GetComponent("Arco") ??

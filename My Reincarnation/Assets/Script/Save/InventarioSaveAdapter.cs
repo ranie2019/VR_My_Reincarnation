@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 [DisallowMultipleComponent]
 public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 {
@@ -54,7 +58,11 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             if (slot == null)
                 continue;
 
-            int quantidade = slot.ObterQuantidadeRealParaSave();
+            List<XRGrabInteractable> itens = slot.ObterItensParaSave();
+            if (itens == null)
+                itens = new List<XRGrabInteractable>();
+
+            int quantidade = itens.Count;
             if (quantidade <= 0)
                 continue;
 
@@ -62,7 +70,9 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             if (itemRepresentante == null)
                 continue;
 
-            ItemPersistente persistenteRepresentante = itemRepresentante.GetComponent<ItemPersistente>();
+            GarantirPersistenciaDosItensDaPilha(itens);
+
+            ItemPersistente persistenteRepresentante = GarantirItemPersistenteParaSave(itemRepresentante);
             if (persistenteRepresentante != null && !persistenteRepresentante.SalvarNoInventario)
                 continue;
 
@@ -73,13 +83,14 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 ? CriarSaveComItemPersistente(persistenteRepresentante, indiceSlot, quantidade)
                 : CriarSaveFallback(itemRepresentante, indiceSlot, quantidade);
 
-            if (data == null || string.IsNullOrWhiteSpace(data.itemId))
+            if (DataInventarioSemIdentificacao(data))
             {
                 { }
                 continue;
             }
 
-            List<XRGrabInteractable> itens = slot.ObterItensParaSave();
+            NormalizarNomeItemSalvo(data, itemRepresentante);
+            MarcarOrigemRuntimeNoSave(data, itens);
             AplicarInstanciaIdsDaPilha(data, itens);
 
             for (int i = 0; i < itens.Count; i++)
@@ -118,7 +129,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         for (int i = 0; i < itens.Count; i++)
         {
             InventorySaveData data = itens[i];
-            if (data == null || string.IsNullOrWhiteSpace(data.itemId))
+            if (DataInventarioSemIdentificacao(data))
             {
                 RegistrarFalhaItemIdVazio();
                 continue;
@@ -181,6 +192,12 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                         out candidatosRuntime)
                     : null;
 
+                bool podeCriarInstanciaSalvaPorPrefab = PodeCriarInstanciaSalvaPorPrefab(
+                    prefabParaRestaurar,
+                    quantidade,
+                    dataInstancia,
+                    candidatosRuntime);
+
                 if (originalCena != null)
                 {
                     originaisUsados.Add(originalCena);
@@ -190,13 +207,15 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                     continue;
                 }
 
-                if (instanciaTinhaIdSalvo && candidatosRuntime > 1)
+                if (instanciaTinhaIdSalvo && candidatosRuntime > 1 && !podeCriarInstanciaSalvaPorPrefab)
                 {
                     { }
                     continue;
                 }
 
-                if (instanciaTinhaIdSalvo && ExisteOriginalMesmoTipoNaoUsado(originaisCena, dataInstancia.itemId, originaisUsados))
+                if (instanciaTinhaIdSalvo &&
+                    !podeCriarInstanciaSalvaPorPrefab &&
+                    ExisteOriginalMesmoTipoNaoUsado(originaisCena, dataInstancia.itemId, originaisUsados))
                 {
                     { }
                     continue;
@@ -422,7 +441,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             if (apenasIdRuntime && !item.InstanciaIdFoiGeradoEmRuntime())
                 continue;
 
-            if (string.Equals(item.ObterItemIdSemFallback(), itemIdNormalizado, System.StringComparison.Ordinal))
+            if (item.CorrespondeAoItemId(itemIdNormalizado))
                 return item;
         }
 
@@ -490,7 +509,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             if (!item.InstanciaIdFoiGeradoEmRuntime())
                 continue;
 
-            if (!string.Equals(item.ObterItemIdSemFallback(), itemIdNormalizado, System.StringComparison.Ordinal))
+            if (!item.CorrespondeAoItemId(itemIdNormalizado))
                 continue;
 
             candidatosRuntime++;
@@ -515,7 +534,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             if (item == null || usados.Contains(item))
                 continue;
 
-            if (string.Equals(item.ObterItemIdSemFallback(), itemIdNormalizado, System.StringComparison.Ordinal))
+            if (item.CorrespondeAoItemId(itemIdNormalizado))
                 return true;
         }
 
@@ -638,8 +657,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             if (!item.InstanciaIdFoiGeradoEmRuntime())
                 continue;
 
-            string itemIdCena = item.ObterItemIdSemFallback();
-            if (!string.Equals(itemIdCena, itemIdNormalizado, System.StringComparison.Ordinal))
+            if (!item.CorrespondeAoItemId(itemIdNormalizado))
                 continue;
 
             totalCandidatos++;
@@ -661,7 +679,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             if (item == null)
                 continue;
 
-            if (!string.IsNullOrWhiteSpace(item.instanciaId))
+            if (ItemPersistente.InstanciaIdEhGuidValido(item.instanciaId))
                 instanciaIds.Add(item.instanciaId.Trim());
 
             if (item.instanciaIds == null)
@@ -670,7 +688,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             for (int j = 0; j < item.instanciaIds.Count; j++)
             {
                 string instanciaId = item.instanciaIds[j];
-                if (!string.IsNullOrWhiteSpace(instanciaId))
+                if (ItemPersistente.InstanciaIdEhGuidValido(instanciaId))
                     instanciaIds.Add(instanciaId.Trim());
             }
         }
@@ -724,23 +742,26 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
     private string CriarInstanciaIdGeradoParaStack(InventorySaveData data)
     {
-        string prefixo = data != null && !string.IsNullOrWhiteSpace(data.itemId)
-            ? data.itemId.Trim()
-            : "item";
-
-        return $"{prefixo}_stack_{System.Guid.NewGuid():N}";
+        return System.Guid.NewGuid().ToString("N");
     }
 
     private GameObject ObterPrefabParaRestaurar(InventorySaveData data)
     {
-        if (data == null || string.IsNullOrWhiteSpace(data.itemId))
+        if (data == null ||
+            (string.IsNullOrWhiteSpace(data.itemId) && string.IsNullOrWhiteSpace(data.nomeItem)))
+        {
             return null;
+        }
 
         ItemDatabaseLocal database = ItemDatabaseLocal.Instancia != null
             ? ItemDatabaseLocal.Instancia
             : FindFirstObjectByType<ItemDatabaseLocal>();
 
-        return database != null ? database.ObterPrefab(data.itemId) : null;
+        if (database == null)
+            return ObterPrefabFallbackSemDatabase(data);
+
+        GameObject prefab = ObterPrefabPorPossiveisIds(database, data.itemId, data.nomeItem);
+        return prefab != null ? prefab : ObterPrefabFallbackSemDatabase(data);
     }
 
     private bool DeveRestaurarDiretoPorPrefab(InventorySaveData data, GameObject prefab)
@@ -750,7 +771,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
         if (prefab == null)
         {
-            if (ItemIdPareceFlecha(data.itemId))
+            if (ItemIdPareceFlecha(data.itemId) || ItemIdPareceFlecha(data.nomeItem))
                 ultimaFalhaPrefabAusente = true;
 
             return false;
@@ -775,8 +796,10 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         ultimoItemIdCarregado = data != null ? data.itemId : string.Empty;
         ultimoPrefabEncontrado = prefab != null;
         ultimaQuantidadeCarregada = Mathf.Max(0, quantidade);
-        ultimaFalhaPrefabAusente = prefab == null && data != null && ItemIdPareceFlecha(data.itemId);
-        ultimaFalhaItemIdVazio = data == null || string.IsNullOrWhiteSpace(data.itemId);
+        ultimaFalhaPrefabAusente = prefab == null &&
+                                   data != null &&
+                                   (ItemIdPareceFlecha(data.itemId) || ItemIdPareceFlecha(data.nomeItem));
+        ultimaFalhaItemIdVazio = DataInventarioSemIdentificacao(data);
         ultimoLoadDiretoPorPrefab = loadDiretoPorPrefab;
     }
 
@@ -790,9 +813,15 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         ultimoLoadDiretoPorPrefab = false;
     }
 
+    private bool DataInventarioSemIdentificacao(InventorySaveData data)
+    {
+        return data == null ||
+               (string.IsNullOrWhiteSpace(data.itemId) && string.IsNullOrWhiteSpace(data.nomeItem));
+    }
+
     private void AdicionarInstanciaIdUnico(List<string> ids, string instanciaId)
     {
-        if (ids == null || string.IsNullOrWhiteSpace(instanciaId))
+        if (ids == null || !ItemPersistente.InstanciaIdEhGuidValido(instanciaId))
             return;
 
         string id = instanciaId.Trim();
@@ -808,6 +837,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             nomeItem = origem.nomeItem,
             instanciaId = instanciaId,
             instanciaIds = new List<string> { instanciaId },
+            instanciaCriadaEmRuntime = origem.instanciaCriadaEmRuntime,
             quantidade = 1,
             slot = origem.slot,
             estaNoInventario = true,
@@ -832,7 +862,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 if (item == null)
                     continue;
 
-                ItemPersistente persistente = item.GetComponent<ItemPersistente>();
+                ItemPersistente persistente = GarantirItemPersistenteParaSave(item);
                 if (persistente == null)
                     continue;
 
@@ -847,18 +877,263 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             data.instanciaId = data.instanciaIds[0];
     }
 
+    private void MarcarOrigemRuntimeNoSave(InventorySaveData data, List<XRGrabInteractable> itens)
+    {
+        if (data == null)
+            return;
+
+        data.instanciaCriadaEmRuntime = false;
+
+        if (itens == null || itens.Count != 1 || itens[0] == null)
+            return;
+
+        ItemPersistente persistente = GarantirItemPersistenteParaSave(itens[0]);
+        data.instanciaCriadaEmRuntime = persistente != null && persistente.InstanciaIdFoiGeradoEmRuntime();
+    }
+
     private InventorySaveData CriarSaveComItemPersistente(ItemPersistente item, int indiceSlot, int quantidade)
     {
-        InventorySaveData data = item.CriarSaveData(indiceSlot, Mathf.Max(1, quantidade), false);
-        data.itemId = item.ObterItemId();
-        data.nomeItem = item.ObterNomeItem();
-        data.quantidade = Mathf.Max(1, quantidade);
-        return data;
+        return item.CriarSaveData(indiceSlot, Mathf.Max(1, quantidade), false);
+    }
+
+    private void GarantirPersistenciaDosItensDaPilha(List<XRGrabInteractable> itens)
+    {
+        if (itens == null)
+            return;
+
+        for (int i = 0; i < itens.Count; i++)
+            GarantirItemPersistenteParaSave(itens[i]);
+    }
+
+    private ItemPersistente GarantirItemPersistenteParaSave(XRGrabInteractable item)
+    {
+        if (item == null)
+            return null;
+
+        ItemPersistente persistente = item.GetComponent<ItemPersistente>();
+        if (persistente == null)
+            persistente = item.gameObject.AddComponent<ItemPersistente>();
+
+        persistente.MarcarComoNoInventario();
+        return persistente;
+    }
+
+    private void NormalizarNomeItemSalvo(InventorySaveData data, XRGrabInteractable representante)
+    {
+        if (data == null)
+            return;
+
+        ItemInventarioDados dados = representante != null
+            ? representante.GetComponent<ItemInventarioDados>()
+            : null;
+
+        if (dados != null && dados.PrefabParaStack != null)
+        {
+            string nomePrefabStack = LimparNomeParaBuscaPrefab(dados.PrefabParaStack.name);
+            if (!string.IsNullOrWhiteSpace(nomePrefabStack))
+            {
+                data.nomeItem = nomePrefabStack;
+                return;
+            }
+        }
+
+        string nomeAtual = !string.IsNullOrWhiteSpace(data.nomeItem)
+            ? data.nomeItem
+            : representante != null ? representante.gameObject.name : string.Empty;
+
+        data.nomeItem = LimparNomeParaBuscaPrefab(nomeAtual);
+    }
+
+    private GameObject ObterPrefabPorPossiveisIds(ItemDatabaseLocal database, string itemId, string nomeItem)
+    {
+        GameObject prefab = ObterPrefabPorId(database, itemId);
+        if (prefab != null)
+            return prefab;
+
+        prefab = ObterPrefabPorId(database, nomeItem);
+        if (prefab != null)
+            return prefab;
+
+        prefab = ObterPrefabPorId(database, LimparNomeParaBuscaPrefab(itemId));
+        if (prefab != null)
+            return prefab;
+
+        return ObterPrefabPorId(database, LimparNomeParaBuscaPrefab(nomeItem));
+    }
+
+    private GameObject ObterPrefabFallbackSemDatabase(InventorySaveData data)
+    {
+        GameObject prefab = ObterPrefabPorReferenciasDaCena(data);
+        if (prefab != null)
+            return prefab;
+
+#if UNITY_EDITOR
+        prefab = ObterPrefabPorGuidNoEditor(data != null ? data.itemId : null);
+        if (prefab != null)
+            return prefab;
+
+        return ObterPrefabPorGuidNoEditor(data != null ? data.nomeItem : null);
+#else
+        return null;
+#endif
+    }
+
+    private GameObject ObterPrefabPorReferenciasDaCena(InventorySaveData data)
+    {
+        if (DataInventarioSemIdentificacao(data))
+            return null;
+
+        ItemInventarioDados[] dadosItens = FindObjectsByType<ItemInventarioDados>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+
+        for (int i = 0; i < dadosItens.Length; i++)
+        {
+            ItemInventarioDados dados = dadosItens[i];
+            if (dados == null)
+                continue;
+
+            GameObject prefab = dados.PrefabParaStack;
+            if (prefab == null)
+                continue;
+
+            if (ReferenciaCorrespondeAoItemSalvo(data, dados.gameObject, dados, prefab))
+                return prefab;
+        }
+
+        ItemPersistente[] persistentes = FindObjectsByType<ItemPersistente>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+
+        for (int i = 0; i < persistentes.Length; i++)
+        {
+            ItemPersistente persistente = persistentes[i];
+            if (persistente == null)
+                continue;
+
+            GameObject prefab = persistente.PrefabReferencia;
+            if (prefab == null)
+            {
+                ItemInventarioDados dados = persistente.GetComponent<ItemInventarioDados>();
+                prefab = dados != null ? dados.PrefabParaStack : null;
+            }
+
+            if (prefab == null)
+                continue;
+
+            if (ReferenciaCorrespondeAoItemSalvo(data, persistente.gameObject, persistente.GetComponent<ItemInventarioDados>(), prefab))
+                return prefab;
+        }
+
+        return null;
+    }
+
+    private bool ReferenciaCorrespondeAoItemSalvo(
+        InventorySaveData data,
+        GameObject referencia,
+        ItemInventarioDados dados,
+        GameObject prefab)
+    {
+        if (data == null)
+            return false;
+
+        if (TextoCorrespondeAoItemSalvo(data, referencia != null ? referencia.name : null))
+            return true;
+
+        if (TextoCorrespondeAoItemSalvo(data, prefab != null ? prefab.name : null))
+            return true;
+
+        if (dados != null && TextoCorrespondeAoItemSalvo(data, dados.NomeItem))
+            return true;
+
+        ItemPersistente persistenteReferencia = referencia != null ? referencia.GetComponent<ItemPersistente>() : null;
+        if (PersistenteCorrespondeAoItemSalvo(data, persistenteReferencia))
+            return true;
+
+        ItemPersistente persistentePrefab = prefab != null ? prefab.GetComponentInChildren<ItemPersistente>(true) : null;
+        return PersistenteCorrespondeAoItemSalvo(data, persistentePrefab);
+    }
+
+    private bool PersistenteCorrespondeAoItemSalvo(InventorySaveData data, ItemPersistente persistente)
+    {
+        if (data == null || persistente == null)
+            return false;
+
+        return persistente.CorrespondeAoItemId(data.itemId) ||
+               persistente.CorrespondeAoItemId(data.nomeItem) ||
+               TextoCorrespondeAoItemSalvo(data, persistente.ObterNomeItem());
+    }
+
+    private bool TextoCorrespondeAoItemSalvo(InventorySaveData data, string texto)
+    {
+        if (data == null || string.IsNullOrWhiteSpace(texto))
+            return false;
+
+        string textoLimpo = LimparNomeParaBuscaPrefab(texto);
+        string itemIdLimpo = LimparNomeParaBuscaPrefab(data.itemId);
+        string nomeLimpo = LimparNomeParaBuscaPrefab(data.nomeItem);
+
+        return (!string.IsNullOrWhiteSpace(data.itemId) && string.Equals(texto.Trim(), data.itemId.Trim(), System.StringComparison.Ordinal)) ||
+               (!string.IsNullOrWhiteSpace(data.nomeItem) && string.Equals(texto.Trim(), data.nomeItem.Trim(), System.StringComparison.Ordinal)) ||
+               (!string.IsNullOrWhiteSpace(itemIdLimpo) && string.Equals(textoLimpo, itemIdLimpo, System.StringComparison.Ordinal)) ||
+               (!string.IsNullOrWhiteSpace(nomeLimpo) && string.Equals(textoLimpo, nomeLimpo, System.StringComparison.Ordinal));
+    }
+
+    private bool PodeCriarInstanciaSalvaPorPrefab(
+        GameObject prefab,
+        int quantidade,
+        InventorySaveData dataInstancia,
+        int candidatosRuntime)
+    {
+        if (prefab == null)
+            return false;
+
+        return quantidade > 1 ||
+               (dataInstancia != null && dataInstancia.instanciaCriadaEmRuntime);
+    }
+
+#if UNITY_EDITOR
+    private GameObject ObterPrefabPorGuidNoEditor(string possivelGuid)
+    {
+        if (string.IsNullOrWhiteSpace(possivelGuid))
+            return null;
+
+        string caminho = AssetDatabase.GUIDToAssetPath(possivelGuid.Trim());
+        return string.IsNullOrWhiteSpace(caminho)
+            ? null
+            : AssetDatabase.LoadAssetAtPath<GameObject>(caminho);
+    }
+#endif
+
+    private GameObject ObterPrefabPorId(ItemDatabaseLocal database, string id)
+    {
+        if (database == null || string.IsNullOrWhiteSpace(id))
+            return null;
+
+        return database.ObterPrefab(id.Trim());
+    }
+
+    private string LimparNomeParaBuscaPrefab(string nome)
+    {
+        string limpo = SlotInventario.LimparNomeItem(nome);
+        if (string.IsNullOrWhiteSpace(limpo))
+            return string.Empty;
+
+        int abre = limpo.LastIndexOf('(');
+        bool terminaComParenteses = limpo.EndsWith(")");
+        if (abre > 0 && terminaComParenteses)
+        {
+            string conteudo = limpo.Substring(abre + 1, limpo.Length - abre - 2).Trim();
+            if (int.TryParse(conteudo, out _))
+                limpo = limpo.Substring(0, abre).TrimEnd();
+        }
+
+        return limpo.Trim();
     }
 
     private InventorySaveData CriarSaveFallback(XRGrabInteractable item, int indiceSlot, int quantidade)
     {
-        string nome = item.gameObject.name.Trim();
+        string nome = LimparNomeParaBuscaPrefab(item.gameObject.name);
         { }
         return new InventorySaveData
         {
@@ -866,6 +1141,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             nomeItem = nome,
             instanciaId = string.Empty,
             instanciaIds = new List<string>(),
+            instanciaCriadaEmRuntime = true,
             quantidade = Mathf.Max(1, quantidade),
             slot = indiceSlot,
             estaNoInventario = true,

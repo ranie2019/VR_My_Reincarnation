@@ -540,7 +540,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4fdda954e7910a4bb9cb8f8f6e266c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BotaoEquipar
-  equiparArmadura: {fileID: 1618013731050769609}
+  equiparManoplas: {fileID: 0}
   acaoConfirmarMaoEsquerda: {fileID: -5982496924579745919, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   acaoConfirmarMaoDireita: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!1 &1587609163791906711
@@ -966,6 +966,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  tipoItemId: b3f87b6db972a6642a58fdd76a90b757
   itemId: Luva Medieval E
   nomeItem: Luva Medieval E
   prefabReferencia: {fileID: 2595310052120142144}
@@ -992,8 +993,9 @@ MonoBehaviour:
   popupInfo: {fileID: 5418489189404554386}
   tempoParaFecharPopup: 10
   luvaVisual: {fileID: 2595310052120142144}
-  rendererMaoAvatar: {fileID: 5853591281552534480}
   transformMaoAvatar: {fileID: 0}
+  rendererMaoAvatar: {fileID: 5853591281552534480}
+  esconderMaoAoEquipar: 0
 --- !u!1 &3182391559044368116
 GameObject:
   m_ObjectHideFlags: 0

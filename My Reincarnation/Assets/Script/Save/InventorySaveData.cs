@@ -8,6 +8,7 @@ public class InventorySaveData
     public string nomeItem;
     public string instanciaId;
     public List<string> instanciaIds = new List<string>();
+    public bool instanciaCriadaEmRuntime;
     public int quantidade;
     public int slot;
     public bool estaNoInventario;

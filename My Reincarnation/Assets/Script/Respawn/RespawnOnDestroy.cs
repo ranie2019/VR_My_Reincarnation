@@ -4,20 +4,20 @@ public class RespawnOnDestroy : MonoBehaviour
 {
     private RespawnManager respawnManager;
 
-    // Método chamado quando o objeto for destruído
+    // Mï¿½todo chamado quando o objeto for destruï¿½do
     private void OnDestroy()
     {
-        // Verifica se o respawnManager foi atribuído
+        // Verifica se o respawnManager foi atribuï¿½do
         if (respawnManager == null)
         {
             // Tenta encontrar o RespawnManager na cena
-            respawnManager = FindObjectOfType<RespawnManager>();
+            respawnManager = FindFirstObjectByType<RespawnManager>();
         }
 
         // Verifica se o RespawnManager foi encontrado
         if (respawnManager != null)
         {
-            // Chama o método de respawn no RespawnManager
+            // Chama o mï¿½todo de respawn no RespawnManager
             respawnManager.RespawnObjectWithDelay(transform.position);
         }
     }

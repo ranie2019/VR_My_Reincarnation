@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 8594416708704879578}
   - component: {fileID: 3701609082630874049}
   - component: {fileID: 1769877224205081261}
-  - component: {fileID: 709610394406300853}
   m_Layer: 0
   m_Name: Bush_02_LOD0
   m_TagString: Untagged
@@ -91,27 +90,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &709610394406300853
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1182111034840551483}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.4, y: 0.49473736, z: 0.4}
-  m_Center: {x: 0, y: 0.23171104, z: 0}
 --- !u!1 &2055633114301092333
 GameObject:
   m_ObjectHideFlags: 0
@@ -127,6 +105,7 @@ GameObject:
   - component: {fileID: 2297320202378653585}
   - component: {fileID: 4473972661782513213}
   - component: {fileID: 2331039552790379468}
+  - component: {fileID: 5745411493303162028}
   m_Layer: 0
   m_Name: Rocha Metalica
   m_TagString: Rock
@@ -376,6 +355,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  tipoItemId: 2fb784b38e116264792d0d064f853083
   itemId: Rocha Metalica
   nomeItem: Rocha Metalica
   prefabReferencia: {fileID: 2055633114301092333}
@@ -387,6 +367,27 @@ MonoBehaviour:
   instanciaId: 
   durabilidadeAtual: 0
   dadosExtrasJson: 
+--- !u!114 &5745411493303162028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2055633114301092333}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a31aaef78a8ae6429093ec0b2516965, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Respawnitem
+  respawnId: Rocha Metalica
+  usarNomeDoObjetoSeIdVazio: 1
+  considerarColetadoAoEntrarNoInventario: 1
+  considerarColetadoAoMudarParent: 1
+  considerarColetadoAoSairDaPosicao: 1
+  exigirQueJogadorPegueParaRespawn: 1
+  distanciaParaConsiderarColetado: 0.25
+  foiPegoPeloJogador: 0
+  respawnSolicitado: 0
 --- !u!1 &4144757264113344106
 GameObject:
   m_ObjectHideFlags: 0

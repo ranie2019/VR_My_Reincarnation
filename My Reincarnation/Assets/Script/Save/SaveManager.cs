@@ -16,7 +16,7 @@ public class SaveManager : MonoBehaviour
     [Header("Configuracao")]
     [SerializeField] private bool autoCarregar = true;
     [SerializeField] private bool salvarAoSair = true;
-    [SerializeField] private bool debugSave = true;
+    [SerializeField] private bool debugSave = false;
     [SerializeField] private string nomeArquivoSave = "save_teste.json";
     [Tooltip("Nao e seguranca real. Apenas dificulta leitura casual do JSON.")]
     [SerializeField] private bool usarBase64 = false;
@@ -98,7 +98,14 @@ public class SaveManager : MonoBehaviour
         if (!string.IsNullOrEmpty(diretorio))
             Directory.CreateDirectory(diretorio);
 
-        File.WriteAllText(CaminhoSave, conteudo, Encoding.UTF8);
+        try
+        {
+            EscreverArquivoSaveSeguro(CaminhoSave, conteudo);
+        }
+        catch (Exception erro)
+        {
+            Debug.LogError($"[SaveManager] Falha ao escrever o save em '{CaminhoSave}': {erro}");
+        }
     }
 
     [ContextMenu("Carregar Jogo")]
@@ -111,13 +118,23 @@ public class SaveManager : MonoBehaviour
 
         RegistrarObjetosSalvaveisNaCena();
 
-        string conteudo = File.ReadAllText(CaminhoSave, Encoding.UTF8);
+        string conteudo;
+        try
+        {
+            conteudo = File.ReadAllText(CaminhoSave, Encoding.UTF8);
+        }
+        catch (Exception erro)
+        {
+            Debug.LogError($"[SaveManager] Falha ao ler o save em '{CaminhoSave}': {erro}");
+            return;
+        }
+
         string json = DecodificarConteudoSave(conteudo);
         SaveData data = JsonUtility.FromJson<SaveData>(json);
 
         if (data == null)
         {
-            { }
+            Debug.LogError("[SaveManager] O arquivo de save foi lido, mas nao pode ser interpretado (JSON invalido ou vazio).");
             return;
         }
 
@@ -152,6 +169,30 @@ public class SaveManager : MonoBehaviour
     public bool ExisteSave()
     {
         return File.Exists(CaminhoSave);
+    }
+
+    private void EscreverArquivoSaveSeguro(string caminhoFinal, string conteudo)
+    {
+        string temporario = caminhoFinal + ".tmp";
+        string backup = caminhoFinal + ".bak";
+
+        File.WriteAllText(temporario, conteudo, Encoding.UTF8);
+
+        if (!File.Exists(caminhoFinal))
+        {
+            File.Move(temporario, caminhoFinal);
+            return;
+        }
+
+        try
+        {
+            File.Replace(temporario, caminhoFinal, backup, true);
+        }
+        catch (Exception)
+        {
+            File.Copy(temporario, caminhoFinal, true);
+            File.Delete(temporario);
+        }
     }
 
     public void RegistrarObjeto(ISalvavel objeto)
@@ -422,8 +463,7 @@ public class SaveManager : MonoBehaviour
             string instanciaId = NormalizarInstanciaId(estadoItem.instanciaId);
             if (!InstanciaIdValido(instanciaId))
             {
-                { }
-                continue;
+                instanciaId = Guid.NewGuid().ToString("N");
             }
 
             estadoItem.instanciaId = instanciaId;
@@ -526,7 +566,7 @@ public class SaveManager : MonoBehaviour
 
     private void AdicionarInstanciaIdSeValido(HashSet<string> destino, string instanciaId)
     {
-        if (destino == null || string.IsNullOrWhiteSpace(instanciaId))
+        if (destino == null || !ItemPersistente.InstanciaIdEhGuidValido(instanciaId))
             return;
 
         destino.Add(instanciaId.Trim());
@@ -581,7 +621,7 @@ public class SaveManager : MonoBehaviour
 
     private bool InstanciaIdValido(string instanciaId)
     {
-        return !string.IsNullOrWhiteSpace(instanciaId);
+        return ItemPersistente.InstanciaIdEhGuidValido(instanciaId);
     }
 
     private string NormalizarInstanciaId(string instanciaId)
@@ -668,8 +708,7 @@ public class SaveManager : MonoBehaviour
             if (ItemEstaNoInventarioOuSlot(item))
                 continue;
 
-            string itemIdCena = item.ObterItemIdSemFallback();
-            if (string.Equals(itemIdCena, itemIdNormalizado, StringComparison.Ordinal))
+            if (item.CorrespondeAoItemId(itemIdNormalizado))
                 return item;
         }
 
@@ -702,8 +741,7 @@ public class SaveManager : MonoBehaviour
             if (!item.InstanciaIdFoiGeradoEmRuntime())
                 continue;
 
-            string itemIdCena = item.ObterItemIdSemFallback();
-            if (!string.Equals(itemIdCena, itemIdNormalizado, StringComparison.Ordinal))
+            if (!item.CorrespondeAoItemId(itemIdNormalizado))
                 continue;
 
             candidatos++;
@@ -778,8 +816,6 @@ public class SaveManager : MonoBehaviour
 
     private Dictionary<string, ISalvavel> CriarMapaObjetosRegistrados()
     {
-        RegistrarObjetosSalvaveisNaCena();
-
         Dictionary<string, ISalvavel> mapa = new Dictionary<string, ISalvavel>();
         for (int i = 0; i < objetosRegistrados.Count; i++)
         {
@@ -1016,7 +1052,7 @@ public class SaveManager : MonoBehaviour
         {
             return Encoding.UTF8.GetString(Convert.FromBase64String(conteudo));
         }
-        catch (Exception erro)
+        catch (Exception)
         {
             { }
             return conteudo;

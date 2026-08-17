@@ -24,13 +24,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 582656207931707891}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.031, y: -0.326, z: -0.023}
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: -0.02, y: -0.326, z: -0.04}
   m_LocalScale: {x: 0.17628568, y: 0.1762857, z: 0.1762857}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4818472777831986682}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
 --- !u!1 &1339669766047109285
 GameObject:
   m_ObjectHideFlags: 0
@@ -55,13 +55,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1339669766047109285}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.031, y: -0.333, z: -0.018}
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: -0.018, y: -0.33, z: 0.035}
   m_LocalScale: {x: 0.17628568, y: 0.1762857, z: 0.1762857}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4818472777831986682}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
 --- !u!1 &4249483966293094480
 GameObject:
   m_ObjectHideFlags: 0
@@ -264,7 +264,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 10
+  m_text: 50
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -695,9 +695,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0c3d50f62979452195e3e45e3994e9a7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Espada
-  danoEspada: 1
-  vidaMaxima: 10
-  vidaAtual: 10
+  danoEspada: 2
+  vidaMaxima: 50
+  vidaAtual: 50
   desgastePorDanoCausado: 1
   destruirQuandoVidaZerar: 1
   textoValorAtual: {fileID: 3626521518572945996}
@@ -733,6 +733,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  tipoItemId: 9891eec797d45634dbf057ab61a81d15
   itemId: Espada Velha
   nomeItem: Espada Velha
   prefabReferencia: {fileID: 8024583501847441683}
@@ -741,7 +742,7 @@ MonoBehaviour:
   destruirOriginalAoCarregarSeEstiverNoInventario: 1
   estaNoInventario: 0
   salvarQuandoSoltoNaCena: 1
-  instanciaId: Espada Velha
+  instanciaId: 
   durabilidadeAtual: 10
   dadosExtrasJson: 
 --- !u!114 &7934644020749567112
@@ -928,7 +929,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 10
+  m_text: 50
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

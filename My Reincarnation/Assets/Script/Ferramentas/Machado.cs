@@ -15,6 +15,9 @@ public class Machado : MonoBehaviour
     [Header("Impacto (opcional)")]
     [SerializeField] private float impactForce = 0f; // 0 = nao aplica forca extra
 
+    [Header("Tipo / Raridade")]
+    [SerializeField] private RaridadeItem tipoMachado = RaridadeItem.Normal;
+
     [Header("Vida / Durabilidade")]
     [SerializeField] private int vidaMaxima = 100;
     [SerializeField] private int vidaAtual = 100;
@@ -81,6 +84,10 @@ public class Machado : MonoBehaviour
     public int VidaAtual => vidaAtual;
     public int VidaMaxima => vidaMaxima;
     public bool Quebrado => quebrado || vidaAtual <= 0;
+    public RaridadeItem TipoMachado => tipoMachado;
+    public int MultiplicadorColetaPorRaridade => RaridadeItemUtil.ObterMultiplicadorProgressivo(tipoMachado);
+    public int CalcularQuantidadeColetaPorRaridade(int quantidadeNormal) =>
+        RaridadeItemUtil.CalcularQuantidadePorRaridade(quantidadeNormal, tipoMachado);
 
     private void Awake()
     {
@@ -161,6 +168,9 @@ public class Machado : MonoBehaviour
             return;
 
         Collider other = collision.collider;
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(other))
+            return;
+
         bool colliderPertenceAArvore = ColliderPertenceAArvore(other);
         bool colliderDeArvoreValida = EhColliderDeArvoreValida(other);
         if (!colliderPertenceAArvore)
@@ -184,6 +194,9 @@ public class Machado : MonoBehaviour
             return;
 
         Collider other = collision.collider;
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(other))
+            return;
+
         if (other == null)
         {
             LogAudioFerramenta("OnCollisionStay", null, "collider nulo", false, false);
@@ -228,6 +241,9 @@ public class Machado : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (Quebrado)
+            return;
+
+        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(other))
             return;
 
         TentarAplicarDanoPorEntradaTrigger(other);
