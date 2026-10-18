@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -115,6 +116,7 @@ public class StatusVR : MonoBehaviour
         }
 
         painelStatus.SetActive(true);
+        AgendarVerificacaoDeEstado(true);
     }
 
     public void FecharStatus()
@@ -126,6 +128,41 @@ public class StatusVR : MonoBehaviour
         }
 
         painelStatus.SetActive(false);
+        AgendarVerificacaoDeEstado(false);
+    }
+
+    // ===================== DIAGNOSTICO: detecta scripts que reviram o SetActive por conta propria =====================
+
+    private Coroutine rotinaVerificacaoDeEstado;
+
+    private void AgendarVerificacaoDeEstado(bool estadoEsperado)
+    {
+        if (!isActiveAndEnabled)
+            return;
+
+        if (rotinaVerificacaoDeEstado != null)
+            StopCoroutine(rotinaVerificacaoDeEstado);
+
+        rotinaVerificacaoDeEstado = StartCoroutine(VerificarEstadoAposFrame(estadoEsperado));
+    }
+
+    private IEnumerator VerificarEstadoAposFrame(bool estadoEsperado)
+    {
+        // Espera o restante do frame passar, dando tempo para qualquer Awake/OnEnable/Start
+        // de outros scripts no painel (ex.: um script de menu que se fecha sozinho) rodar.
+        yield return null;
+
+        if (painelStatus != null && painelStatus.activeSelf != estadoEsperado)
+        {
+            LogWarning(
+                $"StatusVR: tentei deixar '{painelStatus.name}' com SetActive({estadoEsperado}), mas logo em seguida " +
+                $"ele ficou com activeSelf = {painelStatus.activeSelf}. Algum outro script nesse painel (provavelmente " +
+                "no Awake/OnEnable dele) esta alterando o proprio estado ativo por conta propria, entrando em conflito " +
+                "com o StatusVR. Isso costuma acontecer quando o painel referenciado tem seu proprio script de " +
+                "abrir/fechar — nesse caso, o StatusVR deveria chamar os metodos desse script em vez de usar SetActive direto.");
+        }
+
+        rotinaVerificacaoDeEstado = null;
     }
 
     private void ConfigurarAction()
@@ -222,6 +259,6 @@ public class StatusVR : MonoBehaviour
 
     private void LogWarning(string mensagem)
     {
-        { }
+        Debug.LogWarning(mensagem);
     }
 }
