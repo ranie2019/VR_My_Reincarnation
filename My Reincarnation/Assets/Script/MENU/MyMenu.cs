@@ -32,7 +32,7 @@ public class MyMenu : MonoBehaviour
         {
             if (abas[i] == null) continue;
             if (abas[i].fundoBotao != null) abas[i].fundoBotao.color = corNormal;
-            if (abas[i].painel != null)     abas[i].painel.SetActive(false);
+            FecharPainelInterno(abas[i]);
         }
     }
 
@@ -73,7 +73,7 @@ public class MyMenu : MonoBehaviour
         {
             if (abas[i] == null) continue;
             if (abas[i].fundoBotao != null) abas[i].fundoBotao.color = corNormal;
-            if (abas[i].painel != null)     abas[i].painel.SetActive(false);
+            FecharPainelInterno(abas[i]);
         }
 
         abaAtiva = -1;
@@ -83,33 +83,55 @@ public class MyMenu : MonoBehaviour
 
     private void SelecionarAba(int indice)
     {
-        // Clicou na aba ja ativa: fecha o painel e desmarca
+        // Clicou na aba ja ativa: fecha e desmarca
         if (abaAtiva == indice)
         {
-            FecharPainel(indice);
+            FecharPainelInterno(abas[indice]);
             abaAtiva = -1;
             return;
         }
 
         // Fecha o painel anterior
         if (abaAtiva >= 0)
-            FecharPainel(abaAtiva);
+            FecharPainelInterno(abas[abaAtiva]);
 
         // Abre o novo
         abaAtiva = indice;
-        AbrirPainel(indice);
+        AbrirPainelInterno(abas[indice]);
     }
 
-    private void AbrirPainel(int indice)
+    // ── Abrir / Fechar ────────────────────────────────────────
+
+    private static void AbrirPainelInterno(AbaMenuDados aba)
     {
-        if (abas[indice].painel != null)
-            abas[indice].painel.SetActive(true);
+        if (aba == null || aba.painel == null) return;
+
+        // Se o painel contiver um InventarioVR, usa a API dele para
+        // garantir que todos os filhos e slots sejam reativados corretamente.
+        InventarioVR inv = aba.painel.GetComponentInChildren<InventarioVR>(true);
+        if (inv != null)
+        {
+            aba.painel.SetActive(true);
+            inv.AbrirInventario();
+            return;
+        }
+
+        aba.painel.SetActive(true);
     }
 
-    private void FecharPainel(int indice)
+    private static void FecharPainelInterno(AbaMenuDados aba)
     {
-        if (abas[indice].painel != null)
-            abas[indice].painel.SetActive(false);
+        if (aba == null || aba.painel == null) return;
+
+        InventarioVR inv = aba.painel.GetComponentInChildren<InventarioVR>(true);
+        if (inv != null)
+        {
+            inv.FecharInventario();
+            aba.painel.SetActive(false);
+            return;
+        }
+
+        aba.painel.SetActive(false);
     }
 
     // ── Cores ─────────────────────────────────────────────────
