@@ -45,6 +45,14 @@ public class InventarioVR : MonoBehaviour
     public void AlternarInventario() => SetEstado(!aberto);
     public bool EstaAberto() => aberto;
 
+    public bool ControlaPainel(GameObject painel)
+    {
+        if (painel == null || painelInventario == null)
+            return false;
+
+        return painel == painelInventario;
+    }
+
     // ─── LÓGICA INTERNA ───────────────────────────────────────────────────────
 
     private void SetEstado(bool estado)

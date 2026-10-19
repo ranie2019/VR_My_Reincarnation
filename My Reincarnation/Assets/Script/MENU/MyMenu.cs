@@ -108,7 +108,9 @@ public class MyMenu : MonoBehaviour
 
         // Se o painel contiver um InventarioVR, usa a API dele para
         // garantir que todos os filhos e slots sejam reativados corretamente.
-        InventarioVR inv = aba.painel.GetComponentInChildren<InventarioVR>(true);
+        // Em alguns layouts o InventarioVR fica no objeto-pai do painel
+        // (por exemplo, no Canvas Menu), e não dentro do próprio painel.
+        InventarioVR inv = EncontrarInventario(aba.painel);
         if (inv != null)
         {
             aba.painel.SetActive(true);
@@ -123,7 +125,7 @@ public class MyMenu : MonoBehaviour
     {
         if (aba == null || aba.painel == null) return;
 
-        InventarioVR inv = aba.painel.GetComponentInChildren<InventarioVR>(true);
+        InventarioVR inv = EncontrarInventario(aba.painel);
         if (inv != null)
         {
             inv.FecharInventario();
@@ -132,6 +134,21 @@ public class MyMenu : MonoBehaviour
         }
 
         aba.painel.SetActive(false);
+    }
+
+    private static InventarioVR EncontrarInventario(GameObject painel)
+    {
+        if (painel == null) return null;
+
+        // Primeiro procura no próprio painel e nos pais. Isso cobre a
+        // configuração atual, em que o componente está no Canvas Menu.
+        InventarioVR inv = painel.GetComponentInParent<InventarioVR>(true);
+        if (inv != null && inv.ControlaPainel(painel)) return inv;
+
+        // Mantém compatibilidade com painéis que tenham o componente em um
+        // objeto filho.
+        inv = painel.GetComponentInChildren<InventarioVR>(true);
+        return inv != null && inv.ControlaPainel(painel) ? inv : null;
     }
 
     // ── Cores ─────────────────────────────────────────────────

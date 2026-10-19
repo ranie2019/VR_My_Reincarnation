@@ -588,7 +588,7 @@ public class GerenciadorMissoes : MonoBehaviour
         missaoAtual.estado = EstadoMissao.Concluida;
 
         if (uiProgresso != null)
-            uiProgresso.Esconder();
+            uiProgresso.Esconder(missaoAtual);
 
         FecharTodosPopupsMissao();
         FecharObjetosExtrasAoAceitar();
