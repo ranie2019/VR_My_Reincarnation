@@ -220,6 +220,80 @@ public class GerenciadorMissoes : MonoBehaviour
 
     public MissaoDados ObterMissaoAtualPublica() => ObterMissaoAtual();
 
+    public string ObterIdPersistencia()
+    {
+        return gameObject != null ? gameObject.name : GetType().Name;
+    }
+
+    public List<MissionSaveData> CapturarEstadoParaSave()
+    {
+        List<MissionSaveData> resultado = new List<MissionSaveData>();
+        if (missoes == null) return resultado;
+
+        for (int i = 0; i < missoes.Count; i++)
+        {
+            MissaoDados missao = missoes[i];
+            if (missao == null) continue;
+
+            resultado.Add(new MissionSaveData
+            {
+                gerenciadorId = ObterIdPersistencia(),
+                idMissao = missao.idMissao,
+                estado = (int)missao.estado,
+                quantidadeAtualObjetivo = missao.quantidadeAtualObjetivo
+            });
+        }
+
+        return resultado;
+    }
+
+    public void RestaurarEstadoDoSave(List<MissionSaveData> estadosSalvos)
+    {
+        if (estadosSalvos == null || missoes == null) return;
+
+        string idGerenciador = ObterIdPersistencia();
+        int indiceRestaurado = 0;
+
+        for (int i = 0; i < missoes.Count; i++)
+        {
+            MissaoDados missao = missoes[i];
+            if (missao == null) continue;
+
+            MissionSaveData salvo = null;
+            for (int j = 0; j < estadosSalvos.Count; j++)
+            {
+                MissionSaveData candidato = estadosSalvos[j];
+                if (candidato == null) continue;
+                if (!string.Equals(candidato.gerenciadorId, idGerenciador, StringComparison.Ordinal)) continue;
+                if (!string.Equals(candidato.idMissao, missao.idMissao, StringComparison.Ordinal)) continue;
+                salvo = candidato;
+                break;
+            }
+
+            if (salvo == null) continue;
+
+            missao.estado = (EstadoMissao)Mathf.Clamp(salvo.estado, (int)EstadoMissao.NaoIniciada, (int)EstadoMissao.Concluida);
+            missao.quantidadeAtualObjetivo = Mathf.Clamp(salvo.quantidadeAtualObjetivo, 0, Mathf.Max(1, missao.quantidadeAlvo));
+
+            if (missao.estado != EstadoMissao.Concluida)
+                indiceRestaurado = i;
+        }
+
+        missaoAtualIndex = Mathf.Clamp(indiceRestaurado, 0, Mathf.Max(0, missoes.Count - 1));
+        MissaoDados missaoAtiva = ObterMissaoAtual();
+        if (missaoAtiva != null && uiProgresso != null &&
+            (missaoAtiva.estado == EstadoMissao.EmAndamento || missaoAtiva.estado == EstadoMissao.ProntaParaEntregar))
+        {
+            uiProgresso.MostrarMissao(missaoAtiva, this);
+        }
+    }
+
+    private void SalvarEstadoAtual()
+    {
+        if (SaveManager.Instancia != null)
+            SaveManager.Instancia.SalvarJogo();
+    }
+
     private void MostrarCanvas(GameObject canvas)
     {
         FecharCanvasAtivo();
@@ -338,6 +412,7 @@ public class GerenciadorMissoes : MonoBehaviour
         // Fecha de forma completa (evita canvas preso)
         FecharTodosPopupsMissao();
         FecharObjetosExtrasAoAceitar();
+        SalvarEstadoAtual();
     }
 
     public void RecusarMissaoAtual()
@@ -370,6 +445,8 @@ public class GerenciadorMissoes : MonoBehaviour
 
         if (missao.quantidadeAtualObjetivo >= missao.quantidadeAlvo)
             MarcarProntaParaEntregar(missao);
+
+        SalvarEstadoAtual();
     }
 
     // =========================================================
@@ -414,6 +491,8 @@ public class GerenciadorMissoes : MonoBehaviour
 
         if (missao.quantidadeAtualObjetivo >= missao.quantidadeAlvo)
             MarcarProntaParaEntregar(missao);
+
+        SalvarEstadoAtual();
     }
 
     private void ConferirInventarioEAtualizarSeMudou(MissaoDados missao)
@@ -435,6 +514,8 @@ public class GerenciadorMissoes : MonoBehaviour
 
         if (missao.quantidadeAtualObjetivo >= missao.quantidadeAlvo)
             MarcarProntaParaEntregar(missao);
+
+        SalvarEstadoAtual();
     }
 
     private InventarioVR ObterInventarioJogador()
@@ -594,6 +675,7 @@ public class GerenciadorMissoes : MonoBehaviour
         FecharObjetosExtrasAoAceitar();
 
         missaoAtualIndex++;
+        SalvarEstadoAtual();
     }
 
     private void EntregarRecompensasAoPlayer(MissaoDados missao)

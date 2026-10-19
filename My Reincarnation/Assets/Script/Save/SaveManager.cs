@@ -69,6 +69,12 @@ public class SaveManager : MonoBehaviour
             SalvarJogo();
     }
 
+    private void OnApplicationPause(bool pausado)
+    {
+        if (pausado && salvarAoSair)
+            SalvarJogo();
+    }
+
     private void OnDestroy()
     {
         if (Instancia == this)
@@ -82,11 +88,12 @@ public class SaveManager : MonoBehaviour
 
         SaveData data = new SaveData
         {
-            versaoSave = "0.2-status-player",
+            versaoSave = "0.3-missoes-persistentes",
             dataSave = DateTime.Now.ToString("O"),
             player = CriarPlayerSaveData(),
             inventario = salvarInventario ? CapturarInventarioAtual() : new List<InventorySaveData>(),
-            objetosCena = CapturarObjetosCena()
+            objetosCena = CapturarObjetosCena(),
+            missoes = CapturarMissoes()
         };
 
         string json = JsonUtility.ToJson(data, true);
@@ -148,6 +155,41 @@ public class SaveManager : MonoBehaviour
             RestaurarInventario(data.inventario);
 
         RestaurarObjetosCena(data.objetosCena, instanciaIdsInventario);
+        RestaurarMissoes(data.missoes);
+    }
+
+    private List<MissionSaveData> CapturarMissoes()
+    {
+        List<MissionSaveData> resultado = new List<MissionSaveData>();
+        GerenciadorMissoes[] gerenciadores = FindObjectsByType<GerenciadorMissoes>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        for (int i = 0; i < gerenciadores.Length; i++)
+        {
+            GerenciadorMissoes gerenciador = gerenciadores[i];
+            if (gerenciador == null) continue;
+
+            List<MissionSaveData> estados = gerenciador.CapturarEstadoParaSave();
+            if (estados != null)
+                resultado.AddRange(estados);
+        }
+
+        return resultado;
+    }
+
+    private void RestaurarMissoes(List<MissionSaveData> missoesSalvas)
+    {
+        if (missoesSalvas == null || missoesSalvas.Count == 0)
+            return;
+
+        GerenciadorMissoes[] gerenciadores = FindObjectsByType<GerenciadorMissoes>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        for (int i = 0; i < gerenciadores.Length; i++)
+        {
+            if (gerenciadores[i] != null)
+                gerenciadores[i].RestaurarEstadoDoSave(missoesSalvas);
+        }
     }
 
     [ContextMenu("Apagar Save")]

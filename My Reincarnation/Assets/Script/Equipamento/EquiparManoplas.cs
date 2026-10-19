@@ -3,62 +3,65 @@ using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
-/// <summary>
-/// Fica no objeto raiz do item de armadura (ex: "Luva Medieval D/E").
-///
-/// Ao equipar:
-/// - Move o luvaVisual para fora da hierarquia do item ANTES de desativar o item.
-/// - Desativa apenas BoxColliders e Rigidbody � SkinnedMeshRenderer permanece ativo.
-/// - Desativa o objeto raiz do item (Luva Medieval D/E). Como a luvaVisual
-///   ja foi removida antes, ela continua ativa e visivel na mao.
-/// </summary>
 public class EquiparManoplas : MonoBehaviour
 {
     [Header("Popup")]
-    [Tooltip("Canvas com as informacoes e o botao EQUIP. Comeca desativado.")]
     [SerializeField] private GameObject popupInfo;
-
-    [Tooltip("Tempo em segundos antes do popup fechar apos o laser sair do item.")]
     [SerializeField] private float tempoParaFecharPopup = 10f;
 
-    [Header("Visual da Luva")]
+    [Header("Prefab Completo")]
     [Tooltip(
-        "Filho INTERNO da luva que contem o mesh (ex: o objeto 'Luva' dentro de 'Luva Medieval E').\n" +
-        "NAO arraste o objeto raiz 'Luva Medieval E' aqui � se fizer isso o codigo avisa no Console.")]
+        "Referência opcional ao prefab completo da manopla. " +
+        "O objeto raiz deste componente será movido por inteiro."
+    )]
     [SerializeField] private GameObject luvaVisual;
 
-    [Header("Mao do Avatar")]
-    [Tooltip("Transform da mao do avatar (ex: 'Mao Esquerda' ou 'Mao Direita'). A luva vira filha deste Transform.")]
+    [Header("Mão do Avatar")]
     [SerializeField] private Transform transformMaoAvatar;
 
-    [Tooltip("OPCIONAL � SkinnedMeshRenderer da mao nua. Se preenchido e 'Esconder Mao' marcado, so o renderer some.")]
+    [Tooltip("Renderer opcional da mão nua do avatar.")]
     [SerializeField] private SkinnedMeshRenderer rendererMaoAvatar;
 
-    [Tooltip("Se marcado, esconde o renderer da mao nua ao equipar. Deixe desmarcado para ver mao + luva juntas.")]
     [SerializeField] private bool esconderMaoAoEquipar = false;
 
-    // [Header("Atributos (futuro)")]
-    // [SerializeField] private AtributosArmadura atributos;
+    [Header("Escala")]
+    [Tooltip(
+        "Escala usada somente depois que o botão Equipar for chamado. " +
+        "Esta escala não é aplicada no Awake nem ao iniciar o jogo."
+    )]
+    public Vector3 escalaEquipado = Vector3.one;
 
     private XRBaseInteractable interactable;
-    private bool jaEquipado;
     private Coroutine corotinaFecharPopup;
 
-    public bool JaEquipado => jaEquipado;
+    private bool jaEquipado;
 
-    // -------------------------------------------------------------------------
-    // Unity lifecycle
-    // -------------------------------------------------------------------------
+    private Transform paiOriginal;
+    private Vector3 escalaOriginalLocal;
+    private Vector3 posicaoOriginalLocal;
+    private Quaternion rotacaoOriginalLocal;
+
+    public bool JaEquipado => jaEquipado;
 
     private void Awake()
     {
         interactable = GetComponent<XRBaseInteractable>();
 
         if (interactable == null)
-            Debug.LogWarning("[EquiparArmadura] Nenhum XRBaseInteractable encontrado em: " + gameObject.name, this);
+        {
+            Debug.LogWarning(
+                "[EquiparManoplas] Nenhum XRBaseInteractable encontrado em: " +
+                gameObject.name,
+                this
+            );
+        }
 
         if (popupInfo != null)
             popupInfo.SetActive(false);
+
+        // Apenas salva os valores originais.
+        // Não altera a escala neste momento.
+        SalvarTransformOriginal();
     }
 
     private void OnEnable()
@@ -72,16 +75,22 @@ public class EquiparManoplas : MonoBehaviour
 
     private void OnDisable()
     {
-        if (interactable == null)
-            return;
+        if (interactable != null)
+        {
+            interactable.hoverEntered.RemoveListener(OnHoverEntered);
+            interactable.hoverExited.RemoveListener(OnHoverExited);
+        }
 
-        interactable.hoverEntered.RemoveListener(OnHoverEntered);
-        interactable.hoverExited.RemoveListener(OnHoverExited);
+        CancelarFechamentoPendente();
     }
 
-    // -------------------------------------------------------------------------
-    // Hover � popup
-    // -------------------------------------------------------------------------
+    private void SalvarTransformOriginal()
+    {
+        paiOriginal = transform.parent;
+        escalaOriginalLocal = transform.localScale;
+        posicaoOriginalLocal = transform.localPosition;
+        rotacaoOriginalLocal = transform.localRotation;
+    }
 
     private void OnHoverEntered(HoverEnterEventArgs args)
     {
@@ -116,141 +125,217 @@ public class EquiparManoplas : MonoBehaviour
         corotinaFecharPopup = null;
     }
 
-    // -------------------------------------------------------------------------
-    // Equipar
-    // -------------------------------------------------------------------------
-
     public void Equipar()
     {
         if (jaEquipado)
-        {
             return;
-        }
 
         if (!ValidarReferencias())
             return;
 
+        // A escala original já foi preservada no Awake.
+        // A escala equipada só é aplicada neste momento.
         jaEquipado = true;
 
-        // ORDEM CRITICA:
-        // 1. Tira a luva da hierarquia do item ANTES de desativar o item.
-        EncaixarLuvaNaMao();
+        EncaixarPrefabCompletoNaMao();
 
-        // 2. Desativa so BoxCollider e Rigidbody do item raiz.
+        DesativarInteracaoDoItem();
+
         DesativarFisicaDoItem();
 
-        // 3. Esconde renderer da mao nua (opcional).
         EsconderMaoSeConfigurado();
 
-        // 4. Atributos futuros.
         AplicarAtributos();
 
-        // 5. Desativa o item do chao. A luvaVisual ja foi removida, nao e afetada.
-        DesativarItemDoChao();
-
+        FinalizarEquipamento();
     }
 
     private bool ValidarReferencias()
     {
-        if (luvaVisual == null)
-        {
-            Debug.LogWarning("[EquiparArmadura] 'Luva Visual' nao atribuida em: " + gameObject.name +
-                             "\nArraste o filho 'Luva' (nao o objeto raiz 'Luva Medieval') para este campo.", this);
-            return false;
-        }
-
-        // Protecao: avisa se o luvaVisual for o proprio objeto raiz.
-        // Se for, o SetActive(false) do item desativaria a luva junto.
-        if (luvaVisual == gameObject)
-        {
-            Debug.LogWarning("[EquiparArmadura] 'Luva Visual' esta apontando para o proprio objeto raiz '" + gameObject.name + "'!" +
-                           "\nIsto faz a luva sumir ao equipar. Arraste um filho interno (ex: 'Luva') para este campo.", this);
-            return false;
-        }
-
         if (transformMaoAvatar == null)
         {
-            Debug.LogWarning("[EquiparArmadura] 'Transform Mao Avatar' nao atribuido em: " + gameObject.name +
-                             "\nArraste 'Mao Direita' ou 'Mao Esquerda' do Avatar para este campo.", this);
+            Debug.LogWarning(
+                "[EquiparManoplas] O campo 'Transform Mao Avatar' não foi atribuído em: " +
+                gameObject.name,
+                this
+            );
+
             return false;
         }
 
         return true;
     }
 
-    /// <summary>
-    /// Move a luvaVisual para fora da hierarquia do item e encaixa na mao do avatar.
-    /// Depois disso, desativar o item raiz NAO afeta a luva.
-    /// </summary>
-    private void EncaixarLuvaNaMao()
+    private void EncaixarPrefabCompletoNaMao()
     {
-        // Salva rotacao e escala locais originais antes de mudar o pai.
-        Quaternion rotacaoOriginal = luvaVisual.transform.localRotation;
-        Vector3 escalaOriginal = luvaVisual.transform.localScale;
+        Transform raizPrefab = transform;
 
-        // Muda o pai. worldPositionStays: false para podermos definir
-        // os valores locais manualmente logo abaixo.
-        luvaVisual.transform.SetParent(transformMaoAvatar, false);
+        if (raizPrefab == null || transformMaoAvatar == null)
+            return;
 
-        // Posicao zerada: a luva fica exatamente sobre a mao.
-        luvaVisual.transform.localPosition = Vector3.zero;
+        raizPrefab.gameObject.SetActive(true);
 
-        // Rotacao e escala preservadas dos valores originais da luva.
-        luvaVisual.transform.localRotation = rotacaoOriginal;
-        luvaVisual.transform.localScale = escalaOriginal;
+        // O prefab completo passa a acompanhar a mão.
+        raizPrefab.SetParent(transformMaoAvatar, false);
 
-        // Garante ativo � pode ter vindo desativado do prefab.
-        luvaVisual.SetActive(true);
+        // Mantém o alinhamento atual usado pela lógica de equipamento.
+        raizPrefab.localPosition = Vector3.zero;
+        raizPrefab.localRotation = Quaternion.identity;
 
+        // A escala equipada é aplicada somente quando Equipar() é chamado.
+        raizPrefab.localScale = escalaEquipado;
+
+        AtivarHierarquiaCompleta(raizPrefab);
     }
 
-    /// <summary>
-    /// Desativa apenas BoxCollider e Rigidbody do item raiz.
-    /// SkinnedMeshRenderer e os outros componentes da luva nao sao tocados.
-    /// </summary>
-    private void DesativarFisicaDoItem()
+    private void AtivarHierarquiaCompleta(Transform raiz)
     {
-        Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null)
+        if (raiz == null)
+            return;
+
+        raiz.gameObject.SetActive(true);
+
+        for (int i = 0; i < raiz.childCount; i++)
         {
-            rb.isKinematic = true;
-            rb.detectCollisions = false;
+            AtivarHierarquiaCompleta(raiz.GetChild(i));
+        }
+    }
+
+    private void DesativarInteracaoDoItem()
+    {
+        XRBaseInteractable[] interactables =
+            GetComponentsInChildren<XRBaseInteractable>(true);
+
+        for (int i = 0; i < interactables.Length; i++)
+        {
+            XRBaseInteractable itemInteractable = interactables[i];
+
+            if (itemInteractable != null)
+                itemInteractable.enabled = false;
         }
 
-        BoxCollider[] boxColliders = GetComponentsInChildren<BoxCollider>(true);
-        for (int i = 0; i < boxColliders.Length; i++)
+        if (popupInfo != null)
+            popupInfo.SetActive(false);
+    }
+
+    private void DesativarFisicaDoItem()
+    {
+        Rigidbody[] rigidbodies =
+            GetComponentsInChildren<Rigidbody>(true);
+
+        for (int i = 0; i < rigidbodies.Length; i++)
         {
-            if (boxColliders[i] != null)
-                boxColliders[i].enabled = false;
+            Rigidbody rb = rigidbodies[i];
+
+            if (rb == null)
+                continue;
+
+            rb.isKinematic = true;
+            rb.detectCollisions = false;
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        Collider[] colliders =
+            GetComponentsInChildren<Collider>(true);
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+
+            if (collider != null)
+                collider.enabled = false;
         }
     }
 
     private void EsconderMaoSeConfigurado()
     {
-        if (!esconderMaoAoEquipar || rendererMaoAvatar == null)
+        if (!esconderMaoAoEquipar)
             return;
 
-        rendererMaoAvatar.enabled = false;
+        if (rendererMaoAvatar != null)
+            rendererMaoAvatar.enabled = false;
     }
 
     private void AplicarAtributos()
     {
-        // Futuro:
-        // if (atributos == null) return;
-        // StatusPlayer status = FindAnyObjectByType<StatusPlayer>();
-        // if (status != null) status.AplicarBonus(atributos);
+        // Reservado para futuros bônus e efeitos da manopla.
+        // Os scripts do prefab permanecem ativos.
     }
 
-    /// <summary>
-    /// Desativa o objeto raiz do item (Luva Medieval D/E).
-    /// A luvaVisual ja foi removida da hierarquia dele em EncaixarLuvaNaMao(),
-    /// entao ela NAO e afetada por este SetActive(false).
-    /// </summary>
-    private void DesativarItemDoChao()
+    private void FinalizarEquipamento()
     {
         if (popupInfo != null)
             popupInfo.SetActive(false);
 
-        gameObject.SetActive(false);
+        // O prefab completo permanece ativo na mão.
+        gameObject.SetActive(true);
+    }
+
+    public void Desequipar()
+    {
+        if (!jaEquipado)
+            return;
+
+        RestaurarInteracaoDoItem();
+
+        RestaurarFisicaDoItem();
+
+        if (rendererMaoAvatar != null)
+            rendererMaoAvatar.enabled = true;
+
+        if (paiOriginal != null)
+        {
+            transform.SetParent(paiOriginal, false);
+            transform.localPosition = posicaoOriginalLocal;
+            transform.localRotation = rotacaoOriginalLocal;
+
+            // Ao desequipar, retorna exatamente para a escala original.
+            transform.localScale = escalaOriginalLocal;
+        }
+
+        jaEquipado = false;
+    }
+
+    private void RestaurarInteracaoDoItem()
+    {
+        XRBaseInteractable[] interactables =
+            GetComponentsInChildren<XRBaseInteractable>(true);
+
+        for (int i = 0; i < interactables.Length; i++)
+        {
+            XRBaseInteractable itemInteractable = interactables[i];
+
+            if (itemInteractable != null)
+                itemInteractable.enabled = true;
+        }
+    }
+
+    private void RestaurarFisicaDoItem()
+    {
+        Rigidbody[] rigidbodies =
+            GetComponentsInChildren<Rigidbody>(true);
+
+        for (int i = 0; i < rigidbodies.Length; i++)
+        {
+            Rigidbody rb = rigidbodies[i];
+
+            if (rb == null)
+                continue;
+
+            rb.isKinematic = false;
+            rb.detectCollisions = true;
+        }
+
+        Collider[] colliders =
+            GetComponentsInChildren<Collider>(true);
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+
+            if (collider != null)
+                collider.enabled = true;
+        }
     }
 }
