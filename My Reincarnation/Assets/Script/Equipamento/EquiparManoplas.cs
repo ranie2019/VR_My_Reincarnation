@@ -26,8 +26,8 @@ public class EquiparManoplas : MonoBehaviour
 
     [Header("Escala")]
     [Tooltip(
-        "Escala usada somente depois que o botão Equipar for chamado. " +
-        "Esta escala não é aplicada no Awake nem ao iniciar o jogo."
+        "Mantido por compatibilidade com prefabs antigos. " +
+        "A escala original do prefab é preservada e este valor não é aplicado."
     )]
     public Vector3 escalaEquipado = Vector3.one;
 
@@ -40,6 +40,10 @@ public class EquiparManoplas : MonoBehaviour
     private Vector3 escalaOriginalLocal;
     private Vector3 posicaoOriginalLocal;
     private Quaternion rotacaoOriginalLocal;
+
+    // Escala real do objeto no mundo antes de ser equipado.
+    private Vector3 escalaOriginalMundo;
+    private bool escalaOriginalMundoCapturada;
 
     public bool JaEquipado => jaEquipado;
 
@@ -59,9 +63,33 @@ public class EquiparManoplas : MonoBehaviour
         if (popupInfo != null)
             popupInfo.SetActive(false);
 
-        // Apenas salva os valores originais.
-        // Não altera a escala neste momento.
+        // Salva os valores originais sem modificar o objeto.
         SalvarTransformOriginal();
+    }
+
+    private void Start()
+    {
+        /*
+         * Captura a escala real depois que todos os Awake foram executados.
+         * Isso evita capturar uma escala incorreta causada por outros scripts.
+         */
+        escalaOriginalMundo = transform.lossyScale;
+        escalaOriginalMundoCapturada = true;
+
+        // Corrige a escala local para preservar a escala real do mundo.
+        AplicarEscalaMundoComoLocal(escalaOriginalMundo);
+    }
+
+    private void LateUpdate()
+    {
+        /*
+         * Enquanto a manopla não estiver equipada, mantém a escala original
+         * mesmo que outro script tente modificá-la.
+         */
+        if (!jaEquipado && escalaOriginalMundoCapturada)
+        {
+            AplicarEscalaMundoComoLocal(escalaOriginalMundo);
+        }
     }
 
     private void OnEnable()
@@ -133,20 +161,15 @@ public class EquiparManoplas : MonoBehaviour
         if (!ValidarReferencias())
             return;
 
-        // A escala original já foi preservada no Awake.
-        // A escala equipada só é aplicada neste momento.
         jaEquipado = true;
 
         EncaixarPrefabCompletoNaMao();
 
         DesativarInteracaoDoItem();
-
         DesativarFisicaDoItem();
-
         EsconderMaoSeConfigurado();
 
         AplicarAtributos();
-
         FinalizarEquipamento();
     }
 
@@ -168,24 +191,34 @@ public class EquiparManoplas : MonoBehaviour
 
     private void EncaixarPrefabCompletoNaMao()
     {
-        Transform raizPrefab = transform;
-
-        if (raizPrefab == null || transformMaoAvatar == null)
+        if (transformMaoAvatar == null)
             return;
 
-        raizPrefab.gameObject.SetActive(true);
+        gameObject.SetActive(true);
 
-        // O prefab completo passa a acompanhar a mão.
-        raizPrefab.SetParent(transformMaoAvatar, false);
+        /*
+         * Mantém temporariamente a escala de mundo durante a troca de pai.
+         * Assim, a manopla não sofre redução ou aumento automático.
+         */
+        transform.SetParent(transformMaoAvatar, true);
 
-        // Mantém o alinhamento atual usado pela lógica de equipamento.
-        raizPrefab.localPosition = Vector3.zero;
-        raizPrefab.localRotation = Quaternion.identity;
+        transform.localPosition = Vector3.zero;
+        transform.localRotation = Quaternion.identity;
 
-        // A escala equipada é aplicada somente quando Equipar() é chamado.
-        raizPrefab.localScale = escalaEquipado;
+        /*
+         * Não usa mais Vector3.one nem escalaEquipado.
+         * A escala original do prefab é convertida para o contexto da mão.
+         */
+        if (escalaOriginalMundoCapturada)
+        {
+            AplicarEscalaMundoComoLocal(escalaOriginalMundo);
+        }
+        else
+        {
+            transform.localScale = escalaOriginalLocal;
+        }
 
-        AtivarHierarquiaCompleta(raizPrefab);
+        AtivarHierarquiaCompleta(transform);
     }
 
     private void AtivarHierarquiaCompleta(Transform raiz)
@@ -208,10 +241,8 @@ public class EquiparManoplas : MonoBehaviour
 
         for (int i = 0; i < interactables.Length; i++)
         {
-            XRBaseInteractable itemInteractable = interactables[i];
-
-            if (itemInteractable != null)
-                itemInteractable.enabled = false;
+            if (interactables[i] != null)
+                interactables[i].enabled = false;
         }
 
         if (popupInfo != null)
@@ -241,10 +272,8 @@ public class EquiparManoplas : MonoBehaviour
 
         for (int i = 0; i < colliders.Length; i++)
         {
-            Collider collider = colliders[i];
-
-            if (collider != null)
-                collider.enabled = false;
+            if (colliders[i] != null)
+                colliders[i].enabled = false;
         }
     }
 
@@ -260,7 +289,6 @@ public class EquiparManoplas : MonoBehaviour
     private void AplicarAtributos()
     {
         // Reservado para futuros bônus e efeitos da manopla.
-        // Os scripts do prefab permanecem ativos.
     }
 
     private void FinalizarEquipamento()
@@ -268,7 +296,6 @@ public class EquiparManoplas : MonoBehaviour
         if (popupInfo != null)
             popupInfo.SetActive(false);
 
-        // O prefab completo permanece ativo na mão.
         gameObject.SetActive(true);
     }
 
@@ -278,7 +305,6 @@ public class EquiparManoplas : MonoBehaviour
             return;
 
         RestaurarInteracaoDoItem();
-
         RestaurarFisicaDoItem();
 
         if (rendererMaoAvatar != null)
@@ -287,11 +313,14 @@ public class EquiparManoplas : MonoBehaviour
         if (paiOriginal != null)
         {
             transform.SetParent(paiOriginal, false);
+
             transform.localPosition = posicaoOriginalLocal;
             transform.localRotation = rotacaoOriginalLocal;
 
-            // Ao desequipar, retorna exatamente para a escala original.
-            transform.localScale = escalaOriginalLocal;
+            if (escalaOriginalMundoCapturada)
+                AplicarEscalaMundoComoLocal(escalaOriginalMundo);
+            else
+                transform.localScale = escalaOriginalLocal;
         }
 
         jaEquipado = false;
@@ -304,10 +333,8 @@ public class EquiparManoplas : MonoBehaviour
 
         for (int i = 0; i < interactables.Length; i++)
         {
-            XRBaseInteractable itemInteractable = interactables[i];
-
-            if (itemInteractable != null)
-                itemInteractable.enabled = true;
+            if (interactables[i] != null)
+                interactables[i].enabled = true;
         }
     }
 
@@ -332,10 +359,45 @@ public class EquiparManoplas : MonoBehaviour
 
         for (int i = 0; i < colliders.Length; i++)
         {
-            Collider collider = colliders[i];
-
-            if (collider != null)
-                collider.enabled = true;
+            if (colliders[i] != null)
+                colliders[i].enabled = true;
         }
+    }
+
+    private void AplicarEscalaMundoComoLocal(Vector3 escalaMundo)
+    {
+        Vector3 escalaDoPai = transform.parent != null
+            ? transform.parent.lossyScale
+            : Vector3.one;
+
+        Vector3 novaEscalaLocal = new Vector3(
+            DividirSeguro(escalaMundo.x, escalaDoPai.x),
+            DividirSeguro(escalaMundo.y, escalaDoPai.y),
+            DividirSeguro(escalaMundo.z, escalaDoPai.z)
+        );
+
+        if (novaEscalaLocal != transform.localScale)
+        {
+            transform.localScale = novaEscalaLocal;
+        }
+    }
+
+    private static float DividirSeguro(float valor, float divisor)
+    {
+        if (
+            Mathf.Approximately(divisor, 0f) ||
+            float.IsNaN(divisor) ||
+            float.IsInfinity(divisor)
+        )
+        {
+            return valor;
+        }
+
+        float resultado = valor / divisor;
+
+        if (float.IsNaN(resultado) || float.IsInfinity(resultado))
+            return valor;
+
+        return resultado;
     }
 }
