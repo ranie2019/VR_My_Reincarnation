@@ -27,7 +27,7 @@ public class EquiparManoplas : MonoBehaviour
     [Header("Escala")]
     [Tooltip(
         "Mantido por compatibilidade com prefabs antigos. " +
-        "A escala original do prefab é preservada e este valor não é aplicado."
+        "A escala original do prefab é preservada."
     )]
     public Vector3 escalaEquipado = Vector3.one;
 
@@ -41,7 +41,6 @@ public class EquiparManoplas : MonoBehaviour
     private Vector3 posicaoOriginalLocal;
     private Quaternion rotacaoOriginalLocal;
 
-    // Escala real do objeto no mundo antes de ser equipado.
     private Vector3 escalaOriginalMundo;
     private bool escalaOriginalMundoCapturada;
 
@@ -63,30 +62,30 @@ public class EquiparManoplas : MonoBehaviour
         if (popupInfo != null)
             popupInfo.SetActive(false);
 
-        // Salva os valores originais sem modificar o objeto.
         SalvarTransformOriginal();
     }
 
     private void Start()
     {
         /*
-         * Captura a escala real depois que todos os Awake foram executados.
-         * Isso evita capturar uma escala incorreta causada por outros scripts.
+         * Captura a escala real depois dos Awake dos outros componentes.
+         * Não altera o tamanho visual original da manopla.
          */
         escalaOriginalMundo = transform.lossyScale;
         escalaOriginalMundoCapturada = true;
 
-        // Corrige a escala local para preservar a escala real do mundo.
         AplicarEscalaMundoComoLocal(escalaOriginalMundo);
     }
 
     private void LateUpdate()
     {
         /*
-         * Enquanto a manopla não estiver equipada, mantém a escala original
-         * mesmo que outro script tente modificá-la.
+         * Mantém a escala original enquanto a manopla não estiver equipada.
          */
-        if (!jaEquipado && escalaOriginalMundoCapturada)
+        if (!jaEquipado &&
+            escalaOriginalMundoCapturada &&
+            isActiveAndEnabled &&
+            gameObject.activeInHierarchy)
         {
             AplicarEscalaMundoComoLocal(escalaOriginalMundo);
         }
@@ -122,6 +121,9 @@ public class EquiparManoplas : MonoBehaviour
 
     private void OnHoverEntered(HoverEnterEventArgs args)
     {
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return;
+
         CancelarFechamentoPendente();
 
         if (popupInfo != null)
@@ -131,12 +133,30 @@ public class EquiparManoplas : MonoBehaviour
     private void OnHoverExited(HoverExitEventArgs args)
     {
         CancelarFechamentoPendente();
+
+        /*
+         * Ao guardar a manopla no inventário, o GameObject pode ser
+         * desativado antes de o XRI terminar de disparar o hoverExited.
+         * Nesse caso, não se pode iniciar uma coroutine.
+         */
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return;
+
         corotinaFecharPopup = StartCoroutine(FecharPopupAposEspera());
     }
 
     private IEnumerator FecharPopupAposEspera()
     {
         yield return new WaitForSeconds(tempoParaFecharPopup);
+
+        /*
+         * O item pode ter sido guardado no inventário durante a espera.
+         */
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+        {
+            corotinaFecharPopup = null;
+            yield break;
+        }
 
         if (popupInfo != null)
             popupInfo.SetActive(false);
@@ -197,8 +217,7 @@ public class EquiparManoplas : MonoBehaviour
         gameObject.SetActive(true);
 
         /*
-         * Mantém temporariamente a escala de mundo durante a troca de pai.
-         * Assim, a manopla não sofre redução ou aumento automático.
+         * Mantém a escala de mundo durante a troca de pai.
          */
         transform.SetParent(transformMaoAvatar, true);
 
@@ -206,8 +225,8 @@ public class EquiparManoplas : MonoBehaviour
         transform.localRotation = Quaternion.identity;
 
         /*
-         * Não usa mais Vector3.one nem escalaEquipado.
-         * A escala original do prefab é convertida para o contexto da mão.
+         * Não utiliza escalaEquipado nem Vector3.one.
+         * A escala original do prefab é preservada.
          */
         if (escalaOriginalMundoCapturada)
         {
@@ -377,9 +396,7 @@ public class EquiparManoplas : MonoBehaviour
         );
 
         if (novaEscalaLocal != transform.localScale)
-        {
             transform.localScale = novaEscalaLocal;
-        }
     }
 
     private static float DividirSeguro(float valor, float divisor)

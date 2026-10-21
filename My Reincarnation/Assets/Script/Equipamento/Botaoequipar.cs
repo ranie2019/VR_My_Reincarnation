@@ -3,15 +3,6 @@ using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
-/// <summary>
-/// Fica no botão "EQUIP" dentro do PopUp da luva.
-///
-/// Detecta hover do laser + confirmação com botão do controle (mão esquerda
-/// ou direita), e quando confirmado chama EquiparManoplas.Equipar() no
-/// objeto pai (a luva).
-///
-/// Requisito: o objeto precisa ter um Collider (BoxCollider, Is Trigger) do tamanho do botao.
-/// </summary>
 [RequireComponent(typeof(XRSimpleInteractable))]
 public class BotaoEquipar : MonoBehaviour
 {
@@ -19,7 +10,7 @@ public class BotaoEquipar : MonoBehaviour
     [Tooltip("Se vazio, tenta encontrar automaticamente subindo pelos pais.")]
     [SerializeField] private EquiparManoplas equiparManoplas;
 
-    [Header("Confirmação (Hover + Botão do Controle)")]
+    [Header("Confirmação")]
     [SerializeField] private InputActionReference acaoConfirmarMaoEsquerda;
     [SerializeField] private InputActionReference acaoConfirmarMaoDireita;
 
@@ -36,6 +27,9 @@ public class BotaoEquipar : MonoBehaviour
 
     private void OnEnable()
     {
+        if (interactable == null)
+            return;
+
         interactable.hoverEntered.AddListener(OnHoverEntered);
         interactable.hoverExited.AddListener(OnHoverExited);
 
@@ -45,8 +39,11 @@ public class BotaoEquipar : MonoBehaviour
 
     private void OnDisable()
     {
-        interactable.hoverEntered.RemoveListener(OnHoverEntered);
-        interactable.hoverExited.RemoveListener(OnHoverExited);
+        if (interactable != null)
+        {
+            interactable.hoverEntered.RemoveListener(OnHoverEntered);
+            interactable.hoverExited.RemoveListener(OnHoverExited);
+        }
 
         DesabilitarAcao(acaoConfirmarMaoEsquerda);
         DesabilitarAcao(acaoConfirmarMaoDireita);
@@ -61,6 +58,9 @@ public class BotaoEquipar : MonoBehaviour
 
     private void OnHoverEntered(HoverEnterEventArgs args)
     {
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return;
+
         botaoEmHover = true;
     }
 
