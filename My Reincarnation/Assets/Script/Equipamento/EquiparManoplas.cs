@@ -19,6 +19,14 @@ public class EquiparManoplas : MonoBehaviour
     [Header("Mão do Avatar")]
     [SerializeField] private Transform transformMaoAvatar;
 
+    [Header("Eixo de Equipamento")]
+    [Tooltip(
+        "Objeto vazio filho que representa o ponto e a orientação da mão. " +
+        "Deixe vazio para manter o comportamento antigo. Se não for atribuído, " +
+        "o script procura automaticamente por EixoEquipamento ou PoseEquipamento."
+    )]
+    [SerializeField] private Transform eixoEquipamento;
+
     [Tooltip("Renderer opcional da mão nua do avatar.")]
     [SerializeField] private SkinnedMeshRenderer rendererMaoAvatar;
 
@@ -61,6 +69,9 @@ public class EquiparManoplas : MonoBehaviour
 
         if (popupInfo != null)
             popupInfo.SetActive(false);
+
+        if (eixoEquipamento == null)
+            eixoEquipamento = EncontrarEixoEquipamento();
 
         SalvarTransformOriginal();
     }
@@ -206,6 +217,9 @@ public class EquiparManoplas : MonoBehaviour
             return false;
         }
 
+        if (eixoEquipamento == null)
+            eixoEquipamento = EncontrarEixoEquipamento();
+
         return true;
     }
 
@@ -221,9 +235,6 @@ public class EquiparManoplas : MonoBehaviour
          */
         transform.SetParent(transformMaoAvatar, true);
 
-        transform.localPosition = Vector3.zero;
-        transform.localRotation = Quaternion.identity;
-
         /*
          * Não utiliza escalaEquipado nem Vector3.one.
          * A escala original do prefab é preservada.
@@ -238,6 +249,62 @@ public class EquiparManoplas : MonoBehaviour
         }
 
         AtivarHierarquiaCompleta(transform);
+
+        if (eixoEquipamento != null)
+        {
+            AlinharEixoEquipamentoComAMao();
+        }
+        else
+        {
+            /*
+             * Fallback para os prefabs antigos que ainda não possuem eixo.
+             */
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.identity;
+        }
+    }
+
+    private Transform EncontrarEixoEquipamento()
+    {
+        Transform[] filhos = GetComponentsInChildren<Transform>(true);
+
+        for (int i = 0; i < filhos.Length; i++)
+        {
+            Transform filho = filhos[i];
+            if (filho == null || filho == transform)
+                continue;
+
+            if (filho.name == "EixoEquipamento" || filho.name == "PoseEquipamento")
+                return filho;
+        }
+
+        return null;
+    }
+
+    private void AlinharEixoEquipamentoComAMao()
+    {
+        if (transformMaoAvatar == null || eixoEquipamento == null)
+            return;
+
+        /*
+         * Descobre a rotação do eixo em relação à raiz antes de girar a raiz.
+         * Isso funciona mesmo se o eixo estiver dentro de outro objeto filho.
+         */
+        Quaternion rotacaoEixoRelativa =
+            Quaternion.Inverse(transform.rotation) * eixoEquipamento.rotation;
+
+        /*
+         * Faz o eixo ter exatamente a rotação da mão.
+         */
+        transform.rotation =
+            transformMaoAvatar.rotation * Quaternion.Inverse(rotacaoEixoRelativa);
+
+        /*
+         * Depois da rotação, corrige a posição para que o eixo coincida
+         * exatamente com o ponto da mão.
+         */
+        Vector3 deslocamento = transformMaoAvatar.position - eixoEquipamento.position;
+        transform.position += deslocamento;
     }
 
     private void AtivarHierarquiaCompleta(Transform raiz)
