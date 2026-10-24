@@ -234,11 +234,11 @@ GameObject:
   - component: {fileID: 4038677990783922019}
   - component: {fileID: 4543571473896971360}
   - component: {fileID: 1967384602894405602}
+  - component: {fileID: 1594517157628774005}
   - component: {fileID: 4707667140421590661}
   - component: {fileID: 993643554008481779}
   - component: {fileID: 6397627217577386532}
   - component: {fileID: 3569305340409347630}
-  - component: {fileID: 1594517157628774005}
   m_Layer: 0
   m_Name: Luva Medieval E
   m_TagString: Untagged
@@ -336,83 +336,6 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &4707667140421590661
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3174021519282902977}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a0ef4c75ea065ef409f2d527d32e4eef, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioEscalavel
-  escalaOriginalSalva: 0
-  escalaOriginalMundo: {x: 0, y: 0, z: 0}
---- !u!114 &993643554008481779
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3174021519282902977}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8fdcde03f7844e94888d45fb3479b89f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioDados
-  nomeItem: Luva Medieval E
-  prefabParaStack: {fileID: 0}
-  ehFlecha: 0
-  idTipoFlecha: 
-  prefabFlechaParaDisparo: {fileID: 0}
-  iconeFlecha: {fileID: 0}
-  nomeExibicaoFlecha: 
---- !u!114 &6397627217577386532
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3174021519282902977}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
-  tipoItemId: c3dbd0b2dd0ea8f4c8c8a5b9e725ba2c
-  itemId: Luva Medieval E
-  nomeItem: Luva Medieval E
-  prefabReferencia: {fileID: 3174021519282902977}
-  salvarNoInventario: 1
-  usarNomeDoObjetoSeIdVazio: 1
-  destruirOriginalAoCarregarSeEstiverNoInventario: 1
-  estaNoInventario: 0
-  salvarQuandoSoltoNaCena: 1
-  instanciaId: 
-  durabilidadeAtual: -1
-  dadosExtrasJson: 
---- !u!114 &3569305340409347630
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3174021519282902977}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 087613a00cfd7ed428214d1b8af6760b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EquiparArmadura
-  popupInfo: {fileID: 8936089263955818997}
-  tempoParaFecharPopup: 10
-  luvaVisual: {fileID: 3174021519282902977}
-  transformMaoAvatar: {fileID: 0}
-  eixoEquipamento: {fileID: 3108880900868440870}
-  rendererMaoAvatar: {fileID: 8713038843358293647}
-  esconderMaoAoEquipar: 0
-  escalaEquipado: {x: 1, y: 1, z: 1}
 --- !u!114 &1594517157628774005
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -487,7 +410,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 0}
+  m_ParentInteractableObject: {fileID: 1594517157628774005}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -552,6 +475,87 @@ MonoBehaviour:
   arcoEstaSegurado: 0
   interactorMaoSegurando: {fileID: 229072295974475474}
   interactorMaoLivreParaPuxar: {fileID: 5875402693137913083}
+--- !u!114 &4707667140421590661
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3174021519282902977}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ef4c75ea065ef409f2d527d32e4eef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioEscalavel
+  escalaOriginalSalva: 0
+  escalaOriginalMundo: {x: 0, y: 0, z: 0}
+--- !u!114 &993643554008481779
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3174021519282902977}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fdcde03f7844e94888d45fb3479b89f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioDados
+  nomeItem: Luva Medieval E
+  prefabParaStack: {fileID: 3174021519282902977}
+  ehFlecha: 0
+  idTipoFlecha: 
+  prefabFlechaParaDisparo: {fileID: 0}
+  iconeFlecha: {fileID: 0}
+  nomeExibicaoFlecha: 
+--- !u!114 &6397627217577386532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3174021519282902977}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c3e80d4b57647ebb5270dfe525761b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemPersistente
+  tipoItemId: c3dbd0b2dd0ea8f4c8c8a5b9e725ba2c
+  itemId: Luva Medieval E
+  nomeItem: Luva Medieval E
+  prefabReferencia: {fileID: 3174021519282902977}
+  salvarNoInventario: 1
+  usarNomeDoObjetoSeIdVazio: 1
+  destruirOriginalAoCarregarSeEstiverNoInventario: 1
+  estaNoInventario: 0
+  salvarQuandoSoltoNaCena: 1
+  instanciaId: 1e9e33a1db2140d98d63fd37a6066dd3
+  durabilidadeAtual: -1
+  dadosExtrasJson: 
+--- !u!114 &3569305340409347630
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3174021519282902977}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 087613a00cfd7ed428214d1b8af6760b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EquiparArmadura
+  popupInfo: {fileID: 8936089263955818997}
+  tempoParaFecharPopup: 7
+  cameraJogador: {fileID: 0}
+  posicaoPopupNaCamera: {x: 0, y: 0.5, z: 1.5}
+  rotacaoPopupNaCamera: {x: 168, y: 0, z: 0}
+  manterPopupNaFrenteDaCamera: 1
+  luvaVisual: {fileID: 3174021519282902977}
+  transformMaoAvatar: {fileID: 0}
+  eixoEquipamento: {fileID: 3108880900868440870}
+  rendererMaoAvatar: {fileID: 0}
+  esconderMaoAoEquipar: 1
+  escalaEquipado: {x: 1, y: 1, z: 1}
 --- !u!1 &3501217982127983288
 GameObject:
   m_ObjectHideFlags: 0
@@ -993,7 +997,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 0}
+  m_ParentInteractableObject: {fileID: 1594517157628774005}
 --- !u!114 &8399142739883867035
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1006,7 +1010,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4fdda954e7910a4bb9cb8f8f6e266c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BotaoEquipar
-  equiparManoplas: {fileID: 0}
+  equiparManoplas: {fileID: 3569305340409347630}
   acaoConfirmarMaoEsquerda: {fileID: -5982496924579745919, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   acaoConfirmarMaoDireita: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!1 &5105250956481456781
@@ -1989,7 +1993,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8936089263955818997}
-  m_LocalRotation: {x: -1, y: 0, z: -0, w: 0}
+  m_LocalRotation: {x: 0, y: 0, z: -1, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: -0.06825769, y: -0.06272447, z: -0.14896303}
   m_ConstrainProportionsScale: 0
@@ -1997,7 +2001,7 @@ RectTransform:
   - {fileID: 6996695401457573479}
   - {fileID: 3471185981704025963}
   m_Father: {fileID: 2355568209833309052}
-  m_LocalEulerAnglesHint: {x: 0, y: 180, z: -180}
+  m_LocalEulerAnglesHint: {x: 180, y: 180, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: -3, y: 2}

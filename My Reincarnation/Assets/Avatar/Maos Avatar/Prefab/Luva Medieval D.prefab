@@ -362,7 +362,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -442,7 +442,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 0}
+  m_ParentInteractableObject: {fileID: 9028642143933495542}
 --- !u!114 &6803267151108146842
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -455,7 +455,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4fdda954e7910a4bb9cb8f8f6e266c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BotaoEquipar
-  equiparManoplas: {fileID: 0}
+  equiparManoplas: {fileID: 4357929868716077284}
   acaoConfirmarMaoEsquerda: {fileID: -5982496924579745919, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   acaoConfirmarMaoDireita: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!1 &2298911150167541438
@@ -834,13 +834,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3418825607743484541}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
+  m_LocalRotation: {x: -0.5, y: 0.5, z: 0.5, w: 0.5}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7192329827019233722}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: -90, y: 90, z: 0}
 --- !u!1 &3479983483802631729
 GameObject:
   m_ObjectHideFlags: 0
@@ -962,7 +962,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3891966214766364644}
-  m_LocalRotation: {x: 0, y: -1, z: 0, w: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.06825771, y: 0.0627245, z: 0.1489631}
   m_ConstrainProportionsScale: 0
@@ -970,7 +970,7 @@ RectTransform:
   - {fileID: 8430461015534293497}
   - {fileID: 2122137668712978655}
   m_Father: {fileID: 7192329827019233722}
-  m_LocalEulerAnglesHint: {x: 180, y: 0, z: 180}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 3, y: 2}
@@ -1787,7 +1787,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemInventarioDados
   nomeItem: Luva Medieval D
-  prefabParaStack: {fileID: 0}
+  prefabParaStack: {fileID: 6206545602268320895}
   ehFlecha: 0
   idTipoFlecha: 
   prefabFlechaParaDisparo: {fileID: 0}
@@ -1814,7 +1814,7 @@ MonoBehaviour:
   destruirOriginalAoCarregarSeEstiverNoInventario: 1
   estaNoInventario: 0
   salvarQuandoSoltoNaCena: 1
-  instanciaId: 
+  instanciaId: 7182a5a56ad6443e8e55ebe37eb6189b
   durabilidadeAtual: -1
   dadosExtrasJson: 
 --- !u!114 &4357929868716077284
@@ -1830,12 +1830,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EquiparArmadura
   popupInfo: {fileID: 3891966214766364644}
-  tempoParaFecharPopup: 10
+  tempoParaFecharPopup: 7
+  cameraJogador: {fileID: 0}
+  posicaoPopupNaCamera: {x: 0, y: 0.5, z: 1.5}
+  rotacaoPopupNaCamera: {x: 18, y: 180, z: 0}
+  manterPopupNaFrenteDaCamera: 1
   luvaVisual: {fileID: 6206545602268320895}
   transformMaoAvatar: {fileID: 0}
   eixoEquipamento: {fileID: 4532642697252201404}
-  rendererMaoAvatar: {fileID: 5388216258442085314}
-  esconderMaoAoEquipar: 0
+  rendererMaoAvatar: {fileID: 0}
+  esconderMaoAoEquipar: 1
   escalaEquipado: {x: 1, y: 1, z: 1}
 --- !u!1 &6886970774908525791
 GameObject:

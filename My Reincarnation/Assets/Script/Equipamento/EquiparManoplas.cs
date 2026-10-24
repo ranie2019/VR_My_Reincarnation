@@ -9,6 +9,21 @@ public class EquiparManoplas : MonoBehaviour
     [SerializeField] private GameObject popupInfo;
     [SerializeField] private float tempoParaFecharPopup = 10f;
 
+    [Tooltip("Camera usada como referência para posicionar o popup.")]
+    [SerializeField] private Camera cameraJogador;
+
+    [Tooltip(
+        "Posição local do popup em relação à câmera. " +
+        "X = esquerda/direita, Y = baixo/cima, Z = distância à frente."
+    )]
+    [SerializeField] private Vector3 posicaoPopupNaCamera = new Vector3(0f, 0f, 1.5f);
+
+    [Tooltip("Rotação local manual do popup em relação à câmera.")]
+    [SerializeField] private Vector3 rotacaoPopupNaCamera = Vector3.zero;
+
+    [Tooltip("Enquanto estiver aberto, mantém o popup na posição relativa à câmera.")]
+    [SerializeField] private bool manterPopupNaFrenteDaCamera = true;
+
     [Header("Prefab Completo")]
     [Tooltip(
         "Referência opcional ao prefab completo da manopla. " +
@@ -58,6 +73,9 @@ public class EquiparManoplas : MonoBehaviour
     {
         interactable = GetComponent<XRBaseInteractable>();
 
+        if (cameraJogador == null)
+            cameraJogador = Camera.main;
+
         if (interactable == null)
         {
             Debug.LogWarning(
@@ -100,6 +118,13 @@ public class EquiparManoplas : MonoBehaviour
         {
             AplicarEscalaMundoComoLocal(escalaOriginalMundo);
         }
+
+        if (manterPopupNaFrenteDaCamera &&
+            popupInfo != null &&
+            popupInfo.activeInHierarchy)
+        {
+            PosicionarPopupNaCamera();
+        }
     }
 
     private void OnEnable()
@@ -138,7 +163,31 @@ public class EquiparManoplas : MonoBehaviour
         CancelarFechamentoPendente();
 
         if (popupInfo != null)
+        {
+            PosicionarPopupNaCamera();
             popupInfo.SetActive(true);
+            PosicionarPopupNaCamera();
+        }
+    }
+
+    private void PosicionarPopupNaCamera()
+    {
+        if (popupInfo == null)
+            return;
+
+        if (cameraJogador == null)
+            cameraJogador = Camera.main;
+
+        if (cameraJogador == null)
+            return;
+
+        Transform cameraTransform = cameraJogador.transform;
+
+        popupInfo.transform.position =
+            cameraTransform.TransformPoint(posicaoPopupNaCamera);
+
+        popupInfo.transform.rotation =
+            cameraTransform.rotation * Quaternion.Euler(rotacaoPopupNaCamera);
     }
 
     private void OnHoverExited(HoverExitEventArgs args)
