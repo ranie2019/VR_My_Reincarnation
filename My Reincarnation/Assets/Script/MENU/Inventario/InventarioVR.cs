@@ -19,6 +19,7 @@ public class InventarioVR : MonoBehaviour
     private readonly Dictionary<XRSocketInteractor, bool> estadosSockets = new();
     private readonly Dictionary<XRGrabInteractable, bool> estadosGrabInteractables = new();
     private readonly Dictionary<Rigidbody, EstadoRigidbodyInventario> estadosRigidbodies = new();
+    private readonly List<PoseControleInventario> posesControlesFixas = new();
 
     private Collider[] collidersInventario;
 
@@ -29,6 +30,8 @@ public class InventarioVR : MonoBehaviour
 
         if (inventarioRoot != null)
             collidersInventario = inventarioRoot.GetComponentsInChildren<Collider>(true);
+
+        CapturarPosicoesControles();
     }
 
     private void Start()
@@ -65,6 +68,7 @@ public class InventarioVR : MonoBehaviour
                 painelInventario.SetActive(true);
 
             SetFilhosAtivos(true);
+            RestaurarPosicoesControles();
             DefinirFisicaInventario(true);
             AtualizarBotoesRolagem(true);
             AtualizarSlots(true);
@@ -74,10 +78,78 @@ public class InventarioVR : MonoBehaviour
         // Fechando
         AtualizarSlots(false);
         SetFilhosAtivos(false);
+        RestaurarPosicoesControles();
         AtualizarBotoesRolagem(false);
         DefinirFisicaInventario(false);
 
         // NÃO move mais a posição — o painel fica onde está no editor
+    }
+
+    private void LateUpdate()
+    {
+        if (aberto && painelInventario != null && painelInventario.activeInHierarchy)
+            RestaurarPosicoesControles();
+    }
+
+    private void CapturarPosicoesControles()
+    {
+        posesControlesFixas.Clear();
+        if (painelInventario == null)
+            return;
+
+        HashSet<Transform> controles = new();
+        Button[] botoesUI = painelInventario.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < botoesUI.Length; i++)
+        {
+            if (botoesUI[i] != null)
+                AdicionarCadeiaDeControle(botoesUI[i].transform, controles);
+        }
+
+        BotaoRolagemInventarioVR[] botoesRolagemEncontrados = painelInventario.GetComponentsInChildren<BotaoRolagemInventarioVR>(true);
+        for (int i = 0; i < botoesRolagemEncontrados.Length; i++)
+        {
+            if (botoesRolagemEncontrados[i] != null)
+                AdicionarCadeiaDeControle(botoesRolagemEncontrados[i].transform, controles);
+        }
+
+        if (botoesRolagem != null)
+        {
+            for (int i = 0; i < botoesRolagem.Length; i++)
+            {
+                if (botoesRolagem[i] != null)
+                    AdicionarCadeiaDeControle(botoesRolagem[i].transform, controles);
+            }
+        }
+
+        // Guarda na ordem hierárquica: pais antes dos botões, para que a pose
+        // local dos filhos permaneça relativa ao mesmo pai.
+        Transform[] hierarquia = painelInventario.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < hierarquia.Length; i++)
+        {
+            Transform alvo = hierarquia[i];
+            if (alvo != null && controles.Contains(alvo))
+                posesControlesFixas.Add(new PoseControleInventario(alvo));
+        }
+    }
+
+    private void AdicionarCadeiaDeControle(Transform controle, HashSet<Transform> controles)
+    {
+        Transform atual = controle;
+        while (atual != null && atual != painelInventario.transform)
+        {
+            // Não captura transformações dos slots nem dos itens que eles guardam.
+            if (atual.GetComponent<SlotInventario>() != null || ComponentePertenceAItemInventario(atual))
+                break;
+
+            controles.Add(atual);
+            atual = atual.parent;
+        }
+    }
+
+    private void RestaurarPosicoesControles()
+    {
+        for (int i = 0; i < posesControlesFixas.Count; i++)
+            posesControlesFixas[i].Aplicar();
     }
 
     private void SetFilhosAtivos(bool ativo)
@@ -271,5 +343,31 @@ public class InventarioVR : MonoBehaviour
         public readonly bool IsKinematic;
         public readonly bool DetectCollisions;
         public EstadoRigidbodyInventario(bool k, bool d) { IsKinematic = k; DetectCollisions = d; }
+    }
+
+    private readonly struct PoseControleInventario
+    {
+        private readonly Transform transform;
+        private readonly Vector3 posicaoLocal;
+        private readonly Quaternion rotacaoLocal;
+        private readonly Vector3 escalaLocal;
+
+        public PoseControleInventario(Transform alvo)
+        {
+            transform = alvo;
+            posicaoLocal = alvo != null ? alvo.localPosition : Vector3.zero;
+            rotacaoLocal = alvo != null ? alvo.localRotation : Quaternion.identity;
+            escalaLocal = alvo != null ? alvo.localScale : Vector3.one;
+        }
+
+        public void Aplicar()
+        {
+            if (transform == null)
+                return;
+
+            transform.localPosition = posicaoLocal;
+            transform.localRotation = rotacaoLocal;
+            transform.localScale = escalaLocal;
+        }
     }
 }

@@ -201,6 +201,14 @@ public class ItemInventarioEscalavel : MonoBehaviour
         return coube;
     }
 
+    public bool EscalaVisualAtualCabeNoSlot(Transform slotTransform, Bounds boundsPermitido)
+    {
+        return slotTransform != null &&
+               TamanhoValido(boundsPermitido.size) &&
+               TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsRenderers) &&
+               BoundsDentroDoPermitido(boundsRenderers, boundsPermitido);
+    }
+
     private void GarantirEscalaOriginal()
     {
         var escalaComp = GetComponent<EscalaOriginalItem>();

@@ -18,8 +18,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     [SerializeField] private XRSocketInteractor socketInteractor;
     [SerializeField] private Transform pontoEncaixe;
 
-    [Header("Margem de seguranca (0.9 = 90% do slot)")]
-    [SerializeField] private float margemDeSeguranca = 0.9f;
+    [Header("Margem de seguranca (0.8 = 80% do slot)")]
+    [SerializeField] private float margemDeSeguranca = 0.8f;
 
     [Header("Limite visual final do item")]
     [SerializeField] private Vector3 tamanhoVisualMaximoSlot = Vector3.zero;
@@ -1910,8 +1910,18 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (item == null || !EscalaValida(item.transform.localScale))
             return;
 
-        Vector3 escalaVisualMundo = RegistrarOuObterEscalaCanonica(item, item.transform.lossyScale);
+        Vector3 escalaAjustadaParaEsteSlot = item.transform.lossyScale;
+        Vector3 escalaVisualMundo = RegistrarOuObterEscalaCanonica(item, escalaAjustadaParaEsteSlot);
         AplicarEscalaMundoNoItem(item, escalaVisualMundo);
+
+        // A escala canônica pode vir de um slot com limites diferentes.
+        // Se não couber neste, preserva o resultado ajustado para este slot.
+        if (!EscalaVisualAtualCabeNoSlot(item))
+        {
+            escalaVisualMundo = escalaAjustadaParaEsteSlot;
+            AplicarEscalaMundoNoItem(item, escalaVisualMundo);
+        }
+
         escalasVisuaisInventario[item] = escalaVisualMundo;
     }
 
@@ -1920,19 +1930,25 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (itemGuardado == null)
             return;
 
+        bool escalaAplicada = false;
         if (!escalasVisuaisInventario.ContainsKey(itemGuardado) &&
             TentarAplicarEscalaVisualCanonica(itemGuardado))
         {
-            return;
+            escalaAplicada = true;
+        }
+        else if (escalasVisuaisInventario.TryGetValue(itemGuardado, out Vector3 escalaVisualMundo) &&
+                 EscalaValida(escalaVisualMundo))
+        {
+            AplicarEscalaMundoNoItem(itemGuardado, escalaVisualMundo);
+            escalaAplicada = true;
         }
 
-        if (!escalasVisuaisInventario.TryGetValue(itemGuardado, out Vector3 escalaVisualMundo))
+        if (!escalaAplicada || EscalaVisualAtualCabeNoSlot(itemGuardado))
             return;
 
-        if (!EscalaValida(escalaVisualMundo))
-            return;
-
-        AplicarEscalaMundoNoItem(itemGuardado, escalaVisualMundo);
+        InvalidarEscalaVisualParaRecalculo(itemGuardado);
+        if (estadosOriginais.TryGetValue(itemGuardado, out EstadoOriginalItem estado))
+            AplicarEscalaVisualFixaNoSlot(itemGuardado, estado, true);
     }
 
     private void InvalidarEscalaVisualParaRecalculo(XRGrabInteractable item)
@@ -1950,7 +1966,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private bool TentarAplicarEscalaVisualInventario(XRGrabInteractable item, EstadoOriginalItem estado)
     {
-        if (TentarAplicarEscalaVisualCanonica(item))
+        if (TentarAplicarEscalaVisualCanonica(item) && EscalaVisualAtualCabeNoSlot(item))
             return true;
 
         if (item == null || !escalasVisuaisInventario.TryGetValue(item, out Vector3 escalaVisual))
@@ -1963,7 +1979,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return false;
 
         AplicarEscalaMundoNoItem(item, escalaVisual);
-        return true;
+        return EscalaVisualAtualCabeNoSlot(item);
     }
 
     private bool TentarAplicarEscalaVisualCanonica(XRGrabInteractable item)
@@ -1986,7 +2002,23 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         AplicarEscalaMundoNoItem(item, escalaVisual);
         escalasVisuaisInventario[item] = escalaVisual;
-        return true;
+        if (EscalaVisualAtualCabeNoSlot(item))
+            return true;
+
+        escalasVisuaisInventario.Remove(item);
+        return false;
+    }
+
+    private bool EscalaVisualAtualCabeNoSlot(XRGrabInteractable item)
+    {
+        if (item == null || !TryObterBoundsVisualPermitido(out Bounds boundsPermitido))
+            return false;
+
+        ItemInventarioEscalavel itemEscalavel = item.GetComponent<ItemInventarioEscalavel>();
+        if (itemEscalavel == null)
+            itemEscalavel = item.gameObject.AddComponent<ItemInventarioEscalavel>();
+
+        return itemEscalavel.EscalaVisualAtualCabeNoSlot(transform, boundsPermitido);
     }
 
     private Vector3 RegistrarOuObterEscalaCanonica(XRGrabInteractable item, Vector3 escalaVisual)
@@ -2048,6 +2080,14 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return;
 
         AplicarEscalaMundoNoItem(topo, escalaVisual);
+        if (!EscalaVisualAtualCabeNoSlot(topo))
+        {
+            InvalidarEscalaVisualParaRecalculo(topo);
+            if (estadosOriginais.TryGetValue(topo, out EstadoOriginalItem estado))
+                AplicarEscalaVisualFixaNoSlot(topo, estado, true);
+            return;
+        }
+
         escalasVisuaisInventario[topo] = escalaVisual;
 
         if (inventarioAberto && visivelNaRolagem)

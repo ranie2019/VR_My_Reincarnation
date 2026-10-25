@@ -345,18 +345,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 3174021519282902977}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6c2b0b53dcfefc24ea8fd65a89c96025, type: 3}
+  m_Script: {fileID: 11500000, guid: 226e7b567933781438504575d3548b47, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ArmaAttachDuasMao
+  m_EditorClassIdentifier: Assembly-CSharp::ArmaAttachPorMao
   m_InteractionManager: {fileID: 0}
   m_Colliders:
   - {fileID: 4543571473896971360}
   m_InteractionLayers:
     m_Bits: 1
   m_DistanceCalculationMode: 1
-  m_SelectMode: 1
+  m_SelectMode: 0
   m_FocusMode: 1
-  m_CustomReticle: {fileID: 3174021519282902977}
+  m_CustomReticle: {fileID: 0}
   m_AllowGazeInteraction: 0
   m_AllowGazeSelect: 0
   m_OverrideGazeTimeToSelect: 0
@@ -466,15 +466,8 @@ MonoBehaviour:
   m_LimitAngularVelocity: 0
   m_MaxLinearVelocityDelta: 10
   m_MaxAngularVelocityDelta: 20
-  attachSegurarDireita: {fileID: 229072295974475474}
-  attachSegurarEsquerda: {fileID: 5875402693137913083}
-  referenciaMaoDireita: {fileID: 229072295974475474}
-  referenciaMaoEsquerda: {fileID: 5875402693137913083}
-  seguradoPelaMaoDireita: 0
-  seguradoPelaMaoEsquerda: 0
-  arcoEstaSegurado: 0
-  interactorMaoSegurando: {fileID: 229072295974475474}
-  interactorMaoLivreParaPuxar: {fileID: 5875402693137913083}
+  pontoMaoDireita: {fileID: 229072295974475474}
+  pontoMaoEsquerda: {fileID: 5875402693137913083}
 --- !u!114 &4707667140421590661
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -529,7 +522,7 @@ MonoBehaviour:
   destruirOriginalAoCarregarSeEstiverNoInventario: 1
   estaNoInventario: 0
   salvarQuandoSoltoNaCena: 1
-  instanciaId: 4429015482414e938797e8b9054a8fa2
+  instanciaId: 
   durabilidadeAtual: -1
   dadosExtrasJson: 
 --- !u!114 &3569305340409347630
