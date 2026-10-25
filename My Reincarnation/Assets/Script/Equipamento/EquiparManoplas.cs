@@ -1,10 +1,21 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
+public enum LadoMaoEquipamento
+{
+    Direita = 0,
+    Esquerda = 1
+}
+
 public class EquiparManoplas : MonoBehaviour
 {
+    private static readonly List<EquiparManoplas> popupsVisiveis = new List<EquiparManoplas>();
+
+    [Header("Equipamento")]
+    [SerializeField] private LadoMaoEquipamento ladoMao = LadoMaoEquipamento.Direita;
     [Header("Popup")]
     [SerializeField] private GameObject popupInfo;
     [SerializeField] private float tempoParaFecharPopup = 10f;
@@ -23,6 +34,9 @@ public class EquiparManoplas : MonoBehaviour
 
     [Tooltip("Enquanto estiver aberto, mantém o popup na posição relativa à câmera.")]
     [SerializeField] private bool manterPopupNaFrenteDaCamera = true;
+
+    [Tooltip("Distância lateral entre popups abertos ao mesmo tempo.")]
+    [SerializeField, Min(0f)] private float espacamentoHorizontalPopups = 0.45f;
 
     [Header("Prefab Completo")]
     [Tooltip(
@@ -68,6 +82,15 @@ public class EquiparManoplas : MonoBehaviour
     private bool escalaOriginalMundoCapturada;
 
     public bool JaEquipado => jaEquipado;
+    public LadoMaoEquipamento LadoMao => ladoMao;
+    public Transform TransformMaoConfigurada => transformMaoAvatar;
+    public SkinnedMeshRenderer RendererMao => rendererMaoAvatar;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void LimparPopupsVisiveis()
+    {
+        popupsVisiveis.Clear();
+    }
 
     private void Awake()
     {
@@ -145,6 +168,10 @@ public class EquiparManoplas : MonoBehaviour
         }
 
         CancelarFechamentoPendente();
+        RemoverPopupVisivel();
+
+        if (popupInfo != null)
+            popupInfo.SetActive(false);
     }
 
     private void SalvarTransformOriginal()
@@ -164,8 +191,8 @@ public class EquiparManoplas : MonoBehaviour
 
         if (popupInfo != null)
         {
-            PosicionarPopupNaCamera();
             popupInfo.SetActive(true);
+            RegistrarPopupVisivel();
             PosicionarPopupNaCamera();
         }
     }
@@ -182,9 +209,17 @@ public class EquiparManoplas : MonoBehaviour
             return;
 
         Transform cameraTransform = cameraJogador.transform;
+        RemoverPopupsNulos();
+
+        int indice = popupsVisiveis.IndexOf(this);
+        int quantidade = popupsVisiveis.Count;
+        float deslocamentoLateral = indice < 0
+            ? 0f
+            : (indice - (quantidade - 1) * 0.5f) * espacamentoHorizontalPopups;
 
         popupInfo.transform.position =
-            cameraTransform.TransformPoint(posicaoPopupNaCamera);
+            cameraTransform.TransformPoint(posicaoPopupNaCamera) +
+            cameraTransform.right * deslocamentoLateral;
 
         popupInfo.transform.rotation =
             cameraTransform.rotation * Quaternion.Euler(rotacaoPopupNaCamera);
@@ -219,7 +254,10 @@ public class EquiparManoplas : MonoBehaviour
         }
 
         if (popupInfo != null)
+        {
             popupInfo.SetActive(false);
+            RemoverPopupVisivel();
+        }
 
         corotinaFecharPopup = null;
     }
@@ -233,14 +271,64 @@ public class EquiparManoplas : MonoBehaviour
         corotinaFecharPopup = null;
     }
 
+    private void RegistrarPopupVisivel()
+    {
+        RemoverPopupsNulos();
+        if (!popupsVisiveis.Contains(this))
+            popupsVisiveis.Add(this);
+    }
+
+    private void RemoverPopupVisivel()
+    {
+        popupsVisiveis.Remove(this);
+    }
+
+    private static void RemoverPopupsNulos()
+    {
+        for (int i = popupsVisiveis.Count - 1; i >= 0; i--)
+        {
+            EquiparManoplas luva = popupsVisiveis[i];
+            if (luva == null || luva.popupInfo == null || !luva.popupInfo.activeInHierarchy)
+                popupsVisiveis.RemoveAt(i);
+        }
+    }
+
     public void Equipar()
     {
         if (jaEquipado)
             return;
 
-        if (!ValidarReferencias())
-            return;
+        GerenciadorEquipamentosPlayer gerenciador =
+            GerenciadorEquipamentosPlayer.Instancia ?? FindFirstObjectByType<GerenciadorEquipamentosPlayer>();
 
+        if (gerenciador == null)
+        {
+            Debug.LogWarning("[EquiparManoplas] GerenciadorEquipamentosPlayer não encontrado.", this);
+            return;
+        }
+
+        gerenciador.TentarEquipar(this);
+    }
+
+    public bool PodeEquiparNaMao(Transform mao)
+    {
+        if (mao == null)
+        {
+            Debug.LogWarning("[EquiparManoplas] A mão de destino não foi configurada.", this);
+            return false;
+        }
+
+        return true;
+    }
+
+    internal bool EquiparNaMao(Transform mao, SkinnedMeshRenderer rendererMao = null)
+    {
+        if (jaEquipado || !PodeEquiparNaMao(mao))
+            return jaEquipado;
+
+        transformMaoAvatar = mao;
+        if (rendererMao != null)
+            rendererMaoAvatar = rendererMao;
         jaEquipado = true;
 
         EncaixarPrefabCompletoNaMao();
@@ -251,6 +339,7 @@ public class EquiparManoplas : MonoBehaviour
 
         AplicarAtributos();
         FinalizarEquipamento();
+        return true;
     }
 
     private bool ValidarReferencias()
@@ -381,7 +470,10 @@ public class EquiparManoplas : MonoBehaviour
         }
 
         if (popupInfo != null)
+        {
             popupInfo.SetActive(false);
+            RemoverPopupVisivel();
+        }
     }
 
     private void DesativarFisicaDoItem()
@@ -445,18 +537,14 @@ public class EquiparManoplas : MonoBehaviour
         if (rendererMaoAvatar != null)
             rendererMaoAvatar.enabled = true;
 
-        if (paiOriginal != null)
-        {
-            transform.SetParent(paiOriginal, false);
+        transform.SetParent(paiOriginal, false);
+        transform.localPosition = posicaoOriginalLocal;
+        transform.localRotation = rotacaoOriginalLocal;
 
-            transform.localPosition = posicaoOriginalLocal;
-            transform.localRotation = rotacaoOriginalLocal;
-
-            if (escalaOriginalMundoCapturada)
-                AplicarEscalaMundoComoLocal(escalaOriginalMundo);
-            else
-                transform.localScale = escalaOriginalLocal;
-        }
+        if (escalaOriginalMundoCapturada)
+            AplicarEscalaMundoComoLocal(escalaOriginalMundo);
+        else
+            transform.localScale = escalaOriginalLocal;
 
         jaEquipado = false;
     }

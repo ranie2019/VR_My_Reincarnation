@@ -1277,6 +1277,39 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         return pilhaItens.Count > 0;
     }
 
+    public bool PodeRetirarItemParaEquipamento(XRGrabInteractable item)
+    {
+        RemoverItensNulosDaPilha();
+        return item != null && itemGuardado == item && TopoDaPilha() == item;
+    }
+
+    public bool RetirarItemParaEquipamento(XRGrabInteractable item)
+    {
+        if (!PodeRetirarItemParaEquipamento(item))
+            return false;
+
+        RemoverFiltroDoItemGuardado();
+        LiberarSelecaoSocketSemEvento(item);
+        pilhaItens.RemoveAt(pilhaItens.Count - 1);
+
+        bool podeAtualizarEfeitos = inventarioAberto && visivelNaRolagem && gameObject.activeInHierarchy && enabled;
+        if (podeAtualizarEfeitos)
+            TocarSom(somRetirarItem);
+
+        itemGuardado = null;
+        RestaurarItemParaMundo(item);
+        AtualizarContadorTMP();
+
+        if (pilhaItens.Count == 0)
+        {
+            nomeItemAtual = string.Empty;
+            return true;
+        }
+
+        PromoverNovoTopoAposRetirada();
+        return true;
+    }
+
     public int ObterQuantidadeAtual()
     {
         return ObterQuantidadeRealParaSave();
