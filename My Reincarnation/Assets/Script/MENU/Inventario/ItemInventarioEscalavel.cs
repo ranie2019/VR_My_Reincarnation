@@ -72,70 +72,6 @@ public class ItemInventarioEscalavel : MonoBehaviour
         escalaComp.DefinirEscalaOriginal(escalaOriginal);
     }
 
-    public bool AjustarParaSlot(BoxCollider slotCollider, float margemDeSeguranca, Transform pontoReferencia)
-    {
-        if (slotCollider == null) return false;
-
-        GarantirEscalaOriginal();
-        if (!escalaOriginalSalva) return false;
-
-        float margem = Mathf.Clamp(margemDeSeguranca, 0.01f, 1f);
-        Transform slotTransform = slotCollider.transform;
-        Bounds boundsPermitido = new Bounds(slotCollider.center, slotCollider.size * margem);
-        if (!TamanhoValido(boundsPermitido.size)) return false;
-
-        Vector3 escalaLocalOriginal = ConverterEscalaMundoParaLocal(escalaOriginalMundo);
-        AplicarEscalaLocal(escalaLocalOriginal);
-
-        if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsItem))
-            return false;
-
-        Vector3 tamanhoInicial = boundsItem.size;
-        float fatorAplicado = Mathf.Min(1f, MenorFator(boundsPermitido.size, tamanhoInicial));
-        AplicarEscalaLocal(escalaLocalOriginal * fatorAplicado);
-
-        bool coube = false;
-        Vector3 tamanhoFinal = tamanhoInicial;
-
-        for (int i = 0; i < 12; i++)
-        {
-            if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
-                break;
-
-            CentralizarNoSlot(slotTransform, boundsItem, boundsPermitido);
-            Physics.SyncTransforms();
-
-            if (!TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
-                break;
-
-            tamanhoFinal = boundsItem.size;
-            coube = BoundsDentroDoPermitido(boundsItem, boundsPermitido);
-            if (coube)
-                break;
-
-            float ajuste = Mathf.Min(1f, MenorFator(boundsPermitido.size, tamanhoFinal));
-            if (ajuste >= 1f)
-                break;
-
-            fatorAplicado *= ajuste;
-            AplicarEscalaLocal(escalaLocalOriginal * fatorAplicado);
-        }
-
-        if (!coube && TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
-        {
-            CentralizarNoSlot(slotTransform, boundsItem, boundsPermitido);
-            Physics.SyncTransforms();
-
-            if (TentarObterBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsItem))
-            {
-                tamanhoFinal = boundsItem.size;
-                coube = BoundsDentroDoPermitido(boundsItem, boundsPermitido);
-            }
-        }
-
-        return coube;
-    }
-
     public bool AjustarRenderersParaSlotVisual(Transform slotTransform, Bounds boundsPermitido)
     {
         GarantirEscalaOriginal();
@@ -167,7 +103,7 @@ public class ItemInventarioEscalavel : MonoBehaviour
         bool coube = false;
         float fatorAplicado = 1f;
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 24; i++)
         {
             if (!TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsRenderers))
                 return false;
@@ -261,32 +197,6 @@ public class ItemInventarioEscalavel : MonoBehaviour
         Physics.SyncTransforms();
     }
 
-    private bool TentarObterBoundsNoEspacoDoSlot(Transform slotTransform, Vector3 centroInicial, out Bounds boundsLocal)
-    {
-        boundsLocal = new Bounds(centroInicial, Vector3.zero);
-        bool achou = false;
-
-        Collider[] colliders = GetComponentsInChildren<Collider>(true);
-        foreach (Collider col in colliders)
-        {
-            if (col == null || !col.enabled || !col.transform.IsChildOf(transform)) continue;
-            if (!BoundsValido(col.bounds)) continue;
-
-            EncapsularBoundsNoSlot(slotTransform, col.bounds, ref boundsLocal, ref achou);
-        }
-
-        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
-        foreach (Renderer r in renderers)
-        {
-            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy || !r.transform.IsChildOf(transform)) continue;
-            if (!BoundsValido(r.bounds)) continue;
-
-            EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
-        }
-
-        return achou;
-    }
-
     private bool TentarObterRendererBoundsNoEspacoDoSlot(Transform slotTransform, Vector3 centroInicial, out Bounds boundsLocal)
     {
         boundsLocal = new Bounds(centroInicial, Vector3.zero);
@@ -295,7 +205,8 @@ public class ItemInventarioEscalavel : MonoBehaviour
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
         foreach (Renderer r in renderers)
         {
-            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy || !r.transform.IsChildOf(transform)) continue;
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy ||
+                (r.transform != transform && !r.transform.IsChildOf(transform))) continue;
             if (!BoundsValido(r.bounds)) continue;
 
             EncapsularBoundsNoSlot(slotTransform, r.bounds, ref boundsLocal, ref achou);
