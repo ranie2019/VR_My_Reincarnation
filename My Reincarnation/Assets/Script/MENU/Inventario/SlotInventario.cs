@@ -66,6 +66,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private bool aguardarFrameVisualParaEscala;
     private Coroutine rotinaRecalculoEscalaQuandoVisivel;
     private const string NomeAreaRetiradaLaserSlot = "__AreaRetiradaLaserSlot";
+    private const int MaxTentativasRecalculoEscalaVisual = 20;
 
     private void Awake()
     {
@@ -716,6 +717,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             return false;
 
         SalvarEstadoOriginalSeNecessario(itemExtra);
+        AtualizarRenderersAtivosNoEstadoOriginal(itemExtra, estadosOriginais[itemExtra]);
         MarcarItemAceitoPeloSlot(itemExtra, false, "empilhar item extra");
 
         XRGrabInteractable topoAnterior = TopoDaPilha();
@@ -898,33 +900,63 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     private IEnumerator RecalcularEscalaQuandoVisivel()
     {
-        yield return null;
-        aguardarFrameVisualParaEscala = false;
-        TentarRecalcularEscalaPendenteVisivel();
+        for (int tentativa = 0; tentativa < MaxTentativasRecalculoEscalaVisual; tentativa++)
+        {
+            // Aguarda o socket e o XR atualizarem a hierarquia e os bounds dos renderers.
+            yield return null;
 
-        yield return null;
-        TentarRecalcularEscalaPendenteVisivel();
+            if (!inventarioAberto || !visivelNaRolagem || !gameObject.activeInHierarchy)
+                break;
+
+            aguardarFrameVisualParaEscala = false;
+            if (TentarRecalcularEscalaPendenteVisivel())
+                break;
+        }
+
         rotinaRecalculoEscalaQuandoVisivel = null;
     }
 
-    private void TentarRecalcularEscalaPendenteVisivel()
+    private bool TentarRecalcularEscalaPendenteVisivel()
     {
         XRGrabInteractable item = itemGuardado != null ? itemGuardado : TopoDaPilha();
         if (item == null || !estadosOriginais.TryGetValue(item, out EstadoOriginalItem estado))
-            return;
+            return false;
 
         bool precisaRecalcular = itensRestauradosDoSave.Contains(item) ||
                                  itensComEscalaVisualPendente.Contains(item) ||
                                  !escalasVisuaisInventario.ContainsKey(item);
 
         if (!precisaRecalcular)
-            return;
+            return true;
 
+        if (!inventarioAberto || !visivelNaRolagem)
+            return false;
+
+        item.gameObject.SetActive(true);
+        AtivarRenderersOriginaisDoItem(item, estado);
         ParentarItemNoSlot(item);
         PosicionarItemNoPontoDoSlot(item.transform);
+        Physics.SyncTransforms();
         AplicarOuAgendarEscalaVisual(item, estado, true);
         AtualizarVisibilidadeVisual();
         Physics.SyncTransforms();
+
+        return escalasVisuaisInventario.ContainsKey(item) &&
+               !itensComEscalaVisualPendente.Contains(item) &&
+               !itensRestauradosDoSave.Contains(item);
+    }
+
+    private static void AtivarRenderersOriginaisDoItem(XRGrabInteractable item, EstadoOriginalItem estado)
+    {
+        if (item == null || estado == null)
+            return;
+
+        for (int i = 0; i < estado.Renderers.Length; i++)
+        {
+            Renderer renderer = estado.Renderers[i].Renderer;
+            if (renderer != null && estado.Renderers[i].Enabled && renderer.gameObject.activeInHierarchy)
+                renderer.enabled = true;
+        }
     }
 
     private void AplicarEscalaVisualFixaNoSlot(XRGrabInteractable item, EstadoOriginalItem estado, bool forcarRecalculo = false)
@@ -1195,6 +1227,38 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         var itemEscalavel = item.GetComponent<ItemInventarioEscalavel>();
         if (itemEscalavel != null && EscalaValida(escalaOriginalMundo))
             itemEscalavel.ForcarEscalaOriginalMundo(escalaOriginalMundo);
+    }
+
+    private static void AtualizarRenderersAtivosNoEstadoOriginal(XRGrabInteractable item, EstadoOriginalItem estado)
+    {
+        if (item == null || estado == null)
+            return;
+
+        Renderer[] atuais = item.GetComponentsInChildren<Renderer>(true);
+        EstadoRenderer[] renderersAtualizados = new EstadoRenderer[atuais.Length];
+
+        for (int i = 0; i < atuais.Length; i++)
+        {
+            Renderer renderer = atuais[i];
+            if (renderer == null)
+                continue;
+
+            bool estavaAtivo = renderer.enabled && renderer.gameObject.activeInHierarchy;
+            for (int j = 0; j < estado.Renderers.Length; j++)
+            {
+                if (estado.Renderers[j].Renderer != renderer)
+                    continue;
+
+                // Mantém o estado original ativo se outro fluxo já o ocultou,
+                // mas incorpora renderers ativados após a captura inicial.
+                estavaAtivo |= estado.Renderers[j].Enabled;
+                break;
+            }
+
+            renderersAtualizados[i] = new EstadoRenderer(renderer, estavaAtivo);
+        }
+
+        estado.Renderers = renderersAtualizados;
     }
 
     private void SalvarEstadoOriginalSeItem(Transform itemTransform)
@@ -1592,6 +1656,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         }
 
         SalvarEstadoOriginalSeNecessario(item);
+        AtualizarRenderersAtivosNoEstadoOriginal(item, estadosOriginais[item]);
         MarcarItemAceitoPeloSlot(item, false, "primeiro item do slot");
 
         pilhaItens.Add(item);
@@ -1633,11 +1698,12 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (item == null)
             return;
 
-        Transform parentSlot = ObterPontoEncaixe();
-        if (parentSlot == null)
-            parentSlot = transform;
-
-        item.transform.SetParent(parentSlot, true);
+        // Os slots vivem dentro de uma hierarquia de UI com escala nao uniforme.
+        // Tornar o item filho dela deforma meshes (por exemplo, a madeira) e faz
+        // a conversao de escala por lossyScale perder precisao. Mantenha o item
+        // na raiz da cena; LateUpdate e PosicionarItemNoPontoDoSlot continuam
+        // alinhando sua posicao/rotacao ao encaixe sem herdar a escala da UI.
+        item.transform.SetParent(null, true);
     }
 
     // --- RETIRADA -------------------------------------------------------------
@@ -2752,6 +2818,12 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             Renderer = renderer;
             Enabled = renderer != null && renderer.enabled;
         }
+
+        public EstadoRenderer(Renderer renderer, bool enabled)
+        {
+            Renderer = renderer;
+            Enabled = renderer != null && enabled;
+        }
     }
 
     private readonly struct EstadoCollider
@@ -2809,7 +2881,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         public readonly RigidbodyInterpolation InterpolationOriginal;
         public readonly float LinearDampingOriginal;
         public readonly float AngularDampingOriginal;
-        public readonly EstadoRenderer[] Renderers;
+        public EstadoRenderer[] Renderers;
         public readonly EstadoCollider[] Colliders;
         public readonly EstadoCanvas[] Canvases;
         public readonly EstadoGraphic[] Graphics;
