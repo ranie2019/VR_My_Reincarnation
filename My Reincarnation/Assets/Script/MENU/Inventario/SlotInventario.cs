@@ -62,7 +62,10 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     private XRGrabInteractable itemComListenerRetiradaExterna;
     private string nomeItemAtual = string.Empty;
     private bool ignorarProximoExited = false;
-    private bool inventarioAberto = true;
+    // O Canvas Menu pode iniciar inativo. Nesse caso este componente ainda nao
+    // recebeu o estado do InventarioVR quando o SaveManager restaura os itens.
+    // Fechado por padrao impede que itens restaurados aparecam no mundo.
+    private bool inventarioAberto;
     private bool visivelNaRolagem = true;
     private bool operacaoInternaSocket;
     private bool atualizandoTopo;
@@ -2775,8 +2778,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             item.gameObject.SetActive(true);
             AplicarRenderersDoItemDaPilha(item, estado, ehTopo && slotVisivel);
             AplicarUiDoItemDaPilha(item, estado, false);
-            AplicarCollidersDoItemDaPilha(item, estado, ehTopo);
-            AplicarFisicaDoItemDaPilha(item, estado, ehTopo);
+            bool topoInterativo = ehTopo && slotVisivel;
+            AplicarCollidersDoItemDaPilha(item, estado, topoInterativo);
+            AplicarFisicaDoItemDaPilha(item, estado, topoInterativo);
 
             int renderersAtivos = ContarRenderersAtivos(item);
             if (ehTopo)
@@ -3014,6 +3018,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     {
         if (inventarioAberto == aberto)
         {
+            // O inventario pode ter sido restaurado enquanto o Canvas estava
+            // inativo; reaplica o estado tambem quando o valor ja coincide.
+            AtualizarVisibilidadeVisual();
             AtualizarEstadoInteractableRetiradaPorSlot();
             return;
         }

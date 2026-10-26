@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 
+using UnityEngine.Serialization;
+
 public class AvatarBody : MonoBehaviour
 {
     [Header("Fontes (XR)")]
@@ -13,9 +15,14 @@ public class AvatarBody : MonoBehaviour
     public Transform maoDireitaAvatar;    // HandR
     public Transform corpoAvatar;         // Body / Root do corpo
 
-    [Header("Ajustes - OLHOS (resolve seu problema)")]
-    [Tooltip("Offset aplicado na cabeça do avatar (não na câmera). Use Y para subir/baixar os olhos do avatar.")]
-    public Vector3 offsetOlhos = new Vector3(0f, 0.10f, 0f);
+    [Header("Ajustes - Cabeça")]
+    [Tooltip("Desloca a cabeça do modelo em relação ao ponto rastreado pelo headset.")]
+    [FormerlySerializedAs("offsetOlhos")]
+    public Vector3 offsetCabeca = new Vector3(0f, 0.10f, 0f);
+
+    [Header("Ajuste - Câmera Olhos")]
+    [Tooltip("Desloca somente a Main Camera. Z positivo avança no eixo local do Camera Offset; não desloca os controles nem o avatar.")]
+    public Vector3 offsetCameraOlhos = Vector3.zero;
 
     [Header("Ajustes - Corpo (opcional)")]
     [Tooltip("Offset do corpo em relação à câmera (normalmente fica negativo no Y).")]
@@ -28,11 +35,20 @@ public class AvatarBody : MonoBehaviour
     public bool suavizarMaos = false;
     public bool moverCorpo = true;
 
+    private Transform ajusteCameraOlhosRoot;
+    private Vector3 deslocamentoCameraOlhosMundo;
+
+    void Awake()
+    {
+        CriarRaizDeAjusteDaCamera();
+    }
+
     void LateUpdate()
     {
         if (!cameraCabeca) return;
 
-        AtualizarCabecaComOffsetOlhos(); // ✅ aqui é onde resolve
+        AplicarAjusteCameraOlhos();
+        AtualizarCabecaComOffsetCabeca();
         AtualizarMaos();
 
         if (moverCorpo)
@@ -45,15 +61,58 @@ public class AvatarBody : MonoBehaviour
     // =========================
     public void OffsetVisao(Vector3 novoOffsetOlhos)
     {
-        offsetOlhos = novoOffsetOlhos;
+        offsetCabeca = novoOffsetOlhos;
     }
 
-    void AtualizarCabecaComOffsetOlhos()
+    void CriarRaizDeAjusteDaCamera()
+    {
+        if (!cameraCabeca || ajusteCameraOlhosRoot)
+            return;
+
+        Transform paiOriginal = cameraCabeca.parent;
+        if (!paiOriginal)
+            return;
+
+        GameObject raiz = new GameObject("__AjusteCameraOlhos");
+        ajusteCameraOlhosRoot = raiz.transform;
+        ajusteCameraOlhosRoot.SetParent(paiOriginal, false);
+        ajusteCameraOlhosRoot.localPosition = Vector3.zero;
+        ajusteCameraOlhosRoot.localRotation = Quaternion.identity;
+        ajusteCameraOlhosRoot.localScale = Vector3.one;
+
+        // Isola a Main Camera dos controles XR, que continuam no Camera Offset.
+        cameraCabeca.SetParent(ajusteCameraOlhosRoot, true);
+    }
+
+    void AplicarAjusteCameraOlhos()
+    {
+        if (!ajusteCameraOlhosRoot)
+            CriarRaizDeAjusteDaCamera();
+
+        if (!ajusteCameraOlhosRoot)
+        {
+            deslocamentoCameraOlhosMundo = Vector3.zero;
+            return;
+        }
+
+        ajusteCameraOlhosRoot.localPosition = offsetCameraOlhos;
+        Transform pai = ajusteCameraOlhosRoot.parent;
+        deslocamentoCameraOlhosMundo = pai
+            ? pai.TransformVector(offsetCameraOlhos)
+            : offsetCameraOlhos;
+    }
+
+    Vector3 ObterPosicaoCameraSemAjuste()
+    {
+        return cameraCabeca.position - deslocamentoCameraOlhosMundo;
+    }
+
+    void AtualizarCabecaComOffsetCabeca()
     {
         if (!cabecaAvatar) return;
 
         // A cabeça do avatar vai para a posição do HMD + offset dos olhos do modelo
-        Vector3 alvoPos = cameraCabeca.position + (cameraCabeca.rotation * offsetOlhos);
+        Vector3 alvoPos = ObterPosicaoCameraSemAjuste() + (cameraCabeca.rotation * offsetCabeca);
         Quaternion alvoRot = cameraCabeca.rotation;
 
         if (suavizacao <= 0f)
@@ -82,7 +141,7 @@ public class AvatarBody : MonoBehaviour
         if (!corpoAvatar) return;
 
         // Corpo segue a câmera com offset (só pra posicionar torso / root)
-        Vector3 alvoPos = cameraCabeca.position + offsetCorpo;
+        Vector3 alvoPos = ObterPosicaoCameraSemAjuste() + offsetCorpo;
 
         if (suavizacao <= 0f)
             corpoAvatar.position = alvoPos;
