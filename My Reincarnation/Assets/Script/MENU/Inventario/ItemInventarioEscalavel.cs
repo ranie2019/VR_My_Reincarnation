@@ -83,6 +83,17 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
     public bool AjustarRenderersParaSlotVisual(Transform slotTransform, Bounds boundsPermitido, Vector3 escalaBaseMundo)
     {
+        return AjustarRenderersParaSlotVisual(slotTransform, boundsPermitido, escalaBaseMundo, 1f, out _);
+    }
+
+    public bool AjustarRenderersParaSlotVisual(
+        Transform slotTransform,
+        Bounds boundsPermitido,
+        Vector3 escalaBaseMundo,
+        float fatorMaximo,
+        out float fatorAprovado)
+    {
+        fatorAprovado = 1f;
         if (slotTransform == null || !TamanhoValido(boundsPermitido.size))
             return false;
 
@@ -98,43 +109,99 @@ public class ItemInventarioEscalavel : MonoBehaviour
         if (!EscalaValida(escalaLocalBase))
             return false;
 
-        AplicarEscalaLocal(escalaLocalBase);
+        float componenteMenor = Mathf.Min(
+            Mathf.Abs(escalaLocalBase.x),
+            Mathf.Min(Mathf.Abs(escalaLocalBase.y), Mathf.Abs(escalaLocalBase.z)));
+        float fatorMinimo = Mathf.Clamp(0.00011f / componenteMenor, 0.000001f, 1f);
+        fatorMaximo = Mathf.Clamp(fatorMaximo, fatorMinimo, 1f);
 
-        bool coube = false;
-        float fatorAplicado = 1f;
+        if (!TentarAplicarFatorECentralizar(slotTransform, boundsPermitido, escalaLocalBase, fatorMaximo, out bool coube))
+            return false;
 
-        for (int i = 0; i < 24; i++)
+        if (coube)
         {
-            if (!TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsRenderers))
+            fatorAprovado = fatorMaximo;
+            return true;
+        }
+
+        // Procura primeiro uma escala que caiba, reduzindo uniformemente.
+        // Depois faz busca binaria para recuperar a maior escala aprovada.
+        float fatorMaiorQueCabe = 0f;
+        float fatorMenorQueNaoCabe = fatorMaximo;
+        float fatorCandidato = fatorMaximo * 0.5f;
+        bool encontrouEscalaValida = false;
+
+        for (int tentativa = 0; tentativa < 32; tentativa++)
+        {
+            fatorCandidato = Mathf.Max(fatorCandidato, fatorMinimo);
+            if (!TentarAplicarFatorECentralizar(slotTransform, boundsPermitido, escalaLocalBase, fatorCandidato, out coube))
                 return false;
 
-            CentralizarNoSlot(slotTransform, boundsRenderers, boundsPermitido);
-            Physics.SyncTransforms();
-
-            if (!TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsRenderers))
-                return false;
-
-            coube = BoundsDentroDoPermitido(boundsRenderers, boundsPermitido);
             if (coube)
+            {
+                fatorMaiorQueCabe = fatorCandidato;
+                encontrouEscalaValida = true;
+                break;
+            }
+
+            fatorMenorQueNaoCabe = fatorCandidato;
+            if (fatorCandidato <= fatorMinimo)
                 break;
 
-            float ajuste = Mathf.Min(1f, MenorFator(boundsPermitido.size, boundsRenderers.size));
-            if (ajuste >= 1f)
-                break;
-
-            fatorAplicado *= ajuste;
-            AplicarEscalaLocal(escalaLocalBase * fatorAplicado);
+            fatorCandidato *= 0.5f;
         }
 
-        if (!coube && TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsFinais))
+        if (!encontrouEscalaValida)
+            return false;
+
+        for (int tentativa = 0; tentativa < 16; tentativa++)
         {
-            CentralizarNoSlot(slotTransform, boundsFinais, boundsPermitido);
-            Physics.SyncTransforms();
-            coube = TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsFinais) &&
-                    BoundsDentroDoPermitido(boundsFinais, boundsPermitido);
+            fatorCandidato = (fatorMaiorQueCabe + fatorMenorQueNaoCabe) * 0.5f;
+            if (!TentarAplicarFatorECentralizar(slotTransform, boundsPermitido, escalaLocalBase, fatorCandidato, out coube))
+                return false;
+
+            if (coube)
+                fatorMaiorQueCabe = fatorCandidato;
+            else
+                fatorMenorQueNaoCabe = fatorCandidato;
         }
 
-        return coube;
+        if (!TentarAplicarFatorECentralizar(
+                slotTransform,
+                boundsPermitido,
+                escalaLocalBase,
+                fatorMaiorQueCabe,
+                out coube) || !coube)
+            return false;
+
+        fatorAprovado = fatorMaiorQueCabe;
+        return true;
+    }
+
+    private bool TentarAplicarFatorECentralizar(
+        Transform slotTransform,
+        Bounds boundsPermitido,
+        Vector3 escalaLocalBase,
+        float fator,
+        out bool coube)
+    {
+        coube = false;
+        Vector3 escalaCandidata = escalaLocalBase * fator;
+        if (!EscalaValida(escalaCandidata))
+            return false;
+
+        AplicarEscalaLocal(escalaCandidata);
+        if (!TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsRenderers))
+            return false;
+
+        CentralizarNoSlot(slotTransform, boundsRenderers, boundsPermitido);
+        Physics.SyncTransforms();
+
+        if (!TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out boundsRenderers))
+            return false;
+
+        coube = BoundsDentroDoPermitido(boundsRenderers, boundsPermitido);
+        return true;
     }
 
     public bool EscalaVisualAtualCabeNoSlot(Transform slotTransform, Bounds boundsPermitido)
@@ -279,15 +346,6 @@ public class ItemInventarioEscalavel : MonoBehaviour
                boundsItem.max.y <= boundsPermitido.max.y + tolerancia &&
                boundsItem.min.z >= boundsPermitido.min.z - tolerancia &&
                boundsItem.max.z <= boundsPermitido.max.z + tolerancia;
-    }
-
-    private static float MenorFator(Vector3 tamanhoPermitido, Vector3 tamanhoItem)
-    {
-        if (!TamanhoValido(tamanhoPermitido) || !TamanhoValido(tamanhoItem)) return 1f;
-        float fatorX = tamanhoPermitido.x / tamanhoItem.x;
-        float fatorY = tamanhoPermitido.y / tamanhoItem.y;
-        float fatorZ = tamanhoPermitido.z / tamanhoItem.z;
-        return Mathf.Min(fatorX, fatorY, fatorZ);
     }
 
     private static bool TamanhoValido(Vector3 tamanho)

@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 490504}
   - component: {fileID: 6856399782712685286}
+  - component: {fileID: 2088425021519544042}
   - component: {fileID: 1833960573875836410}
   - component: {fileID: 5456440013711417979}
   - component: {fileID: 4828991945644028985}
@@ -32,7 +33,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 518.86, y: 1.788, z: -399.57}
-  m_LocalScale: {x: 0.165, y: 0.165, z: 0.165}
+  m_LocalScale: {x: 0.165, y: 0.16499999, z: 0.16499999}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 9122610332622713400}
@@ -67,6 +68,27 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 2
+--- !u!65 &2088425021519544042
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 165230}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.6475804, y: 1.1457547, z: 0.7259492}
+  m_Center: {x: 0.020345593, y: -0.043726284, z: -0.32949778}
 --- !u!114 &1833960573875836410
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -81,7 +103,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArmaAttachPorMao
   m_InteractionManager: {fileID: 0}
   m_Colliders:
-  - {fileID: 5046302599573686144}
+  - {fileID: 2088425021519544042}
   m_InteractionLayers:
     m_Bits: 4294967295
   m_DistanceCalculationMode: 1
@@ -253,7 +275,7 @@ MonoBehaviour:
   destruirOriginalAoCarregarSeEstiverNoInventario: 1
   estaNoInventario: 0
   salvarQuandoSoltoNaCena: 1
-  instanciaId: d27217b58a964aeea99270a251e8f4d9
+  instanciaId:
   durabilidadeAtual: 0
   dadosExtrasJson: 
 --- !u!114 &739477640651165714
@@ -289,7 +311,6 @@ GameObject:
   - component: {fileID: 9122610332622713400}
   - component: {fileID: 4786969271265711191}
   - component: {fileID: 4222809757830382400}
-  - component: {fileID: 5046302599573686144}
   m_Layer: 0
   m_Name: stone
   m_TagString: Stone
@@ -369,27 +390,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &5046302599573686144
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 516005418796054389}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.6511643, y: 0.73346794, z: 1.1472373}
-  m_Center: {x: 0.014138699, y: 0.33748633, z: -0.037684172}
 --- !u!1 &3469338933817914625
 GameObject:
   m_ObjectHideFlags: 0

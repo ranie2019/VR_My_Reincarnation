@@ -120,7 +120,7 @@ Animator:
   m_Controller: {fileID: 9100000, guid: 4c60e18a9acd01c4ca9266b9fb42350c, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
-  m_ApplyRootMotion: 1
+  m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
@@ -151,10 +151,10 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
+  m_UseGravity: 0
+  m_IsKinematic: 1
   m_Interpolate: 0
-  m_Constraints: 0
+  m_Constraints: 126
   m_CollisionDetection: 2
 --- !u!65 &4382657166284601668
 BoxCollider:
@@ -7993,6 +7993,7 @@ MonoBehaviour:
   mensagemSucesso: {fileID: 8035536039615217978}
   mensagemSemDinheiro: {fileID: 4529861138742097733}
   mensagemJaEstaInteiro: {fileID: 3013458942147016061}
+  pontoSpawn: {fileID: 0}
   precoPorPontoDeVida: 0.1
 --- !u!1 &2161869732713399375
 GameObject:
@@ -8192,7 +8193,11 @@ MonoBehaviour:
   pontoEncaixe: {fileID: 0}
   margemDeSeguranca: 0.8
   tamanhoVisualMaximoSlot: {x: 0, y: 0, z: 0}
-  debugEscalaInventario: 1
+  permitirRetiradaPorLaserNoSlot: 1
+  interactableRetiradaPorSlot: {fileID: 0}
+  collidersRetiradaPorSlot:
+  - {fileID: 8342484539177843702}
+  areaRetiradaLaserSlot: {fileID: 0}
   contadorTMP: {fileID: 0}
   limiteStack: 99
   diagnosticoQuantidadePilha: 0
@@ -8580,7 +8585,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &7573544244500123164
 RectTransform:
   m_ObjectHideFlags: 0
@@ -10424,7 +10429,11 @@ MonoBehaviour:
   pontoEncaixe: {fileID: 0}
   margemDeSeguranca: 0.8
   tamanhoVisualMaximoSlot: {x: 0, y: 0, z: 0}
-  debugEscalaInventario: 1
+  permitirRetiradaPorLaserNoSlot: 1
+  interactableRetiradaPorSlot: {fileID: 0}
+  collidersRetiradaPorSlot:
+  - {fileID: 3676594312793593242}
+  areaRetiradaLaserSlot: {fileID: 0}
   contadorTMP: {fileID: 0}
   limiteStack: 99
   diagnosticoQuantidadePilha: 0
@@ -12405,7 +12414,11 @@ MonoBehaviour:
   pontoEncaixe: {fileID: 5406081625288563368}
   margemDeSeguranca: 0.8
   tamanhoVisualMaximoSlot: {x: 0, y: 0, z: 0}
-  debugEscalaInventario: 1
+  permitirRetiradaPorLaserNoSlot: 1
+  interactableRetiradaPorSlot: {fileID: 0}
+  collidersRetiradaPorSlot:
+  - {fileID: 8716324709651177506}
+  areaRetiradaLaserSlot: {fileID: 0}
   contadorTMP: {fileID: 0}
   limiteStack: 99
   diagnosticoQuantidadePilha: 0
@@ -14612,7 +14625,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1021530563918897349
 RectTransform:
   m_ObjectHideFlags: 0
@@ -16339,7 +16352,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5904546275791623665}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.81}
+  m_LocalPosition: {x: 0, y: 0, z: 0.18}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -16347,7 +16360,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -30.1, y: -10.5}
+  m_AnchoredPosition: {x: -30.1, y: 5.9}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &5938778711698213313
@@ -21073,7 +21086,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &8226109950878368797
 RectTransform:
   m_ObjectHideFlags: 0

@@ -97,7 +97,29 @@ public class CriarItem : MonoBehaviour
         if (inventarioJogador != null)
             return true;
 
-        inventarioJogador = FindFirstObjectByType<InventarioVR>();
+        GameObject jogador = GameObject.FindGameObjectWithTag("Player");
+        if (jogador != null)
+            inventarioJogador = jogador.GetComponentInChildren<InventarioVR>(true);
+
+        if (inventarioJogador == null)
+        {
+            InventarioVR[] candidatos = FindObjectsByType<InventarioVR>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            int maiorQuantidade = -1;
+            for (int i = 0; i < candidatos.Length; i++)
+            {
+                InventarioVR candidato = candidatos[i];
+                if (candidato == null) continue;
+                SlotInventario[] slotsCandidato = candidato.ObterSlotsParaSave();
+                int quantidade = 0;
+                for (int j = 0; j < slotsCandidato.Length; j++)
+                    if (slotsCandidato[j] != null) quantidade += slotsCandidato[j].ObterQuantidadeAtual();
+                if (quantidade > maiorQuantidade)
+                {
+                    maiorQuantidade = quantidade;
+                    inventarioJogador = candidato;
+                }
+            }
+        }
         return inventarioJogador != null;
     }
 
@@ -141,11 +163,7 @@ public class CriarItem : MonoBehaviour
             if (slot == null || !slot.PossuiItem())
                 continue;
 
-            ItemInventarioDados dados = slot.ObterItemRepresentante();
-            if (dados == null)
-                continue;
-
-            if (string.Equals(dados.NomeItem, nomeRecurso, StringComparison.OrdinalIgnoreCase))
+            if (CorrespondeAoRecurso(slot, nomeRecurso))
                 total += slot.ObterQuantidadeAtual();
         }
 
@@ -225,8 +243,7 @@ public class CriarItem : MonoBehaviour
             if (slot == null || !slot.PossuiItem())
                 continue;
 
-            ItemInventarioDados dados = slot.ObterItemRepresentante();
-            if (dados == null || !string.Equals(dados.NomeItem, nomeRecurso, StringComparison.OrdinalIgnoreCase))
+            if (!CorrespondeAoRecurso(slot, nomeRecurso))
                 continue;
 
             while (restante > 0 && slot.PossuiItem())
@@ -243,6 +260,23 @@ public class CriarItem : MonoBehaviour
     /// Checa os recursos de cada botão da lista e liga/desliga cada um
     /// (UI + XRSimpleInteractable) individualmente.
     /// </summary>
+    private static bool CorrespondeAoRecurso(SlotInventario slot, string nomeRecurso)
+    {
+        if (slot == null || string.IsNullOrWhiteSpace(nomeRecurso)) return false;
+        XRGrabInteractable item = slot.ObterItemRepresentanteParaSave();
+        return item != null && string.Equals(ObterNomeDoRecurso(item), nomeRecurso.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ObterNomeDoRecurso(XRGrabInteractable item)
+    {
+        if (item == null) return string.Empty;
+        ItemInventarioDados dados = item.GetComponent<ItemInventarioDados>() ?? item.GetComponentInChildren<ItemInventarioDados>(true);
+        if (dados != null && !string.IsNullOrWhiteSpace(dados.NomeItem)) return SlotInventario.LimparNomeItem(dados.NomeItem);
+        ItemPersistente persistente = item.GetComponent<ItemPersistente>() ?? item.GetComponentInChildren<ItemPersistente>(true);
+        if (persistente != null && !string.IsNullOrWhiteSpace(persistente.ObterNomeItem())) return SlotInventario.LimparNomeItem(persistente.ObterNomeItem());
+        return SlotInventario.LimparNomeItem(item.gameObject.name);
+    }
+
     private void AtualizarEstadoDeTodosOsBotoes()
     {
         if (botoes == null)

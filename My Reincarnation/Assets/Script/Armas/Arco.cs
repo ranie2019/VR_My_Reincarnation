@@ -602,6 +602,14 @@ public class Arco : MonoBehaviour
     private void ForcarVisualPrincipalDoArcoVisivel()
     {
         CapturarVisualPrincipalProtegidoSeNecessario();
+
+        if (estaNoInventario && DevePermanecerOcultoPeloSlot())
+        {
+            AplicarRenderersPrincipaisFuncionais(false);
+            AplicarRenderersDoVisualDedicado(false);
+            return;
+        }
+
         AplicarVisualDedicadoInventarioSeNecessario();
 
         bool podeMostrarVisualFuncional = !estaNoInventario ||
@@ -625,6 +633,29 @@ public class Arco : MonoBehaviour
         }
 
         AplicarRenderersPrincipaisFuncionais(true);
+    }
+
+    private bool DevePermanecerOcultoPeloSlot()
+    {
+        EstadoItemInventario estado = GetComponent<EstadoItemInventario>();
+        if (estado == null || !estado.estaNoInventario)
+            return false;
+
+        return estado.estaEscondidoNaPilha ||
+               (estado.slotAtual != null && !estado.slotAtual.DeveExibirItemNoInventario);
+    }
+
+    private void AplicarRenderersDoVisualDedicado(bool visivel)
+    {
+        if (visualDedicadoInventario == null)
+            return;
+
+        Renderer[] renderers = visualDedicadoInventario.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+                renderers[i].enabled = visivel;
+        }
     }
 
     private void AplicarRenderersPrincipaisFuncionais(bool visivel)
