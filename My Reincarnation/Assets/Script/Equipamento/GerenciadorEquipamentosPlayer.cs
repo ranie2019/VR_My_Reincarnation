@@ -13,15 +13,22 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
     [SerializeField] private SkinnedMeshRenderer rendererMaoDireita;
     [SerializeField] private SkinnedMeshRenderer rendererMaoEsquerda;
 
+    [Header("Cabeça do avatar")]
+    [SerializeField] private Transform cabecaAvatar;
+
     [Header("Inventário")]
     [SerializeField] private InventarioVR inventario;
 
-    [Header("Equipamento atual")]
+    [Header("Luvas atuais")]
     [SerializeField] private EquiparManoplas luvaDireita;
     [SerializeField] private EquiparManoplas luvaEsquerda;
 
+    [Header("Elmo atual")]
+    [SerializeField] private EquiparElmo elmoAtual;
+
     public EquiparManoplas LuvaDireita => luvaDireita;
     public EquiparManoplas LuvaEsquerda => luvaEsquerda;
+    public EquiparElmo ElmoAtual => elmoAtual;
 
     private void Awake()
     {
@@ -128,6 +135,98 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
         return true;
     }
 
+    public bool TentarEquipar(EquiparElmo novoElmo)
+    {
+        if (novoElmo == null)
+            return false;
+
+        ResolverReferencias();
+        Transform cabecaDestino = cabecaAvatar != null ? cabecaAvatar : novoElmo.CabecaConfigurada;
+        if (!novoElmo.PodeEquiparNaCabeca(cabecaDestino))
+            return false;
+
+        if (elmoAtual == novoElmo)
+            return true;
+
+        XRGrabInteractable grabNovo = novoElmo.GetComponent<XRGrabInteractable>();
+        EstadoItemInventario estadoNovo = grabNovo != null
+            ? grabNovo.GetComponent<EstadoItemInventario>()
+            : null;
+        SlotInventario slotOrigem = estadoNovo != null && estadoNovo.estaNoInventario
+            ? estadoNovo.slotAtual
+            : null;
+
+        if (estadoNovo != null && estadoNovo.estaNoInventario &&
+            (slotOrigem == null || !slotOrigem.PodeRetirarItemParaEquipamento(grabNovo)))
+        {
+            Debug.LogWarning("[GerenciadorEquipamentosPlayer] O elmo precisa estar no topo do slot para ser equipado.", novoElmo);
+            return false;
+        }
+
+        if (slotOrigem != null && !slotOrigem.RetirarItemParaEquipamento(grabNovo))
+        {
+            Debug.LogWarning("[GerenciadorEquipamentosPlayer] Não foi possível retirar o elmo do inventário.", novoElmo);
+            return false;
+        }
+
+        if (elmoAtual != null && !TentarGuardarElmoAtual(elmoAtual, cabecaDestino))
+        {
+            if (slotOrigem != null && slotOrigem.RestaurarItemSalvoNoSlot(grabNovo, false))
+                slotOrigem.FinalizarRestauracaoDoSave();
+            return false;
+        }
+
+        if (!novoElmo.EquiparNaCabeca(cabecaDestino))
+            return false;
+
+        elmoAtual = novoElmo;
+        return true;
+    }
+
+    public bool DesequiparElmo()
+    {
+        if (elmoAtual == null)
+            return true;
+
+        if (!TentarGuardarElmoAtual(elmoAtual, cabecaAvatar))
+            return false;
+
+        elmoAtual = null;
+        return true;
+    }
+
+    private bool TentarGuardarElmoAtual(EquiparElmo elmo, Transform cabeca)
+    {
+        if (elmo == null)
+            return true;
+
+        XRGrabInteractable grab = elmo.GetComponent<XRGrabInteractable>();
+        if (grab == null || inventario == null)
+        {
+            Debug.LogWarning("[GerenciadorEquipamentosPlayer] Não foi possível devolver o elmo: inventário ou XRGrabInteractable ausente.", elmo);
+            return false;
+        }
+
+        elmo.Desequipar();
+        SlotInventario[] slots = inventario.ObterSlotsParaSave();
+        for (int i = 0; i < slots.Length; i++)
+        {
+            SlotInventario slot = slots[i];
+            if (slot == null || !slot.RestaurarItemSalvoNoSlot(grab, false))
+                continue;
+
+            slot.FinalizarRestauracaoDoSave();
+            return true;
+        }
+
+        Transform cabecaRestaurada = cabeca != null ? cabeca : elmo.CabecaConfigurada;
+        if (cabecaRestaurada != null)
+            elmo.EquiparNaCabeca(cabecaRestaurada);
+
+        Debug.LogWarning("[GerenciadorEquipamentosPlayer] Inventário sem espaço para guardar o elmo.", elmo);
+        return false;
+    }
+
     private bool TentarGuardarLuvaAtual(EquiparManoplas luva, Transform mao)
     {
         if (luva == null)
@@ -167,6 +266,12 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
     {
         if (avatar == null)
             avatar = GetComponentInChildren<AvatarBody>(true);
+
+        if (avatar == null)
+            avatar = FindFirstObjectByType<AvatarBody>();
+
+        if (cabecaAvatar == null && avatar != null)
+            cabecaAvatar = avatar.cabecaAvatar;
 
         if (maoEsquerda == null && avatar != null)
             maoEsquerda = avatar.maoEsquerdaAvatar;

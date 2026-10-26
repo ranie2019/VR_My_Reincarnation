@@ -32,6 +32,11 @@ public class InventarioVR : MonoBehaviour
             collidersInventario = inventarioRoot.GetComponentsInChildren<Collider>(true);
 
         CapturarPosicoesControles();
+
+        // Define o estado inicial dos slots ainda no Awake. O SaveManager tambem
+        // restaura itens em Start; esperar ate Start aqui permite que um item
+        // restaurado seja tratado como visivel por alguns frames.
+        AtualizarSlots(false);
     }
 
     private void Start()

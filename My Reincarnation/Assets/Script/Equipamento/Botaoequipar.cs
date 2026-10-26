@@ -9,6 +9,7 @@ public class BotaoEquipar : MonoBehaviour
     [Header("Referências")]
     [Tooltip("Se vazio, tenta encontrar automaticamente subindo pelos pais.")]
     [SerializeField] private EquiparManoplas equiparManoplas;
+    [SerializeField] private EquiparElmo equiparElmo;
 
     [Header("Confirmação")]
     [SerializeField] private InputActionReference acaoConfirmarMaoEsquerda;
@@ -23,6 +24,9 @@ public class BotaoEquipar : MonoBehaviour
 
         if (equiparManoplas == null)
             equiparManoplas = GetComponentInParent<EquiparManoplas>(true);
+
+        if (equiparElmo == null)
+            equiparElmo = GetComponentInParent<EquiparElmo>(true);
     }
 
     private void OnEnable()
@@ -77,7 +81,9 @@ public class BotaoEquipar : MonoBehaviour
         if (!BotaoConfirmarPressionado())
             return;
 
-        if (equiparManoplas != null)
+        if (equiparElmo != null)
+            equiparElmo.Equipar();
+        else if (equiparManoplas != null)
             equiparManoplas.Equipar();
     }
 
