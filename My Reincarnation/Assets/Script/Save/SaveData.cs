@@ -13,7 +13,8 @@ public class MissionSaveData
 [Serializable]
 public class SaveData
 {
-    public string versaoSave = "0.3-missoes-persistentes";
+    public const string VersaoAtual = "0.4-estados-individuais";
+    public string versaoSave = VersaoAtual;
     public string dataSave;
     public PlayerSaveData player = new PlayerSaveData();
     public List<InventorySaveData> inventario = new List<InventorySaveData>();

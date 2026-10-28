@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -1507,6 +1507,11 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
     public void LimparItensSalvosDoSlot(bool destruirItens)
     {
+        LimparItensSalvosDoSlot(destruirItens, false);
+    }
+
+    internal void LimparItensSalvosDoSlot(bool destruirItens, bool preservarEstadoParaCarga)
+    {
         RemoverFiltroDoItemGuardado();
 
         for (int i = pilhaItens.Count - 1; i >= 0; i--)
@@ -1519,7 +1524,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
             if (destruirItens)
                 Destroy(item.gameObject);
-            else
+            else if (!preservarEstadoParaCarga)
                 RestaurarItemParaMundo(item);
         }
 
@@ -1533,6 +1538,16 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         ignorarProximoExited = false;
         AtualizarContadorTMP();
         AtualizarVisibilidadeVisual();
+    }
+
+    // Somente leitura: usa as mesmas regras de capacidade e nome da restauracao.
+    public bool ValidarEntradaSave(XRGrabInteractable item, int quantidade, bool substituir)
+    {
+        if (item == null || quantidade < 1 || quantidade > limiteStack) return false;
+        if (substituir) return true;
+        return pilhaItens.Count + quantidade <= limiteStack &&
+            (pilhaItens.Count == 0 || string.IsNullOrWhiteSpace(nomeItemAtual) ||
+             string.Equals(nomeItemAtual, ObterNomeItem(item)));
     }
 
     public bool RestaurarItemSalvoNoSlot(XRGrabInteractable item, bool esconderNaPilha)

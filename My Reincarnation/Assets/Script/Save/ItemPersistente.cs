@@ -184,6 +184,7 @@ public class ItemPersistente : MonoBehaviour
     public InventorySaveData CriarSaveData(int slot, int quantidade, bool equipado)
     {
         float durabilidade = LerDurabilidade();
+        float maxima = LerDurabilidadeMaxima();
 
         return new InventorySaveData
         {
@@ -196,6 +197,8 @@ public class ItemPersistente : MonoBehaviour
             slot = slot,
             estaNoInventario = true,
             durabilidade = durabilidade,
+            possuiDurabilidadeMaxima = durabilidade >= 0f && maxima > 0f,
+            durabilidadeMaxima = maxima,
             equipado = equipado,
             dadosExtrasJson = dadosExtrasJson
         };
@@ -214,11 +217,31 @@ public class ItemPersistente : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(data.instanciaId))
             DefinirInstanciaId(data.instanciaId);
 
+        if (data.possuiDurabilidadeMaxima)
+        {
+            Component componente = ObterComponenteDuravel();
+            if (componente == null ||
+                (!TentarEscreverNumero(componente, "vidaMaxima", data.durabilidadeMaxima) &&
+                 !TentarEscreverNumero(componente, "durabilidadeMaxima", data.durabilidadeMaxima)))
+                throw new InvalidOperationException("Componente de durabilidade incompativel: " + data.instanciaId);
+        }
         durabilidadeAtual = data.durabilidade;
         dadosExtrasJson = data.dadosExtrasJson;
 
         if (durabilidadeAtual >= 0f)
+        {
             EscreverDurabilidade(durabilidadeAtual);
+            if (data.possuiDurabilidadeMaxima)
+            {
+                Component componente = ObterComponenteDuravel();
+                const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                var campo = componente.GetType().GetField("quebrado", flags) ??
+                            componente.GetType().GetField("quebrada", flags) ??
+                            componente.GetType().GetField("arcoQuebrado", flags);
+                if (campo != null && campo.FieldType == typeof(bool))
+                    campo.SetValue(componente, durabilidadeAtual <= 0f);
+            }
+        }
     }
 
     public float LerDurabilidade()
@@ -401,6 +424,37 @@ public class ItemPersistente : MonoBehaviour
     }
 #endif
 
+    public static void ValidarEstadoIndividualNoPrefab(GameObject prefab, InventorySaveData data)
+    {
+        Component duravel = ObterComponenteDuravel(prefab);
+        if (data.durabilidade == -1f && !data.possuiDurabilidadeMaxima && duravel == null) return;
+        if (duravel == null || data.durabilidade < 0f)
+            throw new InvalidOperationException("Estado de durabilidade incompativel: " + data.instanciaId);
+        ValidarCampoDurabilidade(duravel, "vidaAtual", "durabilidadeAtual", data.durabilidade);
+        if (data.possuiDurabilidadeMaxima)
+            ValidarCampoDurabilidade(duravel, "vidaMaxima", "durabilidadeMaxima", data.durabilidadeMaxima);
+    }
+
+    private static void ValidarCampoDurabilidade(Component componente, string nome, string alternativo, float valor)
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        var campo = componente.GetType().GetField(nome, flags) ?? componente.GetType().GetField(alternativo, flags);
+        if (campo == null || (campo.FieldType != typeof(float) && campo.FieldType != typeof(int)) ||
+            (campo.FieldType == typeof(int) && (valor != Math.Truncate(valor) || (double)valor > int.MaxValue)))
+            throw new InvalidOperationException("Campo de durabilidade incompativel: " + componente.GetType().Name);
+    }
+
+    private float LerDurabilidadeMaxima()
+    {
+        Component componente = ObterComponenteDuravel();
+        if (componente == null) return -1f;
+        if (TentarLerNumero(componente, "VidaMaxima", out float valor) ||
+            TentarLerNumero(componente, "vidaMaxima", out valor) ||
+            TentarLerNumero(componente, "DurabilidadeMaxima", out valor) ||
+            TentarLerNumero(componente, "durabilidadeMaxima", out valor)) return valor;
+        return -1f;
+    }
+
     private float LerDurabilidadePorReflexao()
     {
         Component componenteDuravel = ObterComponenteDuravel();
@@ -462,12 +516,14 @@ public class ItemPersistente : MonoBehaviour
 
     private Component ObterComponenteDuravel()
     {
-        return GetComponent("Equipamento") ??
-               GetComponent("Espada") ??
-               GetComponent("Machado") ??
-               GetComponent("Picareta") ??
-               GetComponent("Arco") ??
-               GetComponent("Escudo");
+        return ObterComponenteDuravel(gameObject);
+    }
+
+    private static Component ObterComponenteDuravel(GameObject objeto)
+    {
+        return objeto.GetComponent("Equipamento") ?? objeto.GetComponent("Espada") ??
+               objeto.GetComponent("Machado") ?? objeto.GetComponent("Picareta") ??
+               objeto.GetComponent("Arco") ?? objeto.GetComponent("Escudo");
     }
 
     private bool TentarLerNumero(Component componente, string nome, out float valor)

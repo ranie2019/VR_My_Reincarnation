@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -31,6 +31,28 @@ public class SaveManager : MonoBehaviour
 
     private readonly List<ISalvavel> objetosRegistrados = new List<ISalvavel>();
 
+    public enum EstadoCarga { NaoIniciado, EmAndamento, Concluido, Falhou, RecuperacaoNecessaria, SessaoNova }
+    public EstadoCarga EstadoCarregamento { get; private set; } = EstadoCarga.NaoIniciado;
+    public string UltimoDiagnosticoCarga { get; private set; }
+    public string ArquivoCarregado { get; private set; }
+
+    public void NotificarFalhaRestauracao(string motivo)
+    {
+        EstadoCarregamento = EstadoCarga.RecuperacaoNecessaria;
+        UltimoDiagnosticoCarga = motivo;
+        Debug.LogError("[SaveManager] Salvamento bloqueado: " + motivo);
+    }
+
+    [Serializable]
+    private class EnvelopeValidacao
+    {
+        public string versaoSave;
+        public string dataSave;
+        public PlayerSaveData player;
+        public List<InventorySaveData> inventario;
+        public List<SceneObjectSaveData> objetosCena;
+    }
+
     private string CaminhoSave
     {
         get
@@ -59,7 +81,10 @@ public class SaveManager : MonoBehaviour
     {
         RegistrarObjetosSalvaveisNaCena();
 
-        if (autoCarregar && ExisteSave())
+        if (EstadoCarregamento != EstadoCarga.NaoIniciado) return;
+        if (!ArquivoSaveSeguro.ExisteAlgumaGeracao(CaminhoSave))
+            EstadoCarregamento = EstadoCarga.SessaoNova;
+        else if (autoCarregar)
             CarregarJogo();
     }
 
@@ -84,78 +109,206 @@ public class SaveManager : MonoBehaviour
     [ContextMenu("Salvar Jogo")]
     public void SalvarJogo()
     {
-        RegistrarObjetosSalvaveisNaCena();
-
-        SaveData data = new SaveData
+        // Inclui chamadas automaticas de missoes e chamadas manuais: nenhuma pode contornar uma falha.
+        if (Instancia != this || (EstadoCarregamento != EstadoCarga.Concluido && EstadoCarregamento != EstadoCarga.SessaoNova))
         {
-            versaoSave = "0.3-missoes-persistentes",
-            dataSave = DateTime.Now.ToString("O"),
-            player = CriarPlayerSaveData(),
-            inventario = salvarInventario ? CapturarInventarioAtual() : new List<InventorySaveData>(),
-            objetosCena = CapturarObjetosCena(),
-            missoes = CapturarMissoes()
-        };
-
-        string json = JsonUtility.ToJson(data, true);
-        string conteudo = usarBase64
-            ? Convert.ToBase64String(Encoding.UTF8.GetBytes(json))
-            : json;
-
-        string diretorio = Path.GetDirectoryName(CaminhoSave);
-        if (!string.IsNullOrEmpty(diretorio))
-            Directory.CreateDirectory(diretorio);
-
+            Debug.LogWarning("[SaveManager] Save nao gravado. Estado: " + EstadoCarregamento);
+            return;
+        }
         try
         {
+            RegistrarObjetosSalvaveisNaCena();
+            SaveData data = new SaveData
+            {
+                versaoSave = SaveData.VersaoAtual,
+                dataSave = DateTime.Now.ToString("O"),
+                player = CriarPlayerSaveData(),
+                inventario = salvarInventario ? CapturarInventarioAtual() : new List<InventorySaveData>(),
+                objetosCena = CapturarObjetosCena(),
+                missoes = CapturarMissoes()
+            };
+            string json = JsonUtility.ToJson(data, true);
+            string conteudo = usarBase64 ? Convert.ToBase64String(Encoding.UTF8.GetBytes(json)) : json;
             EscreverArquivoSaveSeguro(CaminhoSave, conteudo);
         }
         catch (Exception erro)
         {
-            Debug.LogError($"[SaveManager] Falha ao escrever o save em '{CaminhoSave}': {erro}");
+            Debug.LogError($"[SaveManager] Save nao confirmado; geracoes existentes preservadas: {erro}");
         }
     }
 
     [ContextMenu("Carregar Jogo")]
     public void CarregarJogo()
     {
-        if (!ExisteSave())
+        if (Instancia != this || EstadoCarregamento == EstadoCarga.EmAndamento) return;
+        // Ausencia de arquivo apos uma falha nao autoriza sobrescrita/novo jogo implicitamente.
+        if (!ArquivoSaveSeguro.ExisteAlgumaGeracao(CaminhoSave))
         {
+            if (EstadoCarregamento == EstadoCarga.NaoIniciado) EstadoCarregamento = EstadoCarga.SessaoNova;
             return;
         }
-
-        RegistrarObjetosSalvaveisNaCena();
-
-        string conteudo;
+        EstadoCarregamento = EstadoCarga.EmAndamento;
+        ArquivoCarregado = null;
         try
         {
-            conteudo = File.ReadAllText(CaminhoSave, Encoding.UTF8);
+            RegistrarObjetosSalvaveisNaCena();
+            SaveData escolhido = null;
+            var falhas = new List<string>();
+            foreach (string caminho in ArquivoSaveSeguro.Candidatos(CaminhoSave))
+            {
+                if (!File.Exists(caminho)) continue;
+                try
+                {
+                    SaveData candidato = InterpretarEValidarSave(File.ReadAllText(caminho, Encoding.UTF8));
+                    ValidarAplicacao(candidato);
+                    escolhido = candidato;
+                    ArquivoCarregado = caminho;
+                    break;
+                }
+                catch (Exception ex) { falhas.Add(caminho + ": " + ex.Message); }
+            }
+            if (escolhido == null)
+                throw new InvalidDataException("Nenhuma geracao pode ser carregada. " + string.Join(" | ", falhas));
+
+            // Nao tenta outro backup depois de iniciar mutacoes na cena.
+            if (salvarInventario) RestaurarInventario(escolhido.inventario);
+            RestaurarPlayer(escolhido.player);
+            RestaurarObjetosCena(escolhido.objetosCena, ExtrairInstanciaIdsInventario(escolhido.inventario));
+            RestaurarMissoes(escolhido.missoes);
+            if (EstadoCarregamento != EstadoCarga.EmAndamento)
+                throw new InvalidOperationException("Um componente informou falha durante a aplicacao.");
+            EstadoCarregamento = EstadoCarga.Concluido;
+            UltimoDiagnosticoCarga = "Carga concluida: " + ArquivoCarregado;
+            Debug.Log("[SaveManager] " + UltimoDiagnosticoCarga +
+                (falhas.Count > 0 ? ". Recuperacao; originais preservados. " + string.Join(" | ", falhas) : ""));
         }
         catch (Exception erro)
         {
-            Debug.LogError($"[SaveManager] Falha ao ler o save em '{CaminhoSave}': {erro}");
-            return;
+            EstadoCarregamento = EstadoCarga.Falhou;
+            NotificarFalhaRestauracao(erro.Message);
         }
+    }
 
-        string json = DecodificarConteudoSave(conteudo);
+    private SaveData InterpretarEValidarSave(string conteudo)
+    {
+        if (string.IsNullOrWhiteSpace(conteudo)) throw new InvalidDataException("Arquivo vazio.");
+        string json = conteudo.Trim().TrimStart('\uFEFF');
+        if (!json.StartsWith("{", StringComparison.Ordinal))
+            json = Encoding.UTF8.GetString(Convert.FromBase64String(json)).Trim().TrimStart('\uFEFF');
+        if (!json.StartsWith("{", StringComparison.Ordinal) || !json.EndsWith("}", StringComparison.Ordinal))
+            throw new InvalidDataException("Documento JSON incompleto.");
+        EnvelopeValidacao envelope = JsonUtility.FromJson<EnvelopeValidacao>(json);
+        if (envelope == null || string.IsNullOrWhiteSpace(envelope.versaoSave) ||
+            string.IsNullOrWhiteSpace(envelope.dataSave) || envelope.player == null ||
+            envelope.inventario == null || envelope.objetosCena == null)
+            throw new InvalidDataException("Estrutura obrigatoria do save ausente.");
+        string numero = envelope.versaoSave.Split('-')[0];
+        if (!Version.TryParse(numero, out Version versao) || versao.Major != 0 || versao.Minor > 4)
+            throw new InvalidDataException("Versao de save nao suportada: " + envelope.versaoSave);
         SaveData data = JsonUtility.FromJson<SaveData>(json);
-
-        if (data == null)
+        var slots = new HashSet<int>();
+        var ids = new HashSet<string>();
+        foreach (InventorySaveData item in data.inventario)
         {
-            Debug.LogError("[SaveManager] O arquivo de save foi lido, mas nao pode ser interpretado (JSON invalido ou vazio).");
-            return;
+            if (item == null || item.slot < 0 || !slots.Add(item.slot) || item.quantidade < 1 || item.quantidade > 99 ||
+                (string.IsNullOrWhiteSpace(item.itemId) && string.IsNullOrWhiteSpace(item.nomeItem)) ||
+                float.IsNaN(item.durabilidade) || float.IsInfinity(item.durabilidade))
+                throw new InvalidDataException("Entrada de inventario invalida.");
+            item.ValidarEstadosIndividuais();
+            if (versao.Minor >= 4 && item.versaoEstadosIndividuais != 1)
+                throw new InvalidDataException("Save novo sem estados individuais.");
+            var locais = new HashSet<string>();
+            if (!string.IsNullOrWhiteSpace(item.instanciaId)) locais.Add(item.instanciaId.Trim());
+            var lista = new HashSet<string>();
+            if (item.instanciaIds != null)
+                foreach (string id in item.instanciaIds)
+                {
+                    if (string.IsNullOrWhiteSpace(id) || !lista.Add(id.Trim()))
+                        throw new InvalidDataException("Lista de identidades invalida.");
+                    locais.Add(id.Trim());
+                }
+            if (locais.Count > item.quantidade) throw new InvalidDataException("IDs excedem quantidade.");
+            foreach (string id in locais)
+                if (!InstanciaIdValido(id) || !ids.Add(id)) throw new InvalidDataException("ID invalido ou duplicado: " + id);
         }
+        var objetos = new HashSet<string>();
+        foreach (SceneObjectSaveData objeto in data.objetosCena)
+        {
+            if (objeto == null || string.IsNullOrWhiteSpace(objeto.objectId) || !objetos.Add(objeto.objectId) ||
+                !VetorFinito(new Vector3(objeto.posX, objeto.posY, objeto.posZ)) ||
+                !VetorFinito(new Vector3(objeto.rotX, objeto.rotY, objeto.rotZ)) ||
+                !VetorFinito(new Vector3(objeto.scaleX, objeto.scaleY, objeto.scaleZ)))
+                throw new InvalidDataException("Objeto de cena invalido.");
+            if (EhDadoItemPersistente(objeto))
+            {
+                if (!string.IsNullOrWhiteSpace(objeto.estadoJson) && ItemPersistente.LerEstadoCenaJson(objeto.estadoJson) == null)
+                    throw new InvalidDataException("Estado de item invalido: " + objeto.objectId);
+                var estado = LerEstadoItemCena(objeto);
+                if (string.IsNullOrWhiteSpace(estado.itemId)) throw new InvalidDataException("Tipo de item ausente.");
+                if (!string.IsNullOrWhiteSpace(estado.instanciaId) &&
+                    (!InstanciaIdValido(estado.instanciaId) || !ids.Add(estado.instanciaId)))
+                    throw new InvalidDataException("Identidade de cena invalida ou repetida.");
+            }
+        }
+        if (!VetorFinito(new Vector3(data.player.posX, data.player.posY, data.player.posZ)) ||
+            !VetorFinito(new Vector3(data.player.rotX, data.player.rotY, data.player.rotZ)))
+            throw new InvalidDataException("Transform do player nao finito.");
+        if (data.missoes != null)
+            foreach (MissionSaveData missao in data.missoes)
+                if (missao == null || string.IsNullOrWhiteSpace(missao.gerenciadorId) || string.IsNullOrWhiteSpace(missao.idMissao) || missao.estado < 0 || missao.estado > 3)
+                    throw new InvalidDataException("Estado de missao invalido.");
+        return data;
+    }
 
-        HashSet<string> instanciaIdsInventario = salvarInventario
-            ? ExtrairInstanciaIdsInventario(data.inventario)
-            : new HashSet<string>();
+    private bool ConteudoSaveValido(string conteudo)
+    {
+        try { InterpretarEValidarSave(conteudo); return true; }
+        catch (Exception) { return false; }
+    }
 
-        RestaurarPlayer(data.player);
-
+    private void ValidarAplicacao(SaveData data)
+    {
         if (salvarInventario)
-            RestaurarInventario(data.inventario);
-
-        RestaurarObjetosCena(data.objetosCena, instanciaIdsInventario);
-        RestaurarMissoes(data.missoes);
+        {
+            var adapter = EncontrarInventarioSalvavel() as InventarioSaveAdapter;
+            if (adapter == null) throw new InvalidOperationException("Adapter com confirmacao de carga indisponivel.");
+            if (!adapter.ValidarRestauracao(data.inventario, out string erro)) throw new InvalidDataException(erro);
+        }
+        if (data.missoes != null && data.missoes.Count > 0)
+        {
+            var disponiveis = new HashSet<string>();
+            foreach (var gerenciador in FindObjectsByType<GerenciadorMissoes>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                foreach (var missao in gerenciador.CapturarEstadoParaSave())
+                    disponiveis.Add(missao.gerenciadorId + "\n" + missao.idMissao);
+            foreach (var missao in data.missoes)
+                if (!disponiveis.Contains(missao.gerenciadorId + "\n" + missao.idMissao))
+                    throw new InvalidDataException("Missao salva indisponivel: " + missao.idMissao);
+        }
+        var registrados = CriarMapaObjetosRegistrados();
+        var existentes = ObterItensPersistentesSoltosCena();
+        var idsReservados = ObterIdsReservadosParaCargaCena(data.objetosCena, ExtrairInstanciaIdsInventario(data.inventario));
+        var usados = new HashSet<ItemPersistente>();
+        var database = ItemDatabaseLocal.Instancia != null ? ItemDatabaseLocal.Instancia : FindFirstObjectByType<ItemDatabaseLocal>();
+        foreach (SceneObjectSaveData objeto in data.objetosCena)
+        {
+            if (!EhDadoItemPersistente(objeto))
+            {
+                if (!registrados.ContainsKey(objeto.objectId))
+                    throw new InvalidDataException("Objeto persistente ausente: " + objeto.objectId);
+                continue;
+            }
+            var estado = LerEstadoItemCena(objeto);
+            var item = EncontrarItemSoltoPorInstancia(existentes, estado.instanciaId, usados);
+            if (item == null)
+            {
+                item = EncontrarItemSoltoComIdRuntimeParaMigrar(existentes, estado.itemId, usados, out int candidatos, idsReservados);
+                if (item == null && (candidatos > 1 || EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(existentes, estado.itemId, usados, idsReservados) != null))
+                    throw new InvalidDataException("Restauracao de cena ambigua: " + objeto.objectId);
+            }
+            if (item != null) usados.Add(item);
+            else if (database == null || database.ObterPrefab(estado.itemId) == null)
+                throw new InvalidDataException("Prefab de cena indisponivel: " + estado.itemId);
+        }
     }
 
     private List<MissionSaveData> CapturarMissoes()
@@ -195,12 +348,17 @@ public class SaveManager : MonoBehaviour
     [ContextMenu("Apagar Save")]
     public void ApagarSave()
     {
-        if (!ExisteSave())
+        if (EstadoCarregamento == EstadoCarga.EmAndamento) return;
+        try
         {
-            return;
+            string sufixo = ".novoJogo." + Guid.NewGuid().ToString("N");
+            foreach (string caminho in ArquivoSaveSeguro.Candidatos(CaminhoSave))
+                if (File.Exists(caminho)) File.Move(caminho, caminho + sufixo);
+            EstadoCarregamento = EstadoCarga.SessaoNova;
+            ArquivoCarregado = null;
+            UltimoDiagnosticoCarga = "Save desvinculado explicitamente; arquivos anteriores preservados.";
         }
-
-        File.Delete(CaminhoSave);
+        catch (Exception ex) { NotificarFalhaRestauracao("Nao foi possivel iniciar novo save: " + ex.Message); }
     }
 
     [ContextMenu("Mostrar Caminho Do Save")]
@@ -215,26 +373,9 @@ public class SaveManager : MonoBehaviour
 
     private void EscreverArquivoSaveSeguro(string caminhoFinal, string conteudo)
     {
-        string temporario = caminhoFinal + ".tmp";
-        string backup = caminhoFinal + ".bak";
-
-        File.WriteAllText(temporario, conteudo, Encoding.UTF8);
-
-        if (!File.Exists(caminhoFinal))
-        {
-            File.Move(temporario, caminhoFinal);
-            return;
-        }
-
-        try
-        {
-            File.Replace(temporario, caminhoFinal, backup, true);
-        }
-        catch (Exception)
-        {
-            File.Copy(temporario, caminhoFinal, true);
-            File.Delete(temporario);
-        }
+        bool recuperadoDeOutraGeracao = ArquivoCarregado != null && !string.Equals(ArquivoCarregado, caminhoFinal, StringComparison.Ordinal);
+        ArquivoSaveSeguro.Gravar(caminhoFinal, conteudo, ConteudoSaveValido, preservarPrincipal: recuperadoDeOutraGeracao);
+        ArquivoCarregado = caminhoFinal;
     }
 
     public void RegistrarObjeto(ISalvavel objeto)
@@ -404,8 +545,7 @@ public class SaveManager : MonoBehaviour
                 continue;
             }
 
-            if (debugSave)
-                { }
+            throw new InvalidOperationException("Objeto nao restaurado: " + data.objectId);
         }
 
         RestaurarItensSoltosCena(objetosCena, instanciaIdsInventario);
@@ -488,6 +628,7 @@ public class SaveManager : MonoBehaviour
             : FindFirstObjectByType<ItemDatabaseLocal>();
 
         List<ItemPersistente> existentesAntes = ObterItensPersistentesSoltosCena();
+        var idsReservados = ObterIdsReservadosParaCargaCena(objetosCena, instanciaIdsInventario);
         HashSet<ItemPersistente> itensUsados = new HashSet<ItemPersistente>();
         HashSet<string> instanciaIdsSalvos = new HashSet<string>();
         HashSet<string> instanciaIdsCarregados = new HashSet<string>();
@@ -498,8 +639,7 @@ public class SaveManager : MonoBehaviour
             ItemPersistente.EstadoCenaItem estadoItem = LerEstadoItemCena(data);
             if (estadoItem == null || string.IsNullOrWhiteSpace(estadoItem.itemId))
             {
-                { }
-                continue;
+                throw new InvalidOperationException("Item de cena nao restaurado: " + data.objectId);
             }
 
             string instanciaId = NormalizarInstanciaId(estadoItem.instanciaId);
@@ -514,8 +654,7 @@ public class SaveManager : MonoBehaviour
 
             if (!instanciaIdsCarregados.Add(instanciaId))
             {
-                { }
-                continue;
+                throw new InvalidOperationException("Item de cena nao restaurado: " + data.objectId);
             }
 
             instanciaIdsSalvos.Add(instanciaId);
@@ -528,7 +667,7 @@ public class SaveManager : MonoBehaviour
                     existentesAntes,
                     estadoItem.itemId,
                     itensUsados,
-                    out int candidatosMigracao);
+                    out int candidatosMigracao, idsReservados);
 
                 if (itemMigravel != null)
                 {
@@ -537,8 +676,7 @@ public class SaveManager : MonoBehaviour
                 }
                 else if (candidatosMigracao > 1)
                 {
-                    { }
-                    continue;
+                    throw new InvalidOperationException("Item de cena nao restaurado: " + data.objectId);
                 }
             }
 
@@ -547,25 +685,22 @@ public class SaveManager : MonoBehaviour
                 ItemPersistente itemMesmoTipo = EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(
                     existentesAntes,
                     estadoItem.itemId,
-                    itensUsados);
+                    itensUsados, idsReservados);
 
                 if (itemMesmoTipo != null)
                 {
-                    { }
-                    continue;
+                    throw new InvalidOperationException("Item de cena nao restaurado: " + data.objectId);
                 }
 
                 if (database == null)
                 {
-                    { }
-                    continue;
+                    throw new InvalidOperationException("Item de cena nao restaurado: " + data.objectId);
                 }
 
                 GameObject prefab = database.ObterPrefab(estadoItem.itemId);
                 if (prefab == null)
                 {
-                    { }
-                    continue;
+                    throw new InvalidOperationException("Item de cena nao restaurado: " + data.objectId);
                 }
 
                 GameObject instancia = Instantiate(prefab);
@@ -580,6 +715,20 @@ public class SaveManager : MonoBehaviour
         }
 
         RemoverDuplicatasItensSoltos(existentesAntes, itensUsados, instanciaIdsSalvos);
+    }
+
+    private HashSet<string> ObterIdsReservadosParaCargaCena(
+        List<SceneObjectSaveData> objetos, HashSet<string> idsInventario)
+    {
+        var ids = idsInventario != null ? new HashSet<string>(idsInventario) : new HashSet<string>();
+        if (objetos == null) return ids;
+        foreach (var objeto in objetos)
+        {
+            if (objeto == null || !EhDadoItemPersistente(objeto)) continue;
+            var estado = LerEstadoItemCena(objeto);
+            if (estado != null) AdicionarInstanciaIdSeValido(ids, estado.instanciaId);
+        }
+        return ids;
     }
 
     private HashSet<string> ExtrairInstanciaIdsInventario(List<InventorySaveData> itens)
@@ -734,7 +883,8 @@ public class SaveManager : MonoBehaviour
     private ItemPersistente EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(
         List<ItemPersistente> itens,
         string itemId,
-        HashSet<ItemPersistente> itensUsados)
+        HashSet<ItemPersistente> itensUsados,
+        HashSet<string> idsReservados = null)
     {
         if (string.IsNullOrWhiteSpace(itemId))
             return null;
@@ -750,6 +900,10 @@ public class SaveManager : MonoBehaviour
             if (ItemEstaNoInventarioOuSlot(item))
                 continue;
 
+            // Este objeto pertence a outro registro do mesmo save, mesmo que seja processado depois.
+            if (idsReservados != null && idsReservados.Contains(item.ObterInstanciaIdSemGerar()))
+                continue;
+
             if (item.CorrespondeAoItemId(itemIdNormalizado))
                 return item;
         }
@@ -761,7 +915,8 @@ public class SaveManager : MonoBehaviour
         List<ItemPersistente> itens,
         string itemId,
         HashSet<ItemPersistente> itensUsados,
-        out int candidatos)
+        out int candidatos,
+        HashSet<string> idsReservados = null)
     {
         candidatos = 0;
 
@@ -778,6 +933,10 @@ public class SaveManager : MonoBehaviour
                 continue;
 
             if (ItemEstaNoInventarioOuSlot(item))
+                continue;
+
+            // Este objeto pertence a outro registro do mesmo save, mesmo que seja processado depois.
+            if (idsReservados != null && idsReservados.Contains(item.ObterInstanciaIdSemGerar()))
                 continue;
 
             if (!item.InstanciaIdFoiGeradoEmRuntime())
@@ -893,9 +1052,7 @@ public class SaveManager : MonoBehaviour
         IInventarioSalvavel inventarioSalvavel = EncontrarInventarioSalvavel();
         if (inventarioSalvavel == null)
         {
-            if (debugSave)
-                { }
-            return new List<InventorySaveData>();
+            throw new InvalidOperationException("Inventario indisponivel para salvar.");
         }
 
         return inventarioSalvavel.SalvarInventario() ?? new List<InventorySaveData>();
@@ -903,18 +1060,10 @@ public class SaveManager : MonoBehaviour
 
     private void RestaurarInventario(List<InventorySaveData> itens)
     {
-        if (itens == null)
-            itens = new List<InventorySaveData>();
-
-        IInventarioSalvavel inventarioSalvavel = EncontrarInventarioSalvavel();
-        if (inventarioSalvavel == null)
-        {
-            if (debugSave)
-                { }
-            return;
-        }
-
-        inventarioSalvavel.CarregarInventario(itens);
+        var adapter = EncontrarInventarioSalvavel() as InventarioSaveAdapter;
+        if (adapter == null) throw new InvalidOperationException("Adapter do inventario indisponivel.");
+        if (!adapter.TentarCarregarInventario(itens, out string erro))
+            throw new InvalidOperationException(erro);
     }
 
     private IInventarioSalvavel EncontrarInventarioSalvavel()

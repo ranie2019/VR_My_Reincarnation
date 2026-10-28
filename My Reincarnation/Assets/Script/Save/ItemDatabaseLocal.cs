@@ -96,13 +96,46 @@ public class ItemDatabaseLocal : MonoBehaviour
 
     public GameObject ObterPrefab(string itemId)
     {
-        if (string.IsNullOrWhiteSpace(itemId) || itens == null)
+        if (string.IsNullOrWhiteSpace(itemId))
             return null;
 
         ConstruirCacheSeNecessario();
 
         string idNormalizado = itemId.Trim();
-        return cachePorId.TryGetValue(idNormalizado, out GameObject prefab) ? prefab : null;
+        if (cachePorId.TryGetValue(idNormalizado, out GameObject prefab) && prefab != null)
+            return prefab;
+
+        // Uma referencia restaurada/importada pode nao ter existido ao montar o cache.
+        InvalidarCache();
+        ConstruirCacheSeNecessario();
+        if (cachePorId.TryGetValue(idNormalizado, out prefab) && prefab != null)
+            return prefab;
+
+        // Os recursos de natureza ja possuem referencias serializadas para o build.
+        // Reutiliza apenas correspondencias exatas do ID de tipo, nunca uma instancia da cena.
+        foreach (var natureza in FindObjectsByType<RespawnNatureza>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            GameObject candidato = natureza.ObterPrefabPorTipoPersistente(idNormalizado);
+            if (candidato == null) continue;
+            if (prefab != null && prefab != candidato)
+                throw new InvalidOperationException("Prefabs de natureza conflitantes para o tipo: " + idNormalizado);
+            prefab = candidato;
+        }
+
+#if UNITY_EDITOR
+        // Recupera tambem o asset exato quando a cena aberta ainda tem um catalogo antigo.
+        if (prefab == null && Guid.TryParseExact(idNormalizado, "N", out _))
+        {
+            string caminho = AssetDatabase.GUIDToAssetPath(idNormalizado);
+            GameObject candidato = string.IsNullOrEmpty(caminho) ? null : AssetDatabase.LoadAssetAtPath<GameObject>(caminho);
+            var persistente = candidato != null ? candidato.GetComponent<ItemPersistente>() : null;
+            if (persistente != null && string.Equals(persistente.ObterTipoItemId(), idNormalizado, StringComparison.Ordinal))
+                prefab = candidato;
+        }
+#endif
+
+        if (prefab != null) RegistrarNoCache(idNormalizado, prefab);
+        return prefab;
     }
 
     public bool ExisteItem(string itemId)
@@ -113,6 +146,7 @@ public class ItemDatabaseLocal : MonoBehaviour
     [ContextMenu("Validar Database")]
     public void ValidarDatabase()
     {
+        InvalidarCache();
         ValidarDatabaseInterno(true);
     }
 

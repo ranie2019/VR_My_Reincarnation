@@ -23,6 +23,26 @@ public class RespawnNatureza : MonoBehaviour
 
     private readonly HashSet<string> respawnsAgendados = new();
 
+    // Consulta somente referencias de prefab, sem instanciar nem agendar respawn.
+    public GameObject ObterPrefabPorTipoPersistente(string tipoItemId)
+    {
+        if (string.IsNullOrWhiteSpace(tipoItemId) || configuracoesNatureza == null)
+            return null;
+
+        GameObject resultado = null;
+        foreach (var config in configuracoesNatureza)
+        {
+            if (config == null || config.prefabRespawn == null) continue;
+            var persistente = config.prefabRespawn.GetComponent<ItemPersistente>();
+            if (persistente == null || !string.Equals(persistente.ObterTipoItemId(), tipoItemId.Trim(), StringComparison.Ordinal))
+                continue;
+            if (resultado != null && resultado != config.prefabRespawn)
+                throw new InvalidOperationException("Mais de um prefab de respawn possui o tipo persistente: " + tipoItemId);
+            resultado = config.prefabRespawn;
+        }
+        return resultado;
+    }
+
     private void Awake()
     {
         if (Instancia != null && Instancia != this)

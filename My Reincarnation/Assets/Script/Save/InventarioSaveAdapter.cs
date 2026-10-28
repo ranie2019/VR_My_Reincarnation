@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -26,6 +26,8 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
     [SerializeField] private bool ultimaFalhaPrefabAusente;
     [SerializeField] private bool ultimaFalhaItemIdVazio;
     [SerializeField] private bool ultimoLoadDiretoPorPrefab;
+
+    private List<GameObject> destruicoesPendentesCarga;
 
     private void Awake()
     {
@@ -112,125 +114,293 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
     public void CarregarInventario(List<InventorySaveData> itens)
     {
-        AtualizarReferencias();
-
-        if (itens == null)
-            return;
-
-        if (limparInventarioAntesCarregar)
-            LimparSlots();
-
-        List<ItemPersistente> originaisCena = ObterItensPersistentesSoltosCena();
-        HashSet<ItemPersistente> originaisUsados = new HashSet<ItemPersistente>();
-
-        HashSet<string> instanciaIdsCarregados = new HashSet<string>();
-        HashSet<SlotInventario> slotsRestaurados = new HashSet<SlotInventario>();
-
-        for (int i = 0; i < itens.Count; i++)
+        if (!TentarCarregarInventario(itens, out string erro))
         {
-            InventorySaveData data = itens[i];
-            if (DataInventarioSemIdentificacao(data))
+            if (SaveManager.Instancia != null) SaveManager.Instancia.NotificarFalhaRestauracao(erro);
+            Debug.LogError("[InventarioSaveAdapter] " + erro, this);
+        }
+    }
+
+    public bool ValidarRestauracao(List<InventorySaveData> itens, out string erro)
+    {
+        erro = null;
+        try
+        {
+            AtualizarReferencias();
+            if (itens == null || slots == null || slots.Length == 0)
+                throw new System.InvalidOperationException("Dados ou slots do inventario indisponiveis.");
+            var ids = new HashSet<string>();
+            var destinos = new HashSet<int>();
+            var originais = ObterItensPersistentesSoltosCena();
+            var usados = new HashSet<ItemPersistente>();
+            foreach (InventorySaveData data in itens)
             {
-                RegistrarFalhaItemIdVazio();
-                continue;
+                if (DataInventarioSemIdentificacao(data))
+                    throw new System.InvalidOperationException("Item sem identificacao.");
+                if (data.slot < 0 || data.slot >= slots.Length || slots[data.slot] == null || !destinos.Add(data.slot))
+                    throw new System.InvalidOperationException("Slot invalido ou repetido: " + data.slot);
+                data.ValidarEstadosIndividuais();
+                GameObject prefab = ObterPrefabParaRestaurar(data);
+                if (prefab == null || prefab.GetComponent<XRGrabInteractable>() == null)
+                    throw new System.InvalidOperationException("Prefab ausente ou sem XRGrabInteractable: " + data.itemId);
+                if (!slots[data.slot].ValidarEntradaSave(prefab.GetComponent<XRGrabInteractable>(), data.quantidade, limparInventarioAntesCarregar))
+                    throw new System.InvalidOperationException("Quantidade ou tipo incompativel no slot " + data.slot);
+                if (float.IsNaN(data.durabilidade) || float.IsInfinity(data.durabilidade))
+                    throw new System.InvalidOperationException("Durabilidade nao finita: " + data.itemId);
+                var idsEntrada = new HashSet<string>();
+                if (!string.IsNullOrWhiteSpace(data.instanciaId)) idsEntrada.Add(data.instanciaId.Trim());
+                if (data.instanciaIds != null)
+                {
+                    var lista = new HashSet<string>();
+                    foreach (string id in data.instanciaIds)
+                    {
+                        if (string.IsNullOrWhiteSpace(id) || !lista.Add(id.Trim()))
+                            throw new System.InvalidOperationException("Lista de IDs invalida: " + data.itemId);
+                        idsEntrada.Add(id.Trim());
+                    }
+                }
+                if (idsEntrada.Count > data.quantidade)
+                    throw new System.InvalidOperationException("Mais IDs que unidades: " + data.itemId);
+                foreach (string id in idsEntrada)
+                    if (!ItemPersistente.InstanciaIdEhGuidValido(id) || !ids.Add(id))
+                        throw new System.InvalidOperationException("ID invalido ou duplicado: " + id);
+
+                // Simula as decisoes de migracao existentes, sem consumir nem destruir candidatos.
+                foreach (string id in ObterInstanciaIdsParaRestaurar(data))
+                {
+                    var unidade = data.CriarDataParaInstancia(id);
+                    GameObject prefabUnidade = ObterPrefabParaRestaurar(unidade);
+                    if (prefabUnidade == null || prefabUnidade.GetComponent<XRGrabInteractable>() == null ||
+                        !slots[data.slot].ValidarEntradaSave(prefabUnidade.GetComponent<XRGrabInteractable>(), data.quantidade, limparInventarioAntesCarregar))
+                        throw new System.InvalidOperationException("Prefab individual ausente ou incompativel: " + unidade.itemId);
+                    if (data.versaoEstadosIndividuais == 1)
+                        ItemPersistente.ValidarEstadoIndividualNoPrefab(prefabUnidade, unidade);
+                    if (DeveRestaurarDiretoPorPrefab(unidade, prefabUnidade)) continue;
+                    ItemPersistente original = EncontrarOriginalParaRestaurarNoInventario(originais, unidade.itemId, id, usados, out int candidatos);
+                    if (original != null)
+                    {
+                        if (original.GetComponent<XRGrabInteractable>() == null ||
+                            !slots[data.slot].ValidarEntradaSave(original.GetComponent<XRGrabInteractable>(), data.quantidade, limparInventarioAntesCarregar))
+                            throw new System.InvalidOperationException("Original incompativel: " + id);
+                        usados.Add(original);
+                    }
+                    else if (!PodeCriarInstanciaSalvaPorPrefab(prefabUnidade, data.quantidade, unidade, candidatos) &&
+                             (candidatos > 1 || ExisteOriginalMesmoTipoNaoUsado(originais, unidade.itemId, usados)))
+                        throw new System.InvalidOperationException("Migracao ambigua; restauracao abortada: " + id);
+                }
             }
+            return true;
+        }
+        catch (System.Exception ex) { erro = ex.Message; return false; }
+    }
 
-            if (data.slot < 0 || slots == null || data.slot >= slots.Length || slots[data.slot] == null)
+    public bool TentarCarregarInventario(List<InventorySaveData> itens, out string erro)
+    {
+        if (!ValidarRestauracao(itens, out erro)) return false;
+        if (destruicoesPendentesCarga != null) { erro = "Restauracao ja em andamento."; return false; }
+        var anteriores = new Dictionary<SlotInventario, List<XRGrabInteractable>>();
+        var quantidadesEsperadas = new Dictionary<SlotInventario, int>();
+        foreach (InventorySaveData data in itens)
+            quantidadesEsperadas[slots[data.slot]] = data.quantidade +
+                (limparInventarioAntesCarregar ? 0 : slots[data.slot].ObterQuantidadeRealParaSave());
+        // Captura os candidatos antes de retirar os antigos dos slots.
+        List<ItemPersistente> originaisCena = ObterItensPersistentesSoltosCena();
+        destruicoesPendentesCarga = new List<GameObject>();
+        try
+        {
+            if (limparInventarioAntesCarregar)
             {
-                { }
-                continue;
+                foreach (SlotInventario slot in slots)
+                {
+                    anteriores[slot] = slot.ObterItensParaSave();
+                    slot.LimparItensSalvosDoSlot(false, true);
+                    foreach (XRGrabInteractable item in anteriores[slot])
+                        if (item != null) item.gameObject.SetActive(false);
+                }
             }
+            HashSet<ItemPersistente> originaisUsados = new HashSet<ItemPersistente>();
 
-            SlotInventario slotDestino = slots[data.slot];
-            int quantidade = Mathf.Max(1, data.quantidade);
-            GameObject prefabParaRestaurar = ObterPrefabParaRestaurar(data);
-            bool restaurarDiretoPorPrefab = DeveRestaurarDiretoPorPrefab(data, prefabParaRestaurar);
-            AtualizarDiagnosticoLoad(data, prefabParaRestaurar, quantidade, restaurarDiretoPorPrefab);
+            HashSet<string> instanciaIdsCarregados = new HashSet<string>();
+            HashSet<SlotInventario> slotsRestaurados = new HashSet<SlotInventario>();
 
-            List<string> instanciaIds = ObterInstanciaIdsParaRestaurar(data);
-            int quantidadeComIdSalvo = instanciaIds.Count;
-
-            for (int quantidadeIndex = 0; quantidadeIndex < quantidade; quantidadeIndex++)
+            for (int i = 0; i < itens.Count; i++)
             {
-                string instanciaId = ObterOuCriarInstanciaIdParaRestaurar(
-                    instanciaIds,
-                    quantidadeIndex,
-                    data,
-                    instanciaIdsCarregados);
+                InventorySaveData data = itens[i];
+                if (DataInventarioSemIdentificacao(data))
+                {
+                    RegistrarFalhaItemIdVazio();
+                    continue;
+                }
 
-                if (!instanciaIdsCarregados.Add(instanciaId))
+                if (data.slot < 0 || slots == null || data.slot >= slots.Length || slots[data.slot] == null)
                 {
                     { }
                     continue;
                 }
 
-                InventorySaveData dataInstancia = CriarDataParaInstancia(data, instanciaId);
-                bool esconderNaPilha = quantidadeIndex < quantidade - 1;
-                bool instanciaTinhaIdSalvo = quantidadeIndex < quantidadeComIdSalvo;
-                int candidatosRuntime = 0;
+                SlotInventario slotDestino = slots[data.slot];
+                int quantidade = Mathf.Max(1, data.quantidade);
+                GameObject prefabParaRestaurar = ObterPrefabParaRestaurar(data);
+                bool restaurarDiretoPorPrefab = DeveRestaurarDiretoPorPrefab(data, prefabParaRestaurar);
+                AtualizarDiagnosticoLoad(data, prefabParaRestaurar, quantidade, restaurarDiretoPorPrefab);
 
-                if (restaurarDiretoPorPrefab)
+                List<string> instanciaIds = ObterInstanciaIdsParaRestaurar(data);
+                int quantidadeComIdSalvo = instanciaIds.Count;
+
+                for (int quantidadeIndex = 0; quantidadeIndex < quantidade; quantidadeIndex++)
                 {
-                    if (CriarERestaurarItemNoInventario(dataInstancia, slotDestino, esconderNaPilha))
+                    string instanciaId = ObterOuCriarInstanciaIdParaRestaurar(
+                        instanciaIds,
+                        quantidadeIndex,
+                        data,
+                        instanciaIdsCarregados);
+
+                    if (!instanciaIdsCarregados.Add(instanciaId))
                     {
-                        slotsRestaurados.Add(slotDestino);
-                        RemoverOriginalSoltoCorrespondenteAoItemRestauradoDireto(
-                            originaisCena,
-                            dataInstancia,
-                            originaisUsados);
+                        { }
+                        continue;
                     }
 
-                    continue;
-                }
+                    InventorySaveData dataInstancia = CriarDataParaInstancia(data, instanciaId);
+                    prefabParaRestaurar = ObterPrefabParaRestaurar(dataInstancia);
+                    restaurarDiretoPorPrefab = DeveRestaurarDiretoPorPrefab(dataInstancia, prefabParaRestaurar);
+                    bool esconderNaPilha = quantidadeIndex < quantidade - 1;
+                    bool instanciaTinhaIdSalvo = quantidadeIndex < quantidadeComIdSalvo;
+                    int candidatosRuntime = 0;
 
-                ItemPersistente originalCena = instanciaTinhaIdSalvo
-                    ? EncontrarOriginalParaRestaurarNoInventario(
-                        originaisCena,
-                        dataInstancia.itemId,
-                        dataInstancia.instanciaId,
-                        originaisUsados,
-                        out candidatosRuntime)
-                    : null;
+                    if (restaurarDiretoPorPrefab)
+                    {
+                        if (CriarERestaurarItemNoInventario(dataInstancia, slotDestino, esconderNaPilha))
+                        {
+                            slotsRestaurados.Add(slotDestino);
+                            RemoverOriginalSoltoCorrespondenteAoItemRestauradoDireto(
+                                originaisCena,
+                                dataInstancia,
+                                originaisUsados);
+                        }
 
-                bool podeCriarInstanciaSalvaPorPrefab = PodeCriarInstanciaSalvaPorPrefab(
-                    prefabParaRestaurar,
-                    quantidade,
-                    dataInstancia,
-                    candidatosRuntime);
+                        continue;
+                    }
 
-                if (originalCena != null)
-                {
-                    originaisUsados.Add(originalCena);
-                    if (RestaurarItemExistente(dataInstancia, originalCena, slotDestino, esconderNaPilha))
+                    ItemPersistente originalCena = instanciaTinhaIdSalvo
+                        ? EncontrarOriginalParaRestaurarNoInventario(
+                            originaisCena,
+                            dataInstancia.itemId,
+                            dataInstancia.instanciaId,
+                            originaisUsados,
+                            out candidatosRuntime)
+                        : null;
+
+                    bool podeCriarInstanciaSalvaPorPrefab = PodeCriarInstanciaSalvaPorPrefab(
+                        prefabParaRestaurar,
+                        quantidade,
+                        dataInstancia,
+                        candidatosRuntime);
+
+                    if (originalCena != null)
+                    {
+                        originaisUsados.Add(originalCena);
+                        if (RestaurarItemExistente(dataInstancia, originalCena, slotDestino, esconderNaPilha))
+                            slotsRestaurados.Add(slotDestino);
+
+                        continue;
+                    }
+
+                    if (instanciaTinhaIdSalvo && candidatosRuntime > 1 && !podeCriarInstanciaSalvaPorPrefab)
+                    {
+                        { }
+                        continue;
+                    }
+
+                    if (instanciaTinhaIdSalvo &&
+                        !podeCriarInstanciaSalvaPorPrefab &&
+                        ExisteOriginalMesmoTipoNaoUsado(originaisCena, dataInstancia.itemId, originaisUsados))
+                    {
+                        { }
+                        continue;
+                    }
+
+                    if (CriarERestaurarItemNoInventario(dataInstancia, slotDestino, esconderNaPilha))
                         slotsRestaurados.Add(slotDestino);
-
-                    continue;
                 }
-
-                if (instanciaTinhaIdSalvo && candidatosRuntime > 1 && !podeCriarInstanciaSalvaPorPrefab)
-                {
-                    { }
-                    continue;
-                }
-
-                if (instanciaTinhaIdSalvo &&
-                    !podeCriarInstanciaSalvaPorPrefab &&
-                    ExisteOriginalMesmoTipoNaoUsado(originaisCena, dataInstancia.itemId, originaisUsados))
-                {
-                    { }
-                    continue;
-                }
-
-                if (CriarERestaurarItemNoInventario(dataInstancia, slotDestino, esconderNaPilha))
-                    slotsRestaurados.Add(slotDestino);
             }
+
+            FinalizarRestauracaoDosSlots();
+            FinalizarVisualAposLoadDosSlots(slotsRestaurados);
+
+            foreach (var esperado in quantidadesEsperadas)
+                if (esperado.Key.ObterQuantidadeRealParaSave() != esperado.Value)
+                    throw new System.InvalidOperationException("Restauracao parcial do inventario; quantidade divergente.");
+            foreach (InventorySaveData data in itens)
+            {
+                var idsRestaurados = new HashSet<string>();
+                foreach (XRGrabInteractable item in slots[data.slot].ObterItensParaSave())
+                {
+                    ItemPersistente persistente = item.GetComponent<ItemPersistente>();
+                    if (persistente != null) idsRestaurados.Add(persistente.ObterInstanciaIdSemGerar());
+                }
+                foreach (string id in ObterInstanciaIdsParaRestaurar(data))
+                    if (!idsRestaurados.Contains(id))
+                        throw new System.InvalidOperationException("ID nao restaurado: " + id);
+                if (data.versaoEstadosIndividuais == 1)
+                {
+                    var restaurados = slots[data.slot].ObterItensParaSave();
+                    int inicio = restaurados.Count - data.quantidade;
+                    for (int i = 0; i < data.quantidade; i++)
+                    {
+                        var persistente = restaurados[inicio + i].GetComponent<ItemPersistente>();
+                        var esperado = data.CriarDataParaInstancia(data.instanciaIds[i]);
+                        var atual = persistente.CriarSaveData(data.slot, 1, false);
+                        if (atual.instanciaId != esperado.instanciaId || atual.itemId != esperado.itemId ||
+                            atual.durabilidade != esperado.durabilidade || atual.dadosExtrasJson != esperado.dadosExtrasJson ||
+                            (esperado.possuiDurabilidadeMaxima &&
+                             (!atual.possuiDurabilidadeMaxima || atual.durabilidadeMaxima != esperado.durabilidadeMaxima)))
+                            throw new System.InvalidOperationException("Estado ou ordem individual nao restaurado: " + esperado.instanciaId);
+                    }
+                }
+            }
+            if (slotsRestaurados.Count > 0 && isActiveAndEnabled)
+                StartCoroutine(FinalizarVisualAposLoadNosProximosFrames(new List<SlotInventario>(slotsRestaurados)));
+            foreach (GameObject original in destruicoesPendentesCarga)
+                if (original != null) { original.SetActive(false); Destroy(original); }
+            // Confirma antes de destruir as instancias do inventario anterior.
+            foreach (var par in anteriores)
+                foreach (XRGrabInteractable item in par.Value)
+                    if (item != null) Destroy(item.gameObject);
+            return true;
         }
-
-        FinalizarRestauracaoDosSlots();
-        FinalizarVisualAposLoadDosSlots(slotsRestaurados);
-
-        if (slotsRestaurados.Count > 0 && isActiveAndEnabled)
-            StartCoroutine(FinalizarVisualAposLoadNosProximosFrames(new List<SlotInventario>(slotsRestaurados)));
+        catch (System.Exception ex)
+        {
+            erro = "Aplicacao do inventario falhou: " + ex.Message;
+            // Recupera as mesmas instancias antigas, preservando seus atributos individuais.
+            try
+            {
+                foreach (var par in anteriores)
+                {
+                    var parciais = par.Key.ObterItensParaSave();
+                    par.Key.LimparItensSalvosDoSlot(false);
+                    foreach (XRGrabInteractable item in parciais)
+                        if (item != null && !originaisCena.Contains(item.GetComponent<ItemPersistente>()))
+                        {
+                            item.gameObject.SetActive(false);
+                            Destroy(item.gameObject);
+                        }
+                    for (int i = 0; i < par.Value.Count; i++)
+                    {
+                        XRGrabInteractable item = par.Value[i];
+                        if (item == null) throw new System.InvalidOperationException("Instancia anterior indisponivel.");
+                        item.gameObject.SetActive(true);
+                        if (!par.Key.RestaurarItemSalvoNoSlot(item, i < par.Value.Count - 1))
+                            throw new System.InvalidOperationException("Nao foi possivel recuperar o slot anterior.");
+                    }
+                    par.Key.FinalizarRestauracaoDoSave();
+                }
+            }
+            catch (System.Exception rollback) { erro += " Recuperacao em memoria incompleta: " + rollback.Message; }
+            if (SaveManager.Instancia != null) SaveManager.Instancia.NotificarFalhaRestauracao(erro);
+            return false;
+        }
+        finally { destruicoesPendentesCarga = null; }
     }
 
     private void FinalizarRestauracaoDosSlots()
@@ -312,31 +482,40 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
         Transform parent = parentItensRestaurados != null ? parentItensRestaurados : transform;
         GameObject instancia = Instantiate(prefab, parent);
-        instancia.name = SlotInventario.LimparNomeItem(prefab.name);
-        instancia.SetActive(true);
-
-        ItemPersistente persistente = instancia.GetComponent<ItemPersistente>();
-        if (persistente == null)
-            persistente = instancia.AddComponent<ItemPersistente>();
-
-        XRGrabInteractable grab = instancia.GetComponent<XRGrabInteractable>();
-        if (grab == null)
+        try
         {
-            Destroy(instancia);
-            return false;
+            instancia.name = SlotInventario.LimparNomeItem(prefab.name);
+            instancia.SetActive(true);
+
+            ItemPersistente persistente = instancia.GetComponent<ItemPersistente>();
+            if (persistente == null)
+                persistente = instancia.AddComponent<ItemPersistente>();
+
+            XRGrabInteractable grab = instancia.GetComponent<XRGrabInteractable>();
+            if (grab == null)
+            {
+                Destroy(instancia);
+                return false;
+            }
+
+            persistente.AplicarSaveData(data);
+            persistente.MarcarComoNoInventario();
+
+            if (!slot.RestaurarItemSalvoNoSlot(grab, esconderNaPilha))
+            {
+                Destroy(instancia);
+                return false;
+            }
+
+            persistente.MarcarComoNoInventario();
+            return true;
         }
-
-        persistente.AplicarSaveData(data);
-        persistente.MarcarComoNoInventario();
-
-        if (!slot.RestaurarItemSalvoNoSlot(grab, esconderNaPilha))
+        catch
         {
+            instancia.SetActive(false);
             Destroy(instancia);
-            return false;
+            throw;
         }
-
-        persistente.MarcarComoNoInventario();
-        return true;
     }
 
     private void RemoverOriginalSoltoCorrespondenteAoItemRestauradoDireto(
@@ -368,8 +547,13 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
         if (original.gameObject != null)
         {
-            original.gameObject.SetActive(false);
-            Destroy(original.gameObject);
+            if (destruicoesPendentesCarga != null)
+                destruicoesPendentesCarga.Add(original.gameObject);
+            else
+            {
+                original.gameObject.SetActive(false);
+                Destroy(original.gameObject);
+            }
         }
     }
 
@@ -831,20 +1015,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
     private InventorySaveData CriarDataParaInstancia(InventorySaveData origem, string instanciaId)
     {
-        return new InventorySaveData
-        {
-            itemId = origem.itemId,
-            nomeItem = origem.nomeItem,
-            instanciaId = instanciaId,
-            instanciaIds = new List<string> { instanciaId },
-            instanciaCriadaEmRuntime = origem.instanciaCriadaEmRuntime,
-            quantidade = 1,
-            slot = origem.slot,
-            estaNoInventario = true,
-            durabilidade = origem.durabilidade,
-            equipado = origem.equipado,
-            dadosExtrasJson = origem.dadosExtrasJson
-        };
+        return origem.CriarDataParaInstancia(instanciaId);
     }
 
     private void AplicarInstanciaIdsDaPilha(InventorySaveData data, List<XRGrabInteractable> itens)
@@ -853,6 +1024,8 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
             return;
 
         data.instanciaIds = new List<string>();
+        data.versaoEstadosIndividuais = 1;
+        data.estadosIndividuais = new List<InventoryItemState>();
 
         if (itens != null)
         {
@@ -866,7 +1039,17 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 if (persistente == null)
                     continue;
 
-                AdicionarInstanciaIdUnico(data.instanciaIds, persistente.ObterInstanciaId());
+                InventorySaveData unidade = persistente.CriarSaveData(data.slot, 1, data.equipado);
+                data.instanciaIds.Add(unidade.instanciaId);
+                data.estadosIndividuais.Add(new InventoryItemState
+                {
+                    instanciaId = unidade.instanciaId, itemId = unidade.itemId, nomeItem = unidade.nomeItem,
+                    durabilidade = unidade.durabilidade,
+                    possuiDurabilidadeMaxima = unidade.possuiDurabilidadeMaxima,
+                    durabilidadeMaxima = unidade.durabilidadeMaxima,
+                    instanciaCriadaEmRuntime = unidade.instanciaCriadaEmRuntime,
+                    equipado = unidade.equipado, dadosExtrasJson = unidade.dadosExtrasJson
+                });
             }
         }
 
@@ -875,6 +1058,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
 
         if (data.instanciaIds.Count > 0)
             data.instanciaId = data.instanciaIds[0];
+        data.ValidarEstadosIndividuais();
     }
 
     private void MarcarOrigemRuntimeNoSave(InventorySaveData data, List<XRGrabInteractable> itens)
