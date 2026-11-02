@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using UnityEngine;
 
@@ -36,6 +36,20 @@ public class ItemPersistente : MonoBehaviour
     public bool DestruirOriginalAoCarregarSeEstiverNoInventario => destruirOriginalAoCarregarSeEstiverNoInventario;
     public GameObject PrefabReferencia => prefabReferencia;
 
+    [SerializeField, HideInInspector] private string origemCenaId;
+    public string OrigemCenaId => origemCenaId;
+    internal Action CapturarIdentidadeRuntime()
+    {
+        bool gerado = instanciaIdGeradoEmRuntime;
+        return () => instanciaIdGeradoEmRuntime = gerado;
+    }
+    internal void DefinirOrigemCena(string id) { origemCenaId = id; }
+    internal bool PossuiRespawnIntencional() => GetComponent<Respawnitem>() != null || GetComponent<Cocumelo>() != null;
+    public void RegistrarConsumoPermanente()
+    {
+        if (!PossuiRespawnIntencional() && SaveManager.Instancia != null)
+            SaveManager.Instancia.RegistrarRemocaoPermanente(origemCenaId);
+    }
     private bool avisoFallbackIdMostrado;
     private bool avisoItemIdVazioMostrado;
     private bool avisoInstanciaIdRuntimeMostrado;
@@ -44,12 +58,24 @@ public class ItemPersistente : MonoBehaviour
     [Serializable]
     public class EstadoCenaItem
     {
+        public bool possuiPontoCogumelo, cogumeloColetado, cogumeloReposicao;
+        public bool coletaJogadorConfirmada;
+        public Vector3 pontoCogumelo, rotacaoPontoCogumelo;
+        public float distanciaPontoCogumelo, tempoPontoCogumelo, alturaPontoCogumelo;
+        public string posicaoEquipamento; // Vazio nos saves antigos e em itens soltos.
         public string itemId;
         public string nomeItem;
         public string instanciaId;
+        public string origemCenaId;
         public float durabilidade;
         public string dadosExtrasJson;
         public bool respawnItemDesarmado;
+        public bool possuiDurabilidadeManopla;
+        public float durabilidadeMaximaManopla;
+        public bool possuiDurabilidadePeitoral;
+        public float durabilidadeMaximaPeitoral;
+        public bool possuiDurabilidadeElmo;
+        public float durabilidadeMaximaElmo;
     }
 
     private void Awake()
@@ -167,6 +193,8 @@ public class ItemPersistente : MonoBehaviour
     public void MarcarComoNoInventario()
     {
         estaNoInventario = true;
+        GetComponent<Cocumelo>()?.NotificarEntradaInventario();
+        GetComponent<Cocumelo>()?.DesarmarComoItemColetado();
         GarantirInstanciaIdRuntime();
     }
 
@@ -191,6 +219,7 @@ public class ItemPersistente : MonoBehaviour
             itemId = ObterItemId(),
             nomeItem = ObterNomeItem(),
             instanciaId = ObterInstanciaId(),
+            origemCenaId = origemCenaId,
             instanciaIds = new System.Collections.Generic.List<string> { ObterInstanciaId() },
             instanciaCriadaEmRuntime = InstanciaIdFoiGeradoEmRuntime(),
             quantidade = Mathf.Max(1, quantidade),
@@ -200,7 +229,7 @@ public class ItemPersistente : MonoBehaviour
             possuiDurabilidadeMaxima = durabilidade >= 0f && maxima > 0f,
             durabilidadeMaxima = maxima,
             equipado = equipado,
-            dadosExtrasJson = dadosExtrasJson
+            dadosExtrasJson = CapturarExtrasManoplas()
         };
     }
 
@@ -210,6 +239,7 @@ public class ItemPersistente : MonoBehaviour
             return;
 
         AplicarItemIdLegadoSeNecessario(data.itemId);
+        if (!string.IsNullOrEmpty(data.origemCenaId)) origemCenaId = data.origemCenaId;
 
         if (!string.IsNullOrWhiteSpace(data.nomeItem))
             nomeItem = data.nomeItem;
@@ -227,6 +257,9 @@ public class ItemPersistente : MonoBehaviour
         }
         durabilidadeAtual = data.durabilidade;
         dadosExtrasJson = data.dadosExtrasJson;
+        RestaurarExtrasManoplas();
+        // Uma copia restaurada pelo inventario ja foi coletada; nunca cria ponto.
+        GetComponent<Cocumelo>()?.DesarmarComoItemColetado();
 
         if (durabilidadeAtual >= 0f)
         {
@@ -259,6 +292,153 @@ public class ItemPersistente : MonoBehaviour
         return gameObject.name;
     }
 
+    [Serializable]
+    private class ExtrasManoplas
+    {
+        public string formato;
+        public string anteriores;
+        public string manoplas;
+    }
+
+    [Serializable]
+    private class ExtrasPeitoral
+    {
+        public string formato;
+        public string anteriores;
+        public string peitoral;
+    }
+
+    private static ExtrasPeitoral LerExtrasPeitoral(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            var extras = JsonUtility.FromJson<ExtrasPeitoral>(json);
+            return extras != null && extras.formato == "my-reincarnation.peitoral.v1" ? extras : null;
+        }
+        catch (Exception) { return null; }
+    }
+
+    [Serializable]
+    private class ExtrasElmo
+    {
+        public string formato;
+        public string anteriores;
+        public string elmo;
+    }
+
+    private static ExtrasElmo LerExtrasElmo(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            var extras = JsonUtility.FromJson<ExtrasElmo>(json);
+            return extras != null && extras.formato == "my-reincarnation.elmo.v1" ? extras : null;
+        }
+        catch (Exception) { return null; }
+    }
+
+    private string CapturarExtrasManoplas()
+    {
+        var elmo = GetComponent<AtributosElmo>();
+        if (elmo != null)
+        {
+            if (!elmo.Gerado) return dadosExtrasJson;
+            var extras = LerExtrasElmo(dadosExtrasJson) ??
+                new ExtrasElmo { formato = "my-reincarnation.elmo.v1", anteriores = dadosExtrasJson };
+            extras.elmo = elmo.ExportarEstadoJson();
+            return JsonUtility.ToJson(extras);
+        }
+        var peitoral = GetComponent<AtributosPeitoral>();
+        if (peitoral != null)
+        {
+            if (!peitoral.Gerado) return dadosExtrasJson;
+            var extras = LerExtrasPeitoral(dadosExtrasJson) ??
+                new ExtrasPeitoral { formato = "my-reincarnation.peitoral.v1", anteriores = dadosExtrasJson };
+            extras.peitoral = peitoral.ExportarEstadoJson();
+            return JsonUtility.ToJson(extras);
+        }
+        AtributosManoplas atributos = GetComponent<AtributosManoplas>();
+        if (atributos == null || !atributos.Gerado) return dadosExtrasJson;
+        ExtrasManoplas envelope = LerExtrasManoplas();
+        if (envelope == null)
+            envelope = new ExtrasManoplas { formato = "my-reincarnation.manoplas.v1", anteriores = dadosExtrasJson };
+        envelope.manoplas = atributos.ExportarEstadoJson();
+        return JsonUtility.ToJson(envelope);
+    }
+
+    private ExtrasManoplas LerExtrasManoplas() => LerExtrasManoplas(dadosExtrasJson);
+
+    private static ExtrasManoplas LerExtrasManoplas(string dadosExtrasJson)
+    {
+        if (string.IsNullOrWhiteSpace(dadosExtrasJson)) return null;
+        try
+        {
+            ExtrasManoplas extras = JsonUtility.FromJson<ExtrasManoplas>(dadosExtrasJson);
+            return extras != null && extras.formato == "my-reincarnation.manoplas.v1" ? extras : null;
+        }
+        catch (Exception) { return null; }
+    }
+
+    public static void ValidarExtrasNoPrefab(GameObject prefab, string dadosExtrasJson)
+    {
+        var elmo = LerExtrasElmo(dadosExtrasJson);
+        if (elmo != null)
+        {
+            if (prefab == null || prefab.GetComponent<AtributosElmo>() == null || string.IsNullOrWhiteSpace(elmo.elmo))
+                throw new System.IO.InvalidDataException("Dados de elmo sem componente ou estado correspondente.");
+            AtributosElmo.LerEValidarEstadoJson(elmo.elmo);
+            return;
+        }
+        var peitoral = LerExtrasPeitoral(dadosExtrasJson);
+        if (peitoral != null)
+        {
+            if (prefab == null || prefab.GetComponent<AtributosPeitoral>() == null || string.IsNullOrWhiteSpace(peitoral.peitoral))
+                throw new System.IO.InvalidDataException("Dados de peitoral sem componente ou estado correspondente.");
+            AtributosPeitoral.LerEValidarEstadoJson(peitoral.peitoral);
+            return;
+        }
+        ExtrasManoplas extras = LerExtrasManoplas(dadosExtrasJson);
+        if (extras == null) return;
+        if (prefab == null || prefab.GetComponent<AtributosManoplas>() == null || string.IsNullOrWhiteSpace(extras.manoplas))
+            throw new System.IO.InvalidDataException("Dados de manopla sem componente ou estado correspondente.");
+        AtributosManoplas.LerEValidarEstadoJson(extras.manoplas);
+    }
+
+    private void RestaurarExtrasManoplas()
+    {
+        var extrasElmo = LerExtrasElmo(dadosExtrasJson);
+        var elmo = GetComponent<AtributosElmo>();
+        if (extrasElmo != null)
+        {
+            if (elmo == null || string.IsNullOrWhiteSpace(extrasElmo.elmo))
+                throw new System.IO.InvalidDataException("Dados de elmo sem componente ou estado correspondente.");
+            elmo.RestaurarEstadoJson(extrasElmo.elmo);
+            return;
+        }
+        elmo?.PrepararMigracaoSaveLegado();
+        var extrasPeitoral = LerExtrasPeitoral(dadosExtrasJson);
+        var peitoral = GetComponent<AtributosPeitoral>();
+        if (extrasPeitoral != null)
+        {
+            if (peitoral == null || string.IsNullOrWhiteSpace(extrasPeitoral.peitoral))
+                throw new System.IO.InvalidDataException("Dados de peitoral sem componente ou estado correspondente.");
+            peitoral.RestaurarEstadoJson(extrasPeitoral.peitoral);
+            return;
+        }
+        peitoral?.PrepararMigracaoSaveLegado();
+        ExtrasManoplas extras = LerExtrasManoplas();
+        AtributosManoplas atributos = GetComponent<AtributosManoplas>();
+        if (extras == null)
+        {
+            atributos?.PrepararMigracaoSaveLegado();
+            return; // Saves anteriores continuam aceitos e recebem atributos depois da verificacao.
+        }
+        if (atributos == null || string.IsNullOrWhiteSpace(extras.manoplas))
+            throw new System.IO.InvalidDataException("Dados de manopla sem componente ou estado correspondente.");
+        atributos.RestaurarEstadoJson(extras.manoplas);
+    }
+
     public string CriarEstadoCenaJson()
     {
         EstadoCenaItem estado = CriarEstadoCena();
@@ -267,23 +447,42 @@ public class ItemPersistente : MonoBehaviour
 
     public EstadoCenaItem CriarEstadoCena()
     {
-        return new EstadoCenaItem
+        var estado = new EstadoCenaItem
         {
             itemId = ObterItemId(),
             nomeItem = ObterNomeItem(),
             instanciaId = ObterInstanciaId(),
+            origemCenaId = origemCenaId,
             durabilidade = LerDurabilidade(),
-            dadosExtrasJson = dadosExtrasJson,
-            respawnItemDesarmado = RespawnItemEstaDesarmado()
+            dadosExtrasJson = CapturarExtrasManoplas(),
+            respawnItemDesarmado = RespawnItemEstaDesarmado(),
+            possuiDurabilidadeManopla = GetComponent<AtributosManoplas>() != null,
+            durabilidadeMaximaManopla = GetComponent<AtributosManoplas>() != null ? GetComponent<AtributosManoplas>().VidaMaxima : 0f,
+            possuiDurabilidadePeitoral = GetComponent<AtributosPeitoral>() != null,
+            durabilidadeMaximaPeitoral = GetComponent<AtributosPeitoral>() != null ? GetComponent<AtributosPeitoral>().VidaMaxima : 0f,
+            possuiDurabilidadeElmo = GetComponent<AtributosElmo>() != null,
+            durabilidadeMaximaElmo = GetComponent<AtributosElmo>() != null ? GetComponent<AtributosElmo>().VidaMaxima : 0f
         };
+        GetComponent<Cocumelo>()?.CapturarEstadoRespawn(estado);
+        return estado;
     }
 
     public void AplicarEstadoCena(EstadoCenaItem estado)
     {
-        if (estado == null)
-            return;
+        if (estado == null) return;
+        ValidarDurabilidadeManoplaCena(gameObject, estado);
+        ValidarPontoCogumelo(estado);
+        bool originalDeCena = !string.IsNullOrEmpty(origemCenaId);
+        GetComponent<Cocumelo>()?.RestaurarEstadoRespawn(estado, originalDeCena);
+        if (estado.possuiDurabilidadeManopla)
+            TentarEscreverNumero(GetComponent<AtributosManoplas>(), "vidaMaxima", estado.durabilidadeMaximaManopla);
+        if (estado.possuiDurabilidadePeitoral)
+            TentarEscreverNumero(GetComponent<AtributosPeitoral>(), "vidaMaxima", estado.durabilidadeMaximaPeitoral);
+        if (estado.possuiDurabilidadeElmo)
+            TentarEscreverNumero(GetComponent<AtributosElmo>(), "vidaMaxima", estado.durabilidadeMaximaElmo);
 
         AplicarItemIdLegadoSeNecessario(estado.itemId);
+        if (!string.IsNullOrEmpty(estado.origemCenaId)) origemCenaId = estado.origemCenaId;
 
         if (!string.IsNullOrWhiteSpace(estado.nomeItem))
             nomeItem = estado.nomeItem.Trim();
@@ -293,6 +492,7 @@ public class ItemPersistente : MonoBehaviour
 
         durabilidadeAtual = estado.durabilidade;
         dadosExtrasJson = estado.dadosExtrasJson;
+        RestaurarExtrasManoplas();
 
         if (durabilidadeAtual >= 0f)
             EscreverDurabilidade(durabilidadeAtual);
@@ -424,9 +624,39 @@ public class ItemPersistente : MonoBehaviour
     }
 #endif
 
+    public static bool EhMigracaoDurabilidadeManopla(GameObject prefab, InventorySaveData data)
+    {
+        return data.durabilidade == -1f && !data.possuiDurabilidadeMaxima &&
+            (ObterComponenteDuravel(prefab) is AtributosManoplas || ObterComponenteDuravel(prefab) is AtributosPeitoral || ObterComponenteDuravel(prefab) is AtributosElmo);
+    }
+
+    public static void ValidarDurabilidadeManoplaCena(GameObject prefab, EstadoCenaItem estado)
+    {
+        if (estado.possuiDurabilidadeElmo &&
+            (prefab == null || prefab.GetComponent<AtributosElmo>() == null ||
+             float.IsNaN(estado.durabilidadeMaximaElmo) || float.IsInfinity(estado.durabilidadeMaximaElmo) ||
+             estado.durabilidadeMaximaElmo <= 0f || float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
+             estado.durabilidade < 0f || estado.durabilidade > estado.durabilidadeMaximaElmo))
+            throw new System.IO.InvalidDataException("Durabilidade de elmo de cena invalida.");
+        if (estado.possuiDurabilidadePeitoral &&
+            (prefab == null || prefab.GetComponent<AtributosPeitoral>() == null ||
+             float.IsNaN(estado.durabilidadeMaximaPeitoral) || float.IsInfinity(estado.durabilidadeMaximaPeitoral) ||
+             estado.durabilidadeMaximaPeitoral <= 0f || float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
+             estado.durabilidade < 0f || estado.durabilidade > estado.durabilidadeMaximaPeitoral))
+            throw new System.IO.InvalidDataException("Durabilidade de peitoral de cena invalida.");
+        if (!estado.possuiDurabilidadeManopla) return;
+        if (prefab == null || prefab.GetComponent<AtributosManoplas>() == null ||
+            float.IsNaN(estado.durabilidadeMaximaManopla) || float.IsInfinity(estado.durabilidadeMaximaManopla) ||
+            estado.durabilidadeMaximaManopla <= 0f || float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
+            estado.durabilidade < 0f || estado.durabilidade > estado.durabilidadeMaximaManopla)
+            throw new System.IO.InvalidDataException("Durabilidade de manopla de cena invalida.");
+    }
+
     public static void ValidarEstadoIndividualNoPrefab(GameObject prefab, InventorySaveData data)
     {
+        ValidarExtrasNoPrefab(prefab, data.dadosExtrasJson);
         Component duravel = ObterComponenteDuravel(prefab);
+        if (EhMigracaoDurabilidadeManopla(prefab, data)) return;
         if (data.durabilidade == -1f && !data.possuiDurabilidadeMaxima && duravel == null) return;
         if (duravel == null || data.durabilidade < 0f)
             throw new InvalidOperationException("Estado de durabilidade incompativel: " + data.instanciaId);
@@ -479,10 +709,22 @@ public class ItemPersistente : MonoBehaviour
         return -1f;
     }
 
+    internal static void ValidarPontoCogumelo(EstadoCenaItem estado)
+    {
+        if (!estado.possuiPontoCogumelo) return;
+        var p = estado.pontoCogumelo; var r = estado.rotacaoPontoCogumelo;
+        float[] valores = { p.x, p.y, p.z, r.x, r.y, r.z, estado.distanciaPontoCogumelo, estado.tempoPontoCogumelo, estado.alturaPontoCogumelo };
+        foreach (float valor in valores)
+            if (float.IsNaN(valor) || float.IsInfinity(valor)) throw new System.IO.InvalidDataException("Ponto de cogumelo nao finito.");
+        if (estado.distanciaPontoCogumelo < 0.1f || estado.tempoPontoCogumelo < 0f || estado.alturaPontoCogumelo < 0f)
+            throw new System.IO.InvalidDataException("Configuracao de ponto de cogumelo invalida.");
+    }
+
     private bool RespawnItemEstaDesarmado()
     {
         Respawnitem respawnItem = GetComponent<Respawnitem>();
-        return respawnItem != null && respawnItem.EstaDesarmadoComoItemColetado();
+        return (respawnItem != null && respawnItem.EstaDesarmadoComoItemColetado()) ||
+            (GetComponent<Cocumelo>() != null && GetComponent<Cocumelo>().EstaDesarmadoComoItemColetado());
     }
 
     private void AplicarRespawnItemDesarmado()
@@ -490,6 +732,7 @@ public class ItemPersistente : MonoBehaviour
         Respawnitem respawnItem = GetComponent<Respawnitem>();
         if (respawnItem != null)
             respawnItem.DesarmarComoItemColetado();
+        GetComponent<Cocumelo>()?.DesarmarComoItemColetado();
     }
 
     private void EscreverDurabilidade(float valor)
@@ -523,7 +766,7 @@ public class ItemPersistente : MonoBehaviour
     {
         return objeto.GetComponent("Equipamento") ?? objeto.GetComponent("Espada") ??
                objeto.GetComponent("Machado") ?? objeto.GetComponent("Picareta") ??
-               objeto.GetComponent("Arco") ?? objeto.GetComponent("Escudo");
+               objeto.GetComponent("Arco") ?? objeto.GetComponent("Escudo") ?? objeto.GetComponent<AtributosManoplas>() ?? (Component)objeto.GetComponent<AtributosPeitoral>() ?? objeto.GetComponent<AtributosElmo>();
     }
 
     private bool TentarLerNumero(Component componente, string nome, out float valor)

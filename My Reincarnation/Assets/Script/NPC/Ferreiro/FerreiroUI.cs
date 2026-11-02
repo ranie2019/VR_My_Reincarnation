@@ -52,6 +52,7 @@ public class FerreiroUI : MonoBehaviour
 
     private Coroutine timerInatividade;
     private GameObject painelAtivoAtual;
+    private float ultimaInteracao;
 
     private void Awake()
     {
@@ -75,7 +76,7 @@ public class FerreiroUI : MonoBehaviour
         if (botoesCategoria != null && botoesCategoria.activeSelf)
             return;
 
-        if (painelAtivoAtual != null)
+        if (painelAtivoAtual != null && painelAtivoAtual.activeInHierarchy)
             return;
 
         FecharTudo();
@@ -213,10 +214,29 @@ public class FerreiroUI : MonoBehaviour
             alvo.SetActive(ativo);
     }
 
+    // Um unico relogio para todos os paineis do ferreiro.
+    public void RegistrarInteracao()
+    {
+        ultimaInteracao = Time.time;
+    }
+
+    private void Update()
+    {
+        if ((popupSaudacao == null || !popupSaudacao.activeInHierarchy) &&
+            (botoesCategoria == null || !botoesCategoria.activeInHierarchy)) return;
+
+        foreach (var interacao in GetComponentsInChildren<UnityEngine.XR.Interaction.Toolkit.Interactables.XRBaseInteractable>(false))
+            if (interacao.isHovered) { RegistrarInteracao(); return; }
+        // Nunca fecha o atendimento com um equipamento preso no socket.
+        foreach (var socket in GetComponentsInChildren<UnityEngine.XR.Interaction.Toolkit.Interactors.XRSocketInteractor>(false))
+            if (socket.hasSelection) { RegistrarInteracao(); return; }
+    }
+
     private void ReiniciarTimer()
     {
         CancelarTimer();
-        timerInatividade = StartCoroutine(RotinaTimerInatividade());
+        RegistrarInteracao();
+        if (isActiveAndEnabled) timerInatividade = StartCoroutine(RotinaTimerInatividade());
     }
 
     private void CancelarTimer()
@@ -230,7 +250,8 @@ public class FerreiroUI : MonoBehaviour
 
     private IEnumerator RotinaTimerInatividade()
     {
-        yield return new WaitForSeconds(tempoInatividade);
+        while (Time.time - ultimaInteracao < Mathf.Max(0.1f, tempoInatividade))
+            yield return null;
         timerInatividade = null;
         FecharTudo();
     }

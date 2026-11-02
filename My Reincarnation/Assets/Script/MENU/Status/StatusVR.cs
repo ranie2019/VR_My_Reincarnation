@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -63,11 +63,12 @@ public class StatusVR : MonoBehaviour
             acaoStatus.performed -= AoBotaoStatusPressionado;
 
         if (acaoStatus != null && acaoAtivadaPorEsteScript)
-            acaoStatus.Disable();
+            UsoAcaoCompartilhada.Liberar(acaoStatus, this);
 
         if (acaoFallback != null)
         {
             acaoFallback.performed -= AoBotaoStatusPressionado;
+            UsoAcaoCompartilhada.Liberar(acaoFallback, this);
             acaoFallback.Disable();
             acaoFallback.Dispose();
             acaoFallback = null;
@@ -264,7 +265,7 @@ public class StatusVR : MonoBehaviour
                 acaoStatus.performed -= AoBotaoStatusPressionado;
 
             if (acaoStatus != null && acaoAtivadaPorEsteScript)
-                acaoStatus.Disable();
+                UsoAcaoCompartilhada.Liberar(acaoStatus, this);
 
             acaoStatus = botaoStatus.action;
             acaoAtivadaPorEsteScript = false;
@@ -276,10 +277,8 @@ public class StatusVR : MonoBehaviour
 
     private void HabilitarAction(InputAction action)
     {
-        if (action == null || action.enabled)
-            return;
-
-        action.Enable();
+        if (action == null) return;
+        UsoAcaoCompartilhada.Adquirir(action, this);
         acaoAtivadaPorEsteScript = true;
     }
 

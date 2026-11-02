@@ -66,6 +66,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
     // recebeu o estado do InventarioVR quando o SaveManager restaura os itens.
     // Fechado por padrao impede que itens restaurados aparecam no mundo.
     private bool inventarioAberto;
+    public bool VisualEstaDisponivel => inventarioAberto && visivelNaRolagem && gameObject.activeInHierarchy;
     private bool visivelNaRolagem = true;
     private bool operacaoInternaSocket;
     private bool atualizandoTopo;
@@ -1459,6 +1460,52 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         return item != null ? item.GetComponent<ItemInventarioDados>() : null;
     }
 
+    internal System.Action CapturarRecuperacaoCarga()
+    {
+        var itens = new List<XRGrabInteractable>(pilhaItens);
+        var originais = new Dictionary<XRGrabInteractable, EstadoOriginalItem>(estadosOriginais);
+        var escalas = new Dictionary<XRGrabInteractable, Vector3>(escalasVisuaisInventario);
+        var restaurados = new HashSet<XRGrabInteractable>(itensRestauradosDoSave);
+        bool aberto = inventarioAberto, visivel = visivelNaRolagem;
+        return () =>
+        {
+            StopAllCoroutines(); rotinaRecalculoEscalaQuandoVisivel = null;
+            LimparItensSalvosDoSlot(false, true);
+            inventarioAberto = aberto; visivelNaRolagem = visivel;
+            for (int i = 0; i < itens.Count; i++)
+                if (itens[i] == null || !RestaurarItemSalvoNoSlot(itens[i], i < itens.Count - 1))
+                    throw new System.InvalidOperationException("Nao foi possivel recuperar as mesmas instancias do slot.");
+            estadosOriginais.Clear();
+            foreach (var par in originais) estadosOriginais.Add(par.Key, par.Value);
+            escalasVisuaisInventario.Clear();
+            foreach (var par in escalas) escalasVisuaisInventario.Add(par.Key, par.Value);
+            itensRestauradosDoSave.Clear(); itensRestauradosDoSave.UnionWith(restaurados);
+            AtualizarContadorTMP(); AtualizarVisibilidadeVisual();
+            TentarSelecionarTopoNoSocket();
+        };
+    }
+
+    // Reserva reversivel: a destruicao pertence a confirmacao da entrega.
+    internal bool ReservarUnidadeParaConsumo(out XRGrabInteractable reservado)
+    {
+        reservado = TopoDaPilha();
+        if (reservado == null) return false;
+        RemoverFiltroDoItemGuardado();
+        LiberarSelecaoSocketSemEvento(reservado);
+        pilhaItens.RemoveAt(pilhaItens.Count - 1);
+        itensRestauradosDoSave.Remove(reservado);
+        itensComEscalaVisualPendente.Remove(reservado);
+        escalasVisuaisInventario.Remove(reservado);
+        estadosOriginais.Remove(reservado);
+        reservado.selectFilters.Remove(this);
+        itemGuardado = null;
+        reservado.gameObject.SetActive(false);
+        if (pilhaItens.Count > 0) PromoverNovoTopoAposRetirada();
+        else nomeItemAtual = string.Empty;
+        AtualizarContadorTMP(); AtualizarVisibilidadeVisual();
+        return true;
+    }
+
     public bool ConsumirUmaUnidade(out ItemInventarioDados itemConsumido)
     {
         itemConsumido = null;
@@ -1485,6 +1532,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         if (itemGuardado == consumido)
             itemGuardado = null;
 
+        consumido.GetComponent<ItemPersistente>()?.RegistrarConsumoPermanente();
         Destroy(consumido.gameObject);
 
         if (pilhaItens.Count == 0)

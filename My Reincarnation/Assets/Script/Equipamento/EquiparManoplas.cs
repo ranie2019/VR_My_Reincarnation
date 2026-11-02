@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -12,7 +12,6 @@ public enum LadoMaoEquipamento
 
 public class EquiparManoplas : MonoBehaviour
 {
-    private static readonly List<EquiparManoplas> popupsVisiveis = new List<EquiparManoplas>();
 
     [Header("Equipamento")]
     [SerializeField] private LadoMaoEquipamento ladoMao = LadoMaoEquipamento.Direita;
@@ -72,6 +71,8 @@ public class EquiparManoplas : MonoBehaviour
     private Coroutine corotinaFecharPopup;
 
     private bool jaEquipado;
+    private System.Action restaurarEstadoEquipamento;
+    private System.Action restaurarVisibilidadeMao;
 
     private Transform paiOriginal;
     private Vector3 escalaOriginalLocal;
@@ -86,11 +87,6 @@ public class EquiparManoplas : MonoBehaviour
     public Transform TransformMaoConfigurada => transformMaoAvatar;
     public SkinnedMeshRenderer RendererMao => rendererMaoAvatar;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void LimparPopupsVisiveis()
-    {
-        popupsVisiveis.Clear();
-    }
 
     private void Awake()
     {
@@ -115,6 +111,8 @@ public class EquiparManoplas : MonoBehaviour
             eixoEquipamento = EncontrarEixoEquipamento();
 
         SalvarTransformOriginal();
+        escalaOriginalMundo = transform.lossyScale;
+        escalaOriginalMundoCapturada = true;
     }
 
     private void Start()
@@ -123,10 +121,16 @@ public class EquiparManoplas : MonoBehaviour
          * Captura a escala real depois dos Awake dos outros componentes.
          * Não altera o tamanho visual original da manopla.
          */
-        escalaOriginalMundo = transform.lossyScale;
-        escalaOriginalMundoCapturada = true;
 
-        AplicarEscalaMundoComoLocal(escalaOriginalMundo);
+        if (!EstaArmazenadoNoInventario() && !jaEquipado)
+            AplicarEscalaMundoComoLocal(escalaOriginalMundo);
+    }
+
+    private bool EstaArmazenadoNoInventario()
+    {
+        var persistente = GetComponent<ItemPersistente>();
+        return EstadoItemInventario.EstaNoInventario(this) ||
+            (persistente != null && persistente.EstaNoInventario()) || GetComponentInParent<SlotInventario>(true) != null;
     }
 
     private void LateUpdate()
@@ -134,7 +138,7 @@ public class EquiparManoplas : MonoBehaviour
         /*
          * Mantém a escala original enquanto a manopla não estiver equipada.
          */
-        if (!jaEquipado &&
+        if (!jaEquipado && !EstaArmazenadoNoInventario() &&
             escalaOriginalMundoCapturada &&
             isActiveAndEnabled &&
             gameObject.activeInHierarchy)
@@ -187,6 +191,7 @@ public class EquiparManoplas : MonoBehaviour
         if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
             return;
 
+        GetComponent<AtributosManoplas>()?.GarantirGeracao();
         CancelarFechamentoPendente();
 
         if (popupInfo != null)
@@ -201,28 +206,13 @@ public class EquiparManoplas : MonoBehaviour
     {
         if (popupInfo == null)
             return;
-
         if (cameraJogador == null)
             cameraJogador = Camera.main;
-
         if (cameraJogador == null)
             return;
 
-        Transform cameraTransform = cameraJogador.transform;
-        RemoverPopupsNulos();
-
-        int indice = popupsVisiveis.IndexOf(this);
-        int quantidade = popupsVisiveis.Count;
-        float deslocamentoLateral = indice < 0
-            ? 0f
-            : (indice - (quantidade - 1) * 0.5f) * espacamentoHorizontalPopups;
-
-        popupInfo.transform.position =
-            cameraTransform.TransformPoint(posicaoPopupNaCamera) +
-            cameraTransform.right * deslocamentoLateral;
-
-        popupInfo.transform.rotation =
-            cameraTransform.rotation * Quaternion.Euler(rotacaoPopupNaCamera);
+        LayoutPopupsEquipamentos.Atualizar(popupInfo, cameraJogador,
+            posicaoPopupNaCamera, rotacaoPopupNaCamera, espacamentoHorizontalPopups);
     }
 
     private void OnHoverExited(HoverExitEventArgs args)
@@ -273,25 +263,14 @@ public class EquiparManoplas : MonoBehaviour
 
     private void RegistrarPopupVisivel()
     {
-        RemoverPopupsNulos();
-        if (!popupsVisiveis.Contains(this))
-            popupsVisiveis.Add(this);
+        PosicionarPopupNaCamera();
     }
 
     private void RemoverPopupVisivel()
     {
-        popupsVisiveis.Remove(this);
+        LayoutPopupsEquipamentos.Remover(popupInfo);
     }
 
-    private static void RemoverPopupsNulos()
-    {
-        for (int i = popupsVisiveis.Count - 1; i >= 0; i--)
-        {
-            EquiparManoplas luva = popupsVisiveis[i];
-            if (luva == null || luva.popupInfo == null || !luva.popupInfo.activeInHierarchy)
-                popupsVisiveis.RemoveAt(i);
-        }
-    }
 
     public void Equipar()
     {
@@ -329,6 +308,8 @@ public class EquiparManoplas : MonoBehaviour
         transformMaoAvatar = mao;
         if (rendererMao != null)
             rendererMaoAvatar = rendererMao;
+        GetComponent<AtributosManoplas>()?.GarantirGeracao();
+        CapturarEstadosAntesDeEquipar();
         jaEquipado = true;
 
         EncaixarPrefabCompletoNaMao();
@@ -488,10 +469,13 @@ public class EquiparManoplas : MonoBehaviour
             if (rb == null)
                 continue;
 
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
             rb.isKinematic = true;
             rb.detectCollisions = false;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
         }
 
         Collider[] colliders =
@@ -526,16 +510,21 @@ public class EquiparManoplas : MonoBehaviour
         gameObject.SetActive(true);
     }
 
+    internal System.Action CapturarEstadoEquipadoParaCarga()
+    {
+        bool equipado = jaEquipado;
+        var restauracao = restaurarEstadoEquipamento;
+        var visibilidade = restaurarVisibilidadeMao;
+        return () => { jaEquipado = equipado; restaurarEstadoEquipamento = restauracao; restaurarVisibilidadeMao = visibilidade; };
+    }
+
     public void Desequipar()
     {
         if (!jaEquipado)
             return;
 
-        RestaurarInteracaoDoItem();
-        RestaurarFisicaDoItem();
-
-        if (rendererMaoAvatar != null)
-            rendererMaoAvatar.enabled = true;
+        restaurarEstadoEquipamento?.Invoke();
+        restaurarEstadoEquipamento = null;
 
         transform.SetParent(paiOriginal, false);
         transform.localPosition = posicaoOriginalLocal;
@@ -549,42 +538,45 @@ public class EquiparManoplas : MonoBehaviour
         jaEquipado = false;
     }
 
-    private void RestaurarInteracaoDoItem()
+    private void CapturarEstadosAntesDeEquipar()
     {
-        XRBaseInteractable[] interactables =
-            GetComponentsInChildren<XRBaseInteractable>(true);
-
-        for (int i = 0; i < interactables.Length; i++)
+        var estados = new List<System.Action>();
+        foreach (var componente in GetComponentsInChildren<XRBaseInteractable>(true))
         {
-            if (interactables[i] != null)
-                interactables[i].enabled = true;
+            var alvo = componente; bool ativo = alvo.enabled;
+            estados.Add(() => { if (alvo != null) alvo.enabled = ativo; });
         }
+        foreach (var componente in GetComponentsInChildren<Collider>(true))
+        {
+            var alvo = componente; bool ativo = alvo.enabled;
+            estados.Add(() => { if (alvo != null) alvo.enabled = ativo; });
+        }
+        foreach (var componente in GetComponentsInChildren<Rigidbody>(true))
+        {
+            var alvo = componente; bool cinematico = alvo.isKinematic, colisoes = alvo.detectCollisions;
+            estados.Add(() => { if (alvo != null) { alvo.isKinematic = cinematico; alvo.detectCollisions = colisoes; } });
+        }
+        var mao = rendererMaoAvatar;
+        if (mao != null)
+        {
+            bool visivel = mao.enabled;
+            restaurarVisibilidadeMao = () => { if (mao != null) mao.enabled = visivel; };
+            estados.Add(restaurarVisibilidadeMao);
+        }
+        restaurarEstadoEquipamento = () => { foreach (var restaurar in estados) restaurar(); };
     }
 
-    private void RestaurarFisicaDoItem()
+    internal void PrepararQuebraPorDurabilidade()
     {
-        Rigidbody[] rigidbodies =
-            GetComponentsInChildren<Rigidbody>(true);
-
-        for (int i = 0; i < rigidbodies.Length; i++)
-        {
-            Rigidbody rb = rigidbodies[i];
-
-            if (rb == null)
-                continue;
-
-            rb.isKinematic = false;
-            rb.detectCollisions = true;
-        }
-
-        Collider[] colliders =
-            GetComponentsInChildren<Collider>(true);
-
-        for (int i = 0; i < colliders.Length; i++)
-        {
-            if (colliders[i] != null)
-                colliders[i].enabled = true;
-        }
+        if (!jaEquipado) return;
+        jaEquipado = false;
+        restaurarVisibilidadeMao?.Invoke();
+        restaurarVisibilidadeMao = null;
+        restaurarEstadoEquipamento = null;
+        var gerenciador = GetComponentInParent<GerenciadorEquipamentosPlayer>();
+        if (gerenciador == null) gerenciador = GerenciadorEquipamentosPlayer.Instancia;
+        gerenciador?.NotificarManoplaDestruida(this);
+        LayoutPopupsEquipamentos.Remover(popupInfo);
     }
 
     private void AplicarEscalaMundoComoLocal(Vector3 escalaMundo)
@@ -620,5 +612,118 @@ public class EquiparManoplas : MonoBehaviour
             return valor;
 
         return resultado;
+    }
+}
+
+// Compartilhado por todos os tipos de equipamento; nao depende de componente na cena.
+internal static class LayoutPopupsEquipamentos
+{
+    private sealed class Entrada
+    {
+        public GameObject popup;
+        public Camera camera;
+        public Vector3 posicao;
+        public Vector3 rotacao;
+        public float espacamento;
+        public float meiaLargura;
+        public float centroVisual;
+        public float centroNaLinha;
+    }
+
+    private static readonly List<Entrada> entradas = new List<Entrada>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void Limpar() { entradas.Clear(); }
+
+    public static void Atualizar(GameObject popup, Camera camera, Vector3 posicao,
+        Vector3 rotacao, float espacamento)
+    {
+        entradas.RemoveAll(e => e.popup == null || e.camera == null || !e.popup.activeInHierarchy);
+        if (popup == null || !popup.activeInHierarchy || camera == null)
+            return;
+        Entrada entrada = entradas.Find(e => e.popup == popup);
+        if (entrada == null)
+        {
+            entrada = new Entrada { popup = popup };
+            entradas.Add(entrada);
+        }
+        entrada.camera = camera;
+        entrada.posicao = posicao;
+        entrada.rotacao = rotacao;
+        entrada.espacamento = Mathf.Max(0f, espacamento);
+        Reorganizar();
+    }
+
+    public static void Remover(GameObject popup)
+    {
+        entradas.RemoveAll(e => e.popup == null || e.popup == popup ||
+            e.camera == null || !e.popup.activeInHierarchy);
+        Reorganizar();
+    }
+
+    private static readonly Vector3[] cantosPopup = new Vector3[4];
+    private const float FolgaEntreBordas = 0.03f;
+
+    private static void MedirLargura(Entrada entrada)
+    {
+        float minimo = float.PositiveInfinity;
+        float maximo = float.NegativeInfinity;
+        Transform painel = entrada.popup.transform;
+        Vector3 direita = entrada.camera.transform.right;
+        // Mede somente UI visivel, incluindo o botao. Nao usa o tamanho do equipamento.
+        foreach (UnityEngine.UI.Graphic visual in entrada.popup.GetComponentsInChildren<UnityEngine.UI.Graphic>(false))
+        {
+            if (!visual.isActiveAndEnabled) continue;
+            visual.rectTransform.GetWorldCorners(cantosPopup);
+            foreach (Vector3 canto in cantosPopup)
+            {
+                float x = Vector3.Dot(canto - painel.position, direita);
+                minimo = Mathf.Min(minimo, x);
+                maximo = Mathf.Max(maximo, x);
+            }
+        }
+        bool valido = !float.IsInfinity(minimo) && !float.IsInfinity(maximo) &&
+            !float.IsNaN(minimo) && !float.IsNaN(maximo);
+        entrada.meiaLargura = valido ? (maximo - minimo) * 0.5f : 0f;
+        entrada.centroVisual = valido ? (maximo + minimo) * 0.5f : 0f;
+    }
+
+    private static void Reorganizar()
+    {
+        // Primeiro aplica a orientacao final para medir a largura projetada na camera,
+        // mesmo com escalas diferentes ou pivots fora do centro.
+        foreach (Entrada entrada in entradas)
+        {
+            entrada.popup.transform.rotation = entrada.camera.transform.rotation * Quaternion.Euler(entrada.rotacao);
+            MedirLargura(entrada);
+        }
+        foreach (Entrada primeira in entradas)
+        {
+            if (entradas.Find(e => e.camera == primeira.camera) != primeira) continue;
+            Entrada anterior = null;
+            float distanciaMinima = 0f;
+            foreach (Entrada entrada in entradas)
+                if (entrada.camera == primeira.camera)
+                    distanciaMinima = Mathf.Max(distanciaMinima, entrada.espacamento);
+
+            foreach (Entrada entrada in entradas)
+            {
+                if (entrada.camera != primeira.camera) continue;
+                // Preserva a distancia configurada como minimo entre centros e aumenta
+                // automaticamente quando as larguras precisam de mais espaco.
+                entrada.centroNaLinha = anterior == null ? 0f : anterior.centroNaLinha +
+                    Mathf.Max(distanciaMinima, anterior.meiaLargura + entrada.meiaLargura + FolgaEntreBordas);
+                anterior = entrada;
+            }
+            float centroConjunto = (-primeira.meiaLargura + anterior.centroNaLinha + anterior.meiaLargura) * 0.5f;
+            Transform referencia = primeira.camera.transform;
+            Vector3 origem = referencia.TransformPoint(primeira.posicao);
+            foreach (Entrada entrada in entradas)
+            {
+                if (entrada.camera != primeira.camera) continue;
+                entrada.popup.transform.position = origem + referencia.right *
+                    (entrada.centroNaLinha - centroConjunto - entrada.centroVisual);
+            }
+        }
     }
 }

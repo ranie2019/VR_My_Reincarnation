@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 [DisallowMultipleComponent]
@@ -16,6 +16,9 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
     [Header("Cabeça do avatar")]
     [SerializeField] private Transform cabecaAvatar;
 
+    [Header("Corpo do avatar")]
+    [SerializeField] private Transform corpoAvatar;
+
     [Header("Inventário")]
     [SerializeField] private InventarioVR inventario;
 
@@ -26,9 +29,95 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
     [Header("Elmo atual")]
     [SerializeField] private EquiparElmo elmoAtual;
 
+    [Header("Peitoral atual")]
+    [SerializeField] private EquiparPeitoral peitoralAtual;
+    private bool trocandoPeitoral;
+    public EquiparPeitoral PeitoralAtual => peitoralAtual;
+
     public EquiparManoplas LuvaDireita => luvaDireita;
     public EquiparManoplas LuvaEsquerda => luvaEsquerda;
     public EquiparElmo ElmoAtual => elmoAtual;
+
+    // Identificadores persistentes; nao dependem do nome/traducao do prefab.
+    internal static string IdentificarPosicaoVestida(GameObject item)
+    {
+        var luva = item.GetComponent<EquiparManoplas>();
+        if (luva != null && luva.JaEquipado)
+            return luva.LadoMao == LadoMaoEquipamento.Direita ? "mao-direita" : "mao-esquerda";
+        var elmo = item.GetComponent<EquiparElmo>();
+        if (elmo != null && elmo.JaEquipado) return "cabeca";
+        var peitoral = item.GetComponent<EquiparPeitoral>();
+        return peitoral != null && peitoral.JaEquipado ? "peitoral" : string.Empty;
+    }
+
+    internal static bool PosicaoSaveValida(string posicao) => string.IsNullOrEmpty(posicao) ||
+        posicao == "mao-direita" || posicao == "mao-esquerda" || posicao == "cabeca" || posicao == "peitoral";
+
+    internal void ValidarEquipamentoParaCarga(GameObject item, string posicao)
+    {
+        ResolverReferencias();
+        bool valido = false;
+        var luva = item.GetComponent<EquiparManoplas>();
+        int tipos = (luva != null ? 1 : 0) + (item.GetComponent<EquiparElmo>() != null ? 1 : 0) +
+            (item.GetComponent<EquiparPeitoral>() != null ? 1 : 0);
+        if (tipos != 1) throw new System.IO.InvalidDataException("Item sem controlador unico de equipamento.");
+        switch (posicao)
+        {
+            case "mao-direita": valido = luva != null && luva.LadoMao == LadoMaoEquipamento.Direita && maoDireita != null; break;
+            case "mao-esquerda": valido = luva != null && luva.LadoMao == LadoMaoEquipamento.Esquerda && maoEsquerda != null; break;
+            case "cabeca": valido = item.GetComponent<EquiparElmo>() != null && cabecaAvatar != null; break;
+            case "peitoral": valido = item.GetComponent<EquiparPeitoral>() != null && corpoAvatar != null; break;
+        }
+        if (!valido) throw new System.IO.InvalidDataException("Equipamento ou destino indisponivel: " + posicao);
+    }
+
+    internal void RestaurarEquipamentoVestido(ItemPersistente item, string posicao)
+    {
+        ValidarEquipamentoParaCarga(item.gameObject, posicao);
+        bool sucesso;
+        switch (posicao)
+        {
+            case "mao-direita":
+            case "mao-esquerda": sucesso = TentarEquipar(item.GetComponent<EquiparManoplas>()); break;
+            case "cabeca": sucesso = TentarEquipar(item.GetComponent<EquiparElmo>()); break;
+            default: sucesso = TentarEquipar(item.GetComponent<EquiparPeitoral>()); break;
+        }
+        if (!sucesso || IdentificarPosicaoVestida(item.gameObject) != posicao)
+            throw new System.InvalidOperationException("Nao foi possivel restaurar equipamento: " + posicao);
+    }
+
+    // Nao devolve itens ao inventario durante a carga: o save ja define seus destinos.
+    internal void PrepararRestauracaoEquipamentos()
+    {
+        if (luvaDireita != null) luvaDireita.Desequipar();
+        if (luvaEsquerda != null) luvaEsquerda.Desequipar();
+        if (elmoAtual != null) elmoAtual.Desequipar();
+        if (peitoralAtual != null) peitoralAtual.Desequipar();
+        luvaDireita = null; luvaEsquerda = null; elmoAtual = null; peitoralAtual = null;
+    }
+
+    internal System.Action CapturarRecuperacaoEquipamentos()
+    {
+        var direita = luvaDireita; var esquerda = luvaEsquerda;
+        var elmo = elmoAtual; var peitoral = peitoralAtual;
+        var recuperarDireita = direita != null ? direita.CapturarEstadoEquipadoParaCarga() : null;
+        var recuperarEsquerda = esquerda != null ? esquerda.CapturarEstadoEquipadoParaCarga() : null;
+        var recuperarElmo = elmo != null ? elmo.CapturarEstadoEquipadoParaCarga() : null;
+        var recuperarPeitoral = peitoral != null ? peitoral.CapturarEstadoEquipadoParaCarga() : null;
+        var partes = new System.Collections.Generic.List<System.Action>();
+        foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+        {
+            var alvo = renderer; bool visivel = alvo.enabled;
+            partes.Add(() => { if (alvo != null) alvo.enabled = visivel; });
+        }
+        return () =>
+        {
+            luvaDireita = direita; luvaEsquerda = esquerda; elmoAtual = elmo; peitoralAtual = peitoral;
+            foreach (var restaurar in partes) restaurar();
+            recuperarDireita?.Invoke(); recuperarEsquerda?.Invoke();
+            recuperarElmo?.Invoke(); recuperarPeitoral?.Invoke();
+        };
+    }
 
     private void Awake()
     {
@@ -115,6 +204,22 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
             luvaEsquerda = novaLuva;
 
         return true;
+    }
+
+    internal void NotificarElmoDestruido(EquiparElmo elmo)
+    {
+        if (elmoAtual == elmo) elmoAtual = null;
+    }
+
+    internal void NotificarPeitoralDestruido(EquiparPeitoral peitoral)
+    {
+        if (peitoralAtual == peitoral) peitoralAtual = null;
+    }
+
+    internal void NotificarManoplaDestruida(EquiparManoplas luva)
+    {
+        if (luvaDireita == luva) luvaDireita = null;
+        if (luvaEsquerda == luva) luvaEsquerda = null;
     }
 
     public bool Desequipar(LadoMaoEquipamento lado)
@@ -227,6 +332,117 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
         return false;
     }
 
+    public bool TentarEquipar(EquiparPeitoral novoPeitoral)
+    {
+        if (trocandoPeitoral) return false;
+        trocandoPeitoral = true;
+        try { return TentarEquiparPeitoralInterno(novoPeitoral); }
+        finally { trocandoPeitoral = false; }
+    }
+
+    private bool TentarEquiparPeitoralInterno(EquiparPeitoral novoPeitoral)
+    {
+        if (novoPeitoral == null)
+            return false;
+
+        ResolverReferencias();
+        Transform corpoDestino = corpoAvatar != null ? corpoAvatar : novoPeitoral.CorpoConfigurado;
+        if (!novoPeitoral.PodeEquiparNoCorpo(corpoDestino))
+            return false;
+
+        if (peitoralAtual == novoPeitoral)
+        {
+            if (novoPeitoral.JaEquipado) return true;
+            peitoralAtual = null;
+        }
+
+        XRGrabInteractable grabNovo = novoPeitoral.GetComponent<XRGrabInteractable>();
+        EstadoItemInventario estadoNovo = grabNovo != null
+            ? grabNovo.GetComponent<EstadoItemInventario>()
+            : null;
+        SlotInventario slotOrigem = estadoNovo != null && estadoNovo.estaNoInventario
+            ? estadoNovo.slotAtual
+            : null;
+
+        if (estadoNovo != null && estadoNovo.estaNoInventario &&
+            (slotOrigem == null || !slotOrigem.PodeRetirarItemParaEquipamento(grabNovo)))
+        {
+            Debug.LogWarning("[GerenciadorEquipamentosPlayer] O peitoral precisa estar no topo do slot para ser equipado.", novoPeitoral);
+            return false;
+        }
+
+        if (slotOrigem != null && !slotOrigem.RetirarItemParaEquipamento(grabNovo))
+        {
+            Debug.LogWarning("[GerenciadorEquipamentosPlayer] Não foi possível retirar o peitoral do inventário.", novoPeitoral);
+            return false;
+        }
+
+        if (peitoralAtual != null && !TentarGuardarPeitoralAtual(peitoralAtual, corpoDestino))
+        {
+            if (slotOrigem != null && slotOrigem.RestaurarItemSalvoNoSlot(grabNovo, false))
+                slotOrigem.FinalizarRestauracaoDoSave();
+            return false;
+        }
+
+        if (!novoPeitoral.EquiparNoCorpo(corpoDestino))
+            return false;
+
+        peitoralAtual = novoPeitoral;
+        return true;
+    }
+
+    public bool DesequiparPeitoral()
+    {
+        if (trocandoPeitoral) return false;
+        trocandoPeitoral = true;
+        try { ResolverReferencias(); return DesequiparPeitoralInterno(); }
+        finally { trocandoPeitoral = false; }
+    }
+
+    private bool DesequiparPeitoralInterno()
+    {
+        if (peitoralAtual == null)
+            return true;
+
+        if (!TentarGuardarPeitoralAtual(peitoralAtual, corpoAvatar))
+            return false;
+
+        peitoralAtual = null;
+        return true;
+    }
+
+    private bool TentarGuardarPeitoralAtual(EquiparPeitoral peitoral, Transform corpo)
+    {
+        if (peitoral == null)
+            return true;
+
+        XRGrabInteractable grab = peitoral.GetComponent<XRGrabInteractable>();
+        if (grab == null || inventario == null)
+        {
+            Debug.LogWarning("[GerenciadorEquipamentosPlayer] Não foi possível devolver o peitoral: inventário ou XRGrabInteractable ausente.", peitoral);
+            return false;
+        }
+
+        peitoral.Desequipar();
+        SlotInventario[] slots = inventario.ObterSlotsParaSave();
+        for (int i = 0; slots != null && i < slots.Length; i++)
+        {
+            SlotInventario slot = slots[i];
+            if (slot == null || !slot.RestaurarItemSalvoNoSlot(grab, false))
+                continue;
+
+            slot.FinalizarRestauracaoDoSave();
+            return true;
+        }
+
+        Transform corpoRestaurado = corpo != null ? corpo : peitoral.CorpoConfigurado;
+        if (corpoRestaurado != null)
+            peitoral.EquiparNoCorpo(corpoRestaurado);
+
+        Debug.LogWarning("[GerenciadorEquipamentosPlayer] Inventário sem espaço para guardar o peitoral.", peitoral);
+        return false;
+    }
+
     private bool TentarGuardarLuvaAtual(EquiparManoplas luva, Transform mao)
     {
         if (luva == null)
@@ -269,6 +485,9 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
 
         if (avatar == null)
             avatar = FindFirstObjectByType<AvatarBody>();
+
+        if (corpoAvatar == null && avatar != null)
+            corpoAvatar = avatar.corpoAvatar;
 
         if (cabecaAvatar == null && avatar != null)
             cabecaAvatar = avatar.cabecaAvatar;

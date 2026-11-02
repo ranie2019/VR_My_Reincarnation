@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 
@@ -62,6 +62,29 @@ internal static class ArquivoSaveSeguro
         if (!string.Equals(File.ReadAllText(principal, Encoding.UTF8), conteudo, StringComparison.Ordinal) ||
             !validar(File.ReadAllText(principal, Encoding.UTF8)))
             throw new InvalidDataException("Verificacao do save publicado falhou.");
-        // Mantem .bak e .bak.previous. Arquivos de falhas sao preservados para diagnostico.
+        // Limpeza apenas depois da publicacao validada; nunca remove geracoes de recuperacao.
+        LimparPreservados(principal, 20);
     }
+    private static void LimparPreservados(string principal, int manter)
+    {
+        try
+        {
+            string pasta = Path.GetDirectoryName(Path.GetFullPath(principal));
+            string nome = Path.GetFileName(principal);
+            foreach (string prefixo in new[] { nome + ".tmp.preservado.", nome + ".bak.previous.preservado." })
+            {
+                var arquivos = new System.Collections.Generic.List<FileInfo>();
+                foreach (string arquivo in Directory.GetFiles(pasta, prefixo + "*"))
+                {
+                    string sufixo = Path.GetFileName(arquivo).Substring(prefixo.Length);
+                    if (Guid.TryParseExact(sufixo, "N", out _)) arquivos.Add(new FileInfo(arquivo));
+                }
+                arquivos.Sort((a, b) => b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc));
+                for (int i = manter; i < arquivos.Count; i++) arquivos[i].Delete();
+            }
+        }
+        catch (IOException) { } // Retencao nao pode invalidar um save publicado.
+        catch (UnauthorizedAccessException) { }
+    }
+
 }

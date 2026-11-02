@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -457,6 +457,9 @@ public class Arco : MonoBehaviour
     private void Update()
     {
         SincronizarModoInventarioPorParent();
+        if (estaNoInventario || attachDuasMao == null ||
+            (!attachDuasMao.EstaSeguradoPelaDireita() && !attachDuasMao.EstaSeguradoPelaEsquerda()))
+            UsoAcaoCompartilhada.LiberarTodas(this);
         AtualizarEntradaSeletorFlechas();
 
         if (estaNoInventario)
@@ -498,6 +501,7 @@ public class Arco : MonoBehaviour
 
     private void OnDisable()
     {
+        UsoAcaoCompartilhada.LiberarTodas(this);
         maoCandidataPuxar = null;
         maoCandidataDentroDaArea = false;
         cordaSeguradaPeloGrip = false;
@@ -2955,13 +2959,12 @@ public class Arco : MonoBehaviour
         return null;
     }
 
-    private static float LerValorAcaoGrip(InputActionReference acaoGrip)
+    private float LerValorAcaoGrip(InputActionReference acaoGrip)
     {
         if (acaoGrip == null || acaoGrip.action == null)
             return 0f;
 
-        if (!acaoGrip.action.enabled)
-            acaoGrip.action.Enable();
+        UsoAcaoCompartilhada.Adquirir(acaoGrip.action, this);
 
         try
         {

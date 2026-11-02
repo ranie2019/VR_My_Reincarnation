@@ -19,8 +19,18 @@ public class SpawnOnDestroy : MonoBehaviour
     [SerializeField, Range(0.001f, 100f)] private float spawnChance = 100f;
 
     // Método chamado quando este objeto for destruído
+    private bool encerrandoAplicacao;
+    private void OnApplicationQuit() { encerrandoAplicacao = true; }
+
     private void OnDestroy()
     {
+        if (!Application.isPlaying || encerrandoAplicacao || !gameObject.scene.isLoaded) return;
+        // Descarte de itens de inventario e limpeza de carga nao sao uma morte no mundo.
+        var item = GetComponent<ItemPersistente>();
+        if (item != null && item.EstaNoInventario()) return;
+        if (SaveManager.Instancia != null &&
+            SaveManager.Instancia.EstadoCarregamento != SaveManager.EstadoCarga.Concluido &&
+            SaveManager.Instancia.EstadoCarregamento != SaveManager.EstadoCarga.SessaoNova) return;
         // Verifica se o objeto a ser spawnado está definido
         if (objectToSpawn != null)
         {

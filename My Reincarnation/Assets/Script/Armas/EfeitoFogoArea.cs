@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -185,8 +185,8 @@ public class EfeitoFogoArea : MonoBehaviour
             if (alvoCollider == null || DeveIgnorarCollider(alvoCollider))
                 continue;
 
-            SlimeIA slime = ResolverSlime(alvoCollider);
-            if (slime == null || slime.Morto)
+            Component slime = ResolverInimigo(alvoCollider);
+            if (slime == null || ReceptorDanoInimigo.EstaMorto(slime))
                 continue;
 
             if (!TagPodeReceberDano(alvoCollider, slime))
@@ -196,7 +196,7 @@ public class EfeitoFogoArea : MonoBehaviour
             if (!alvosAtingidosNoPulso.Add(idAlvo))
                 continue;
 
-            slime.ReceberDano(danoPorPulso, origemDano);
+            ReceptorDanoInimigo.Aplicar(slime, danoPorPulso, origemDano);
             quantidadeAlvosDanificadosNoUltimoPulso++;
             ultimoAlvoDanificado = slime.gameObject;
         }
@@ -239,24 +239,9 @@ public class EfeitoFogoArea : MonoBehaviour
             bufferColliders[i] = null;
     }
 
-    private SlimeIA ResolverSlime(Collider alvoCollider)
+    private Component ResolverInimigo(Collider alvoCollider)
     {
-        if (alvoCollider == null)
-            return null;
-
-        SlimeIA slime = alvoCollider.GetComponentInParent<SlimeIA>();
-        if (slime != null)
-            return slime;
-
-        if (alvoCollider.attachedRigidbody != null)
-        {
-            slime = alvoCollider.attachedRigidbody.GetComponentInParent<SlimeIA>();
-            if (slime != null)
-                return slime;
-        }
-
-        Transform raiz = alvoCollider.transform.root;
-        return raiz != null ? raiz.GetComponentInChildren<SlimeIA>(true) : null;
+        return ReceptorDanoInimigo.Resolver(alvoCollider);
     }
 
     private bool DeveIgnorarCollider(Collider col)
@@ -276,7 +261,7 @@ public class EfeitoFogoArea : MonoBehaviour
         return false;
     }
 
-    private bool TagPodeReceberDano(Collider alvoCollider, SlimeIA slime)
+    private bool TagPodeReceberDano(Collider alvoCollider, Component slime)
     {
         if (tagsQueRecebemDano == null || tagsQueRecebemDano.Length == 0)
             return true;

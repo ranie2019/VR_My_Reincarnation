@@ -33,6 +33,10 @@ public class MenuStatus : MonoBehaviour
     [SerializeField] private TextMeshProUGUI textoManaAtual;
     [SerializeField] private TextMeshProUGUI textoManaMaxima;
 
+    [Header("Rotulos HP / MP (busca automatica por nome)")]
+    [SerializeField] private TextMeshProUGUI textoRotuloHP;
+    [SerializeField] private TextMeshProUGUI textoRotuloMP;
+
     [Header("Rein (Moeda)")]
     [SerializeField] private TextMeshProUGUI textoRein;
 
@@ -81,6 +85,8 @@ public class MenuStatus : MonoBehaviour
         Definir(textoClasse,        statusPlayer.GetClasse());
         Definir(textoNivel,         statusPlayer.GetNivel().ToString());
         Definir(textoPontosStatus,  statusPlayer.GetPontosStatusDisponiveis().ToString());
+        Definir(textoRotuloHP, "HP:");
+        Definir(textoRotuloMP, "MP:");
         Definir(textoVidaAtual,     statusPlayer.GetVidaAtual().ToString());
         Definir(textoVidaMaxima,    statusPlayer.GetVidaMaxima().ToString());
         Definir(textoManaAtual,     statusPlayer.GetManaAtual().ToString());
@@ -117,10 +123,12 @@ public class MenuStatus : MonoBehaviour
         textoClasse       = Buscar(textoClasse,       todos, "CLASS (1)");
         textoNivel        = Buscar(textoNivel,        todos, "LEVEL (1)");
         textoPontosStatus = Buscar(textoPontosStatus, todos, "STATUS POINTS (1)");
-        textoVidaAtual    = Buscar(textoVidaAtual,    todos, "BLOOD (1)");
-        textoVidaMaxima   = Buscar(textoVidaMaxima,   todos, "BLOOD (3)");
-        textoManaAtual    = Buscar(textoManaAtual,    todos, "MANNA (1)", "MANA (1)");
-        textoManaMaxima   = Buscar(textoManaMaxima,   todos, "MANNA (3)", "MANA (3)");
+        textoRotuloHP = Buscar(textoRotuloHP, todos, "HP", "BLOOD", "VIDA", "SANGUE");
+        textoRotuloMP = Buscar(textoRotuloMP, todos, "MP", "MANNA", "MANA");
+        textoVidaAtual    = Buscar(textoVidaAtual,    todos, "HP (1)", "BLOOD (1)");
+        textoVidaMaxima   = Buscar(textoVidaMaxima,   todos, "HP (3)", "BLOOD (3)");
+        textoManaAtual    = Buscar(textoManaAtual,    todos, "MP (1)", "MANNA (1)", "MANA (1)");
+        textoManaMaxima   = Buscar(textoManaMaxima,   todos, "MP (3)", "MANNA (3)", "MANA (3)");
         textoRein         = Buscar(textoRein,         todos, "REIN (1)", "GOLD (1)");
         textoExpAtual     = Buscar(textoExpAtual,     todos, "EXPERIENCE (1)");
         textoExpMaxima    = Buscar(textoExpMaxima,    todos, "EXPERIENCE (3)");

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using UnityEngine;
 
@@ -44,7 +44,10 @@ public class CarteiraReinPlayer : MonoBehaviour
             return;
 
         reinUnidades = saldoNormalizado;
-        AoSaldoReinAlterado?.Invoke(reinUnidades);
+        if (AoSaldoReinAlterado != null)
+            foreach (Action<long> callback in AoSaldoReinAlterado.GetInvocationList())
+                try { callback(reinUnidades); }
+                catch (Exception erro) { Debug.LogException(erro, this); }
     }
 
     public string ObterSaldoFormatado()

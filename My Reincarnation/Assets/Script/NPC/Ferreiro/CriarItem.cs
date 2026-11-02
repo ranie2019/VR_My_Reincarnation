@@ -76,6 +76,8 @@ public class CriarItem : MonoBehaviour
 
     private void VerificarFechamentoPorInatividade()
     {
+        var ferreiro = GetComponentInParent<FerreiroUI>(true);
+        if (ferreiro != null && ferreiro.isActiveAndEnabled) return;
         if (Time.time - ultimaInteracao < tempoParaFecharPorInatividade)
             return;
 
@@ -172,25 +174,28 @@ public class CriarItem : MonoBehaviour
 
     private bool PossuiRecursosSuficientes(ConfiguracaoBotao configuracao)
     {
-        if (configuracao == null || configuracao.custos == null)
-            return false;
+        if (!TentarAgruparCustos(configuracao, out var custos)) return false;
+        foreach (var custo in configuracao.custos)
+            if (custo != null) AtualizarTextoQuantidade(custo, ContarRecurso(custo.nomeRecurso));
+        foreach (var custo in custos)
+            if (ContarRecurso(custo.Key) < custo.Value) return false;
+        return true;
+    }
 
-        bool suficiente = true;
-
-        for (int i = 0; i < configuracao.custos.Count; i++)
+    private static bool TentarAgruparCustos(ConfiguracaoBotao configuracao, out Dictionary<string, int> custos)
+    {
+        custos = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (configuracao == null || configuracao.custos == null) return false;
+        foreach (var custo in configuracao.custos)
         {
-            CustoRecurso custo = configuracao.custos[i];
-            if (custo == null)
-                continue;
-
-            int quantidadeAtual = ContarRecurso(custo.nomeRecurso);
-            AtualizarTextoQuantidade(custo, quantidadeAtual);
-
-            if (quantidadeAtual < custo.quantidade)
-                suficiente = false;
+            if (custo == null) continue;
+            if (string.IsNullOrWhiteSpace(custo.nomeRecurso) || custo.quantidade <= 0) return false;
+            string nome = custo.nomeRecurso.Trim();
+            custos.TryGetValue(nome, out int atual);
+            if ((long)atual + custo.quantidade > int.MaxValue) return false;
+            custos[nome] = atual + custo.quantidade;
         }
-
-        return suficiente;
+        return true;
     }
 
     private static void AtualizarTextoQuantidade(CustoRecurso custo, int quantidadeAtual)
@@ -213,46 +218,96 @@ public class CriarItem : MonoBehaviour
     /// Remove do inventário do jogador os recursos usados pelo item deste botão específico.
     /// Chamado pelo BotaoCriarItem depois de confirmar a criação.
     /// </summary>
-    public bool ConsumirRecursos(Button botao)
+    private bool consumindoRecursos;
+
+    public bool ConsumirRecursos(Button botao) => ExecutarConsumo(botao, null);
+
+    public bool TentarCriarComRecursos(Button botao, Func<GameObject> criar)
     {
-        ConfiguracaoBotao configuracao = EncontrarConfiguracao(botao);
-        if (configuracao == null || !PossuiRecursosSuficientes(configuracao))
-            return false;
-
-        for (int i = 0; i < configuracao.custos.Count; i++)
-        {
-            CustoRecurso custo = configuracao.custos[i];
-            if (custo != null)
-                ConsumirRecurso(custo.nomeRecurso, custo.quantidade);
-        }
-
-        return true;
+        return criar != null && ExecutarConsumo(botao, criar);
     }
 
-    private void ConsumirRecurso(string nomeRecurso, int quantidade)
+    private bool ExecutarConsumo(Button botao, Func<GameObject> criar)
     {
-        if (quantidade <= 0)
-            return;
-
-        SlotInventario[] slots = ObterSlotsDoJogador();
-        int restante = quantidade;
-
-        for (int i = 0; i < slots.Length && restante > 0; i++)
+        if (consumindoRecursos) return false;
+        var configuracao = EncontrarConfiguracao(botao);
+        if (!TentarAgruparCustos(configuracao, out var custos) || !PossuiRecursosSuficientes(configuracao)) return false;
+        consumindoRecursos = true;
+        var save = SaveManager.Instancia;
+        save?.IniciarOperacaoCritica();
+        var recuperarSlots = new List<Action>();
+        var recuperarItens = new List<RecuperacaoItemCarga>();
+        var reservados = new List<XRGrabInteractable>();
+        GameObject criado = null;
+        bool sucesso = false;
+        try
         {
-            SlotInventario slot = slots[i];
-            if (slot == null || !slot.PossuiItem())
-                continue;
-
-            if (!CorrespondeAoRecurso(slot, nomeRecurso))
-                continue;
-
-            while (restante > 0 && slot.PossuiItem())
+            var plano = new List<KeyValuePair<SlotInventario, int>>();
+            foreach (var custo in custos)
             {
-                if (!slot.ConsumirUmaUnidade(out _))
-                    break;
-
-                restante--;
+                int restante = custo.Value;
+                foreach (var slot in ObterSlotsDoJogador())
+                {
+                    if (slot == null || !CorrespondeAoRecurso(slot, custo.Key)) continue;
+                    int quantidade = Mathf.Min(restante, slot.ObterQuantidadeAtual());
+                    if (quantidade <= 0) continue;
+                    plano.Add(new KeyValuePair<SlotInventario, int>(slot, quantidade));
+                    recuperarSlots.Add(slot.CapturarRecuperacaoCarga());
+                    foreach (var item in slot.ObterItensParaSave()) recuperarItens.Add(new RecuperacaoItemCarga(item));
+                    restante -= quantidade;
+                    if (restante == 0) break;
+                }
+                if (restante != 0) throw new InvalidOperationException("Materiais insuficientes durante a reserva.");
             }
+            foreach (var parte in plano)
+                for (int i = 0; i < parte.Value; i++)
+                {
+                    if (!parte.Key.ReservarUnidadeParaConsumo(out var item))
+                        throw new InvalidOperationException("Nao foi possivel reservar todos os materiais.");
+                    reservados.Add(item);
+                }
+            if (criar != null)
+            {
+                criado = criar();
+                if (criado == null) throw new InvalidOperationException("A criacao nao retornou um item.");
+                var atributos = criado.GetComponent<AtributosManoplas>();
+                if (atributos != null && !atributos.GarantirGeracao())
+                    throw new InvalidOperationException("Configuracao de atributos invalida no item criado.");
+                var peitoral = criado.GetComponent<AtributosPeitoral>();
+                if (peitoral != null && !peitoral.GarantirGeracao())
+                    throw new InvalidOperationException("Configuracao de atributos do peitoral invalida no item criado.");
+                var elmo = criado.GetComponent<AtributosElmo>();
+                if (elmo != null && !elmo.GarantirGeracao())
+                    throw new InvalidOperationException("Configuracao de atributos do elmo invalida no item criado.");
+            }
+            // A partir daqui nao existem operacoes reversiveis pendentes.
+            foreach (var item in reservados) item.GetComponent<ItemPersistente>()?.RegistrarConsumoPermanente();
+            sucesso = true;
+            foreach (var item in reservados) Destroy(item.gameObject);
+            return true;
+        }
+        catch (Exception erro)
+        {
+            Debug.LogError("[CriarItem] Criacao cancelada: " + erro.Message, this);
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (!sucesso)
+                {
+                    if (criado != null) { criado.SetActive(false); Destroy(criado); }
+                    foreach (var recuperar in recuperarSlots) recuperar();
+                    foreach (var recuperar in recuperarItens) recuperar.Restaurar();
+                }
+            }
+            catch (Exception erro)
+            {
+                save?.NotificarFalhaRestauracao("Recuperacao dos materiais incompleta: " + erro.Message);
+                Debug.LogError(erro, this);
+            }
+            finally { consumindoRecursos = false; save?.FinalizarOperacaoCritica(); }
         }
     }
 

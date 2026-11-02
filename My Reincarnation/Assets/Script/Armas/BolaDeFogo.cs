@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -490,7 +490,7 @@ public class BolaDeFogo : MonoBehaviour, IDano
         if (col == ultimoColliderImpactoRegistrado && !(col is TerrainCollider))
             return false;
 
-        if (ResolverSlime(col) != null)
+        if (ResolverInimigo(col) != null)
             return false;
 
         return CamadaEstaNaMascara(col.gameObject.layer, camadasChaoAreaDeFogo);
@@ -524,15 +524,15 @@ public class BolaDeFogo : MonoBehaviour, IDano
             if (!TagPodeReceberDano(alvoCollider))
                 continue;
 
-            SlimeIA slime = ResolverSlime(alvoCollider);
-            if (slime == null || slime.Morto)
+            Component slime = ResolverInimigo(alvoCollider);
+            if (slime == null || ReceptorDanoInimigo.EstaMorto(slime))
                 continue;
 
             int idAlvo = slime.GetInstanceID();
             if (!alvosDanificados.Add(idAlvo))
                 continue;
 
-            slime.ReceberDano(danoFinal, gameObject);
+            ReceptorDanoInimigo.Aplicar(slime, danoFinal, gameObject);
             quantidadeAlvosDanificados++;
         }
     }
@@ -544,24 +544,9 @@ public class BolaDeFogo : MonoBehaviour, IDano
         alvosDanificados.Clear();
     }
 
-    private SlimeIA ResolverSlime(Collider alvoCollider)
+    private Component ResolverInimigo(Collider alvoCollider)
     {
-        if (alvoCollider == null)
-            return null;
-
-        SlimeIA slime = alvoCollider.GetComponentInParent<SlimeIA>();
-        if (slime != null)
-            return slime;
-
-        if (alvoCollider.attachedRigidbody != null)
-        {
-            slime = alvoCollider.attachedRigidbody.GetComponentInParent<SlimeIA>();
-            if (slime != null)
-                return slime;
-        }
-
-        Transform raiz = alvoCollider.transform.root;
-        return raiz != null ? raiz.GetComponentInChildren<SlimeIA>(true) : null;
+        return ReceptorDanoInimigo.Resolver(alvoCollider);
     }
 
     private void DefinirDono(GameObject novoDono)

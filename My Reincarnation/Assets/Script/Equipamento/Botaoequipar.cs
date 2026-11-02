@@ -10,6 +10,7 @@ public class BotaoEquipar : MonoBehaviour
     [Tooltip("Se vazio, tenta encontrar automaticamente subindo pelos pais.")]
     [SerializeField] private EquiparManoplas equiparManoplas;
     [SerializeField] private EquiparElmo equiparElmo;
+    [SerializeField] private EquiparPeitoral equiparPeitoral;
 
     [Header("Confirmação")]
     [SerializeField] private InputActionReference acaoConfirmarMaoEsquerda;
@@ -18,12 +19,23 @@ public class BotaoEquipar : MonoBehaviour
     private XRSimpleInteractable interactable;
     private bool botaoEmHover;
 
+    internal void DefinirElmoDoPopup(EquiparElmo elmo)
+    {
+        // O popup pode ficar fora da hierarquia do equipamento enquanto acompanha a camera.
+        equiparElmo = elmo;
+        equiparManoplas = null;
+        equiparPeitoral = null;
+    }
+
     private void Awake()
     {
         interactable = GetComponent<XRSimpleInteractable>();
 
         if (equiparManoplas == null)
             equiparManoplas = GetComponentInParent<EquiparManoplas>(true);
+
+        if (equiparPeitoral == null)
+            equiparPeitoral = GetComponentInParent<EquiparPeitoral>(true);
 
         if (equiparElmo == null)
             equiparElmo = GetComponentInParent<EquiparElmo>(true);
@@ -43,6 +55,7 @@ public class BotaoEquipar : MonoBehaviour
 
     private void OnDisable()
     {
+        UsoAcaoCompartilhada.LiberarTodas(this);
         if (interactable != null)
         {
             interactable.hoverEntered.RemoveListener(OnHoverEntered);
@@ -81,7 +94,9 @@ public class BotaoEquipar : MonoBehaviour
         if (!BotaoConfirmarPressionado())
             return;
 
-        if (equiparElmo != null)
+        if (equiparPeitoral != null)
+            equiparPeitoral.Equipar();
+        else if (equiparElmo != null)
             equiparElmo.Equipar();
         else if (equiparManoplas != null)
             equiparManoplas.Equipar();
@@ -108,15 +123,15 @@ public class BotaoEquipar : MonoBehaviour
         }
     }
 
-    private static void HabilitarAcao(InputActionReference acaoRef)
+    private void HabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Enable();
+            UsoAcaoCompartilhada.Adquirir(acaoRef.action, this);
     }
 
-    private static void DesabilitarAcao(InputActionReference acaoRef)
+    private void DesabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Disable();
+            UsoAcaoCompartilhada.Liberar(acaoRef.action, this);
     }
 }

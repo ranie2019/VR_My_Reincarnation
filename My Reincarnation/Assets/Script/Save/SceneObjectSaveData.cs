@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 
 [Serializable]
 public class SceneObjectSaveData
 {
+    public bool quarentenaCogumelo; // Registro preservado, nunca instanciado automaticamente.
     public string objectId;
     public string tipoObjeto;
     public string prefabItemId;

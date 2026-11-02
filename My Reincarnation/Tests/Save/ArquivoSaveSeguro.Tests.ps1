@@ -55,6 +55,13 @@ public static class SaveFileTests
         ArquivoSaveSeguro.Gravar(p, a, Valid);
         var archived = Directory.GetFiles(root, "normal.json.bak.previous.preservado.*");
         Check(archived.Length == 1 && File.ReadAllText(archived[0]) == a, "Older backup discarded");
+        string retain = Path.Combine(root, "retain.json");
+        string unrelated = retain + ".bak.previous.preservado.manual";
+        File.WriteAllText(unrelated,"manual diagnostic");
+        for(int i=0;i<28;i++) ArquivoSaveSeguro.Gravar(retain, a, Valid);
+        Check(Directory.GetFiles(root,"retain.json.bak.previous.preservado.*").Length==21,"Retention should keep 20 generated files plus unrelated manual file");
+        Check(File.Exists(unrelated),"Retention must not delete unrelated manual diagnostics");
+        Check(File.ReadAllText(retain)==a&&File.ReadAllText(retain+".bak")==a&&File.ReadAllText(retain+".bak.previous")==a,"Retention must preserve recovery generations");
         return assertions + " assertions passed; isolated files: " + root;
     }
 }

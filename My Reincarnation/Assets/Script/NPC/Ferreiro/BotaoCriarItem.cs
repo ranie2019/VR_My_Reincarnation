@@ -46,6 +46,8 @@ public class BotaoCriarItem : MonoBehaviour
         interactable = GetComponent<XRSimpleInteractable>();
 
         if (criarItem == null)
+            criarItem = GetComponentInParent<CriarItem>(true);
+        if (criarItem == null)
             criarItem = FindFirstObjectByType<CriarItem>();
 
         if (botaoUI == null)
@@ -63,6 +65,7 @@ public class BotaoCriarItem : MonoBehaviour
 
     private void OnDisable()
     {
+        UsoAcaoCompartilhada.LiberarTodas(this);
         interactable.hoverEntered.RemoveListener(OnHoverEntered);
         interactable.hoverExited.RemoveListener(OnHoverExited);
 
@@ -74,6 +77,7 @@ public class BotaoCriarItem : MonoBehaviour
 
     private void Update()
     {
+        if (botaoEmHover && criarItem != null) criarItem.RegistrarInteracao();
         VerificarConfirmacao();
     }
 
@@ -109,13 +113,10 @@ public class BotaoCriarItem : MonoBehaviour
         if (!criarItem.PossuiRecursosSuficientes(botaoUI))
             return;
 
-        if (!criarItem.ConsumirRecursos(botaoUI))
-            return;
-
         Vector3 posicao = pontoSpawn != null ? pontoSpawn.position : transform.position;
         Quaternion rotacao = pontoSpawn != null ? pontoSpawn.rotation : Quaternion.identity;
 
-        Instantiate(prefab, posicao, rotacao);
+        criarItem.TentarCriarComRecursos(botaoUI, () => Instantiate(prefab, posicao, rotacao));
     }
 
     private bool BotaoConfirmarPressionado()
@@ -139,15 +140,15 @@ public class BotaoCriarItem : MonoBehaviour
         }
     }
 
-    private static void HabilitarAcao(InputActionReference acaoRef)
+    private void HabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Enable();
+            UsoAcaoCompartilhada.Adquirir(acaoRef.action, this);
     }
 
-    private static void DesabilitarAcao(InputActionReference acaoRef)
+    private void DesabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Disable();
+            UsoAcaoCompartilhada.Liberar(acaoRef.action, this);
     }
 }

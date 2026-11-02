@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -454,6 +454,11 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void TentarReceberDanoPorContato(Collider outroCollider)
     {
+        if (outroCollider != null &&
+            (outroCollider.GetComponentInParent<Flecha>() != null ||
+             (outroCollider.attachedRigidbody != null && outroCollider.attachedRigidbody.GetComponent<Flecha>() != null)))
+            return; // Flecha.ProcessarColisao e o unico responsavel pelo impacto.
+
         if (morto || outroCollider == null)
             return;
 

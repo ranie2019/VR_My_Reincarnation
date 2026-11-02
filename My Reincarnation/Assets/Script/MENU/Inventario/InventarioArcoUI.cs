@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -675,7 +675,7 @@ public class InventarioArcoUI : MonoBehaviour
         {
             InputAction acao = acoesHabilitadasPorEsteScript[i];
             if (acao != null)
-                acao.Disable();
+                UsoAcaoCompartilhada.Liberar(acao, this);
         }
 
         acoesHabilitadasPorEsteScript.Clear();
@@ -771,10 +771,8 @@ public class InventarioArcoUI : MonoBehaviour
 
     private void GarantirAcaoHabilitada(InputAction acao)
     {
-        if (acao == null || acao.enabled)
-            return;
-
-        acao.Enable();
+        if (acao == null) return;
+        UsoAcaoCompartilhada.Adquirir(acao, this);
 
         if (!acoesHabilitadasPorEsteScript.Contains(acao))
             acoesHabilitadasPorEsteScript.Add(acao);

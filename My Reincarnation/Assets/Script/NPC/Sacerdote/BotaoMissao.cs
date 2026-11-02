@@ -1,3 +1,4 @@
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
@@ -45,6 +46,7 @@ public class BotaoMissao : MonoBehaviour
 
     private void OnDisable()
     {
+        UsoAcaoCompartilhada.LiberarTodas(this);
         interactable.hoverEntered.RemoveListener(OnHoverEntered);
         interactable.hoverExited.RemoveListener(OnHoverExited);
 
@@ -101,15 +103,51 @@ public class BotaoMissao : MonoBehaviour
         }
     }
 
-    private static void HabilitarAcao(InputActionReference acaoRef)
+    private void HabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Enable();
+            UsoAcaoCompartilhada.Adquirir(acaoRef.action, this);
     }
 
-    private static void DesabilitarAcao(InputActionReference acaoRef)
+    private void DesabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Disable();
+            UsoAcaoCompartilhada.Liberar(acaoRef.action, this);
+    }
+}
+
+// Compartilhado pelos botoes e interfaces VR; reside em um arquivo ja compilado pelo Unity.
+internal static class UsoAcaoCompartilhada
+{
+    private sealed class Uso
+    {
+        internal readonly HashSet<object> donos = new HashSet<object>();
+        internal bool habilitadaAqui;
+    }
+    private static readonly Dictionary<InputAction, Uso> usos = new Dictionary<InputAction, Uso>();
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void Limpar()
+    {
+        foreach (var par in usos) if (par.Value.habilitadaAqui) par.Key.Disable();
+        usos.Clear();
+    }
+    internal static void Adquirir(InputAction acao, object dono)
+    {
+        if (acao == null || dono == null) return;
+        if (!usos.TryGetValue(acao, out var uso))
+        { uso = new Uso { habilitadaAqui = !acao.enabled }; usos.Add(acao, uso); }
+        uso.donos.Add(dono);
+        if (!acao.enabled) acao.Enable();
+    }
+    internal static void Liberar(InputAction acao, object dono)
+    {
+        if (acao == null || !usos.TryGetValue(acao, out var uso) || !uso.donos.Remove(dono)) return;
+        if (uso.donos.Count != 0) return;
+        usos.Remove(acao);
+        if (uso.habilitadaAqui) acao.Disable();
+    }
+    internal static void LiberarTodas(object dono)
+    {
+        foreach (var acao in new List<InputAction>(usos.Keys)) Liberar(acao, dono);
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
@@ -362,7 +362,10 @@ public class Flecha : MonoBehaviour, IDano
             transformComTag = outroCollider.transform.root;
         }
 
-        alvo = transformComTag != null ? transformComTag.gameObject : null;
+        Component receptor = ReceptorDanoInimigo.Resolver(outroCollider);
+        StatusPlayer player = outroCollider.GetComponentInParent<StatusPlayer>();
+        alvo = transformComTag == null ? null : receptor != null ? receptor.gameObject :
+            player != null ? player.gameObject : transformComTag.gameObject;
         return alvo != null;
     }
 
@@ -371,6 +374,13 @@ public class Flecha : MonoBehaviour, IDano
         if (alvo == null || danoFinal <= 0)
             return false;
 
+        Component inimigo = ReceptorDanoInimigo.Resolver(alvo.transform);
+        if (inimigo != null)
+        {
+            if (ReceptorDanoInimigo.EstaMorto(inimigo)) return false;
+            ReceptorDanoInimigo.Aplicar(inimigo, danoFinal, gameObject);
+            return true;
+        }
         Component[] componentes = ColetarComponentesParaDano(alvo);
         for (int i = 0; i < componentes.Length; i++)
         {
@@ -455,14 +465,14 @@ public class Flecha : MonoBehaviour, IDano
 
         AdicionarComponentes(alvo.GetComponents<Component>(), componentes, visitados);
         AdicionarComponentes(alvo.GetComponentsInParent<Component>(true), componentes, visitados);
-        AdicionarComponentes(alvo.GetComponentsInChildren<Component>(true), componentes, visitados);
+
 
         Rigidbody rb = alvo.GetComponentInParent<Rigidbody>();
         if (rb != null)
         {
             AdicionarComponentes(rb.GetComponents<Component>(), componentes, visitados);
             AdicionarComponentes(rb.GetComponentsInParent<Component>(true), componentes, visitados);
-            AdicionarComponentes(rb.GetComponentsInChildren<Component>(true), componentes, visitados);
+
         }
 
         return componentes.ToArray();

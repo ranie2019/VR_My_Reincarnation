@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -13,6 +13,7 @@ using UnityEngine;
 /// </summary>
 public class GerenciadorMissoes : MonoBehaviour
 {
+    private bool entregaEmAndamento;
     public enum TipoObjetivo
     {
         MatarInimigos,
@@ -225,6 +226,31 @@ public class GerenciadorMissoes : MonoBehaviour
         return gameObject != null ? gameObject.name : GetType().Name;
     }
 
+    internal Action CapturarRecuperacaoSave()
+    {
+        int indice = missaoAtualIndex;
+        var restauracoes = new List<Action>();
+        if (missoes != null)
+            foreach (var missao in missoes)
+            {
+                if (missao == null) continue;
+                var alvo = missao;
+                var estado = alvo.estado;
+                int quantidade = alvo.quantidadeAtualObjetivo;
+                restauracoes.Add(() => { alvo.estado = estado; alvo.quantidadeAtualObjetivo = quantidade; });
+            }
+        // A restauracao das missoes pode modificar a UI; preserva seus componentes e hierarquia.
+        var visuais = new List<RecuperacaoItemCarga>();
+        foreach (Transform filho in transform)
+            visuais.Add(new RecuperacaoItemCarga(filho));
+        return () =>
+        {
+            foreach (var visual in visuais) visual.Restaurar();
+            foreach (var restaurar in restauracoes) restaurar();
+            missaoAtualIndex = indice;
+        };
+    }
+
     public List<MissionSaveData> CapturarEstadoParaSave()
     {
         List<MissionSaveData> resultado = new List<MissionSaveData>();
@@ -323,6 +349,9 @@ public class GerenciadorMissoes : MonoBehaviour
     private void IniciarTimerInatividade()
     {
         CancelarTimerInatividade();
+        // No ferreiro o atendimento inteiro usa o relogio de FerreiroUI.
+        var ferreiro = GetComponent<FerreiroUI>();
+        if (ferreiro != null && ferreiro.isActiveAndEnabled) return;
         rotinaTimerInatividade = StartCoroutine(RotinaTimerInatividade());
     }
 
@@ -521,7 +550,7 @@ public class GerenciadorMissoes : MonoBehaviour
     private InventarioVR ObterInventarioJogador()
     {
         if (inventarioJogadorCache == null)
-            inventarioJogadorCache = FindFirstObjectByType<InventarioVR>();
+            inventarioJogadorCache = FindFirstObjectByType<InventarioVR>(FindObjectsInactive.Include);
         return inventarioJogadorCache;
     }
 
@@ -589,92 +618,96 @@ public class GerenciadorMissoes : MonoBehaviour
     // CONSUMIR ITENS NA ENTREGA
     // =========================================================
 
-    private void ConsumirItensDaMissao(MissaoDados missao)
-    {
-        if (missao == null) return;
-        if (missao.tipoObjetivo != TipoObjetivo.ColetarItens) return;
-        if (string.IsNullOrEmpty(missao.idAlvo)) return;
-
-        int quantidadeParaConsumir = Mathf.Max(0, missao.quantidadeAlvo);
-        if (quantidadeParaConsumir == 0) return;
-
-        InventarioVR inventario = ObterInventarioJogador();
-        if (inventario == null)
-        {
-            Debug.LogWarning("[Missão] InventarioVR não encontrado ao consumir itens.");
-            return;
-        }
-
-        SlotInventario[] slots = inventario.ObterSlotsParaSave();
-        if (slots == null || slots.Length == 0) return;
-
-        int consumidos = 0;
-        bool houveProgresso;
-
-        do
-        {
-            houveProgresso = false;
-
-            for (int i = 0; i < slots.Length && consumidos < quantidadeParaConsumir; i++)
-            {
-                SlotInventario slot = slots[i];
-                if (slot == null || !slot.PossuiItem())
-                    continue;
-
-                string nomeNoSlot = ObterNomeItemDoSlot(slot);
-                if (string.IsNullOrEmpty(nomeNoSlot))
-                    continue;
-
-                if (!string.Equals(nomeNoSlot, missao.idAlvo, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                if (slot.ConsumirUmaUnidade(out _))
-                {
-                    consumidos++;
-                    houveProgresso = true;
-                }
-            }
-        }
-        while (houveProgresso && consumidos < quantidadeParaConsumir);
-
-    }
-
-    // =========================================================
-    // ENTREGA
-    // =========================================================
-
     public void EntregarRecompensaEAvancar()
     {
-        MissaoDados missaoAtual = ObterMissaoAtual();
-        if (missaoAtual == null || missaoAtual.estado != EstadoMissao.ProntaParaEntregar)
-            return;
-
-        ConsumirItensDaMissao(missaoAtual);
-
-        if (missaoAtual.prefabRecompensa != null)
+        MissaoDados missao = ObterMissaoAtual();
+        if (entregaEmAndamento || missao == null || missao.estado != EstadoMissao.ProntaParaEntregar) return;
+        entregaEmAndamento = true;
+        SaveManager save = SaveManager.Instancia;
+        save?.IniciarOperacaoCritica();
+        var recuperarSlots = new List<Action>();
+        var recuperarItens = new List<RecuperacaoItemCarga>();
+        var reservados = new List<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+        GameObject recompensa = null;
+        StatusPlayer status = FindFirstObjectByType<StatusPlayer>();
+        CarteiraReinPlayer carteira = status != null ? status.ObterCarteiraRein() : null;
+        string statusAnterior = null;
+        long saldoAnterior = carteira != null ? carteira.ReinUnidades : 0;
+        bool sucesso = false;
+        int indiceAnterior = missaoAtualIndex;
+        try
         {
-            Vector3 posicao = missaoAtual.pontoSpawnRecompensa != null
-                ? missaoAtual.pontoSpawnRecompensa.position
-                : transform.position;
-
-            Quaternion rotacao = missaoAtual.pontoSpawnRecompensa != null
-                ? missaoAtual.pontoSpawnRecompensa.rotation
-                : Quaternion.identity;
-
-            Instantiate(missaoAtual.prefabRecompensa, posicao, rotacao);
+            statusAnterior = status != null ? JsonUtility.ToJson(status) : null;
+            if ((missao.recompensaExperiencia > 0 && status == null) ||
+                (ConverterReinParaUnidades(missao.recompensaRein) > 0 && carteira == null)) return;
+            if (missao.tipoObjetivo == TipoObjetivo.ColetarItens)
+            {
+                InventarioVR inventario = ObterInventarioJogador();
+                int necessario = Mathf.Max(0, missao.quantidadeAlvo);
+                if (inventario == null || ObterQuantidadeItemNoInventario(missao.idAlvo) < necessario) return;
+                var plano = new List<KeyValuePair<SlotInventario, int>>();
+                foreach (var slot in inventario.ObterSlotsParaSave())
+                {
+                    if (slot == null || !string.Equals(ObterNomeItemDoSlot(slot), missao.idAlvo, StringComparison.OrdinalIgnoreCase)) continue;
+                    int quantidade = Mathf.Min(necessario, slot.ObterQuantidadeAtual());
+                    if (quantidade <= 0) continue;
+                    plano.Add(new KeyValuePair<SlotInventario, int>(slot, quantidade));
+                    recuperarSlots.Add(slot.CapturarRecuperacaoCarga());
+                    foreach (var item in slot.ObterItensParaSave())
+                        recuperarItens.Add(new RecuperacaoItemCarga(item));
+                    necessario -= quantidade;
+                    if (necessario == 0) break;
+                }
+                if (necessario != 0) return;
+                foreach (var par in plano)
+                    for (int i = 0; i < par.Value; i++)
+                    {
+                        if (!par.Key.ReservarUnidadeParaConsumo(out var item))
+                            throw new InvalidOperationException("Reserva de materiais incompleta.");
+                        reservados.Add(item);
+                    }
+                if (reservados.Count != Mathf.Max(0, missao.quantidadeAlvo))
+                    throw new InvalidOperationException("Quantidade consumida divergente.");
+            }
+            if (missao.prefabRecompensa != null)
+                recompensa = Instantiate(missao.prefabRecompensa,
+                    missao.pontoSpawnRecompensa != null ? missao.pontoSpawnRecompensa.position : transform.position,
+                    missao.pontoSpawnRecompensa != null ? missao.pontoSpawnRecompensa.rotation : Quaternion.identity);
+            EntregarRecompensasAoPlayer(missao);
+            missao.estado = EstadoMissao.Concluida;
+            missaoAtualIndex++;
+            foreach (var item in reservados)
+            {
+                item.GetComponent<ItemPersistente>()?.RegistrarConsumoPermanente();
+                Destroy(item.gameObject);
+            }
+            sucesso = true;
         }
-
-        EntregarRecompensasAoPlayer(missaoAtual);
-
-        missaoAtual.estado = EstadoMissao.Concluida;
-
-        if (uiProgresso != null)
-            uiProgresso.Esconder(missaoAtual);
-
-        FecharTodosPopupsMissao();
-        FecharObjetosExtrasAoAceitar();
-
-        missaoAtualIndex++;
+        catch (Exception erro) { Debug.LogError("[Missao] Entrega nao confirmada: " + erro, this); }
+        finally
+        {
+            try
+            {
+                if (!sucesso)
+                {
+                    foreach (var recuperar in recuperarSlots) recuperar();
+                    foreach (var recuperar in recuperarItens) recuperar.Restaurar();
+                    if (recompensa != null) { recompensa.SetActive(false); Destroy(recompensa); }
+                    if (status != null && statusAnterior != null) JsonUtility.FromJsonOverwrite(statusAnterior, status);
+                    if (carteira != null) carteira.DefinirSaldoPorUnidades(saldoAnterior);
+                    missao.estado = EstadoMissao.ProntaParaEntregar; missaoAtualIndex = indiceAnterior;
+                }
+            }
+            catch (Exception rollback)
+            {
+                save?.NotificarFalhaRestauracao("Entrega de missao: recuperacao incompleta. " + rollback.Message);
+                Debug.LogError(rollback, this);
+            }
+            finally { save?.FinalizarOperacaoCritica(); entregaEmAndamento = false; }
+        }
+        if (!sucesso) return;
+        if (uiProgresso != null) uiProgresso.Esconder(missao);
+        FecharTodosPopupsMissao(); FecharObjetosExtrasAoAceitar();
         SalvarEstadoAtual();
     }
 

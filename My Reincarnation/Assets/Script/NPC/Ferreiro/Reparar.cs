@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,6 +31,7 @@ public class Reparar : MonoBehaviour
     private float valorAtualDoReparo;
     private StatusPlayer statusPlayer;
     private XRSocketInteractor socketSlot;
+    private bool reparoEmAndamento;
 
     private static readonly string[] TiposReparaveis =
     {
@@ -39,7 +40,10 @@ public class Reparar : MonoBehaviour
         "Machado",
         "Picareta",
         "Arco",
-        "Escudo"
+        "Escudo",
+        "AtributosManoplas",
+        "AtributosPeitoral",
+        "AtributosElmo"
     };
 
     private void Start()
@@ -98,6 +102,12 @@ public class Reparar : MonoBehaviour
         // Interactor (ex.: um slot simples de UI onde o item vira filho do slot).
         if (socketSlot == null)
             VerificarItemNoSlot();
+        else
+        {
+            // Sincroniza tambem selecoes anteriores ao Start ou a reabertura.
+            var selecionado = socketSlot.firstInteractableSelected;
+            ProcessarItemDetectado(selecionado != null ? selecionado.transform.gameObject : null);
+        }
     }
 
     private void VerificarItemNoSlot()
@@ -156,70 +166,68 @@ public class Reparar : MonoBehaviour
 
     public void TentarReparar()
     {
-        EsconderTodasMensagens();
-
-        if (itemNoSlot == null)
-        {
-            return;
-        }
-
-        GameObject item = itemNoSlot;
+        if (reparoEmAndamento || itemNoSlot == null) return;
+        reparoEmAndamento = true;
+        SaveManager save = SaveManager.Instancia;
+        save?.IniciarOperacaoCritica();
+        CarteiraReinPlayer carteira = null;
         Component equip = equipamentoNoSlot;
-        float preco = valorAtualDoReparo;
-        float faltando = equip != null && TentarCalcularVidaFaltando(equip, out float valorFaltando) ? valorFaltando : 0f;
-
-        MoverItemParaSpawn(item);
-
-        itemNoSlot = null;
-        equipamentoNoSlot = null;
-        AtualizarValorNaTela(0f);
-
-        if (equip != null && faltando <= 0.01f)
+        string estadoAnterior = equip != null ? JsonUtility.ToJson(equip) : null;
+        long pago = 0;
+        bool concluido = false;
+        try
         {
-            if (mensagemJaEstaInteiro != null)
-                mensagemJaEstaInteiro.SetActive(true);
-
-            return;
+            EsconderTodasMensagens();
+            if (equip == null || !TentarCalcularVidaFaltando(equip, out float faltando)) return;
+            if (faltando <= 0.01f)
+            { if (mensagemJaEstaInteiro != null) mensagemJaEstaInteiro.SetActive(true); return; }
+            if (statusPlayer == null) statusPlayer = FindFirstObjectByType<StatusPlayer>();
+            carteira = statusPlayer != null ? statusPlayer.ObterCarteiraRein() : null;
+            if (carteira == null) return;
+            float preco = faltando * precoPorPontoDeVida;
+            if (float.IsNaN(preco) || float.IsInfinity(preco) || preco < 0f || preco * 100000d > long.MaxValue) return;
+            long custo = (long)Mathf.Round(preco * 100000f);
+            if (custo > 0 && !carteira.TentarRemoverReinUnidades(custo))
+            { if (mensagemSemDinheiro != null) mensagemSemDinheiro.SetActive(true); return; }
+            pago = custo;
+            if (!TentarRepararComponente(equip) ||
+                !TentarCalcularVidaFaltando(equip, out float restante) || restante > 0.01f)
+                throw new InvalidOperationException("Reparo nao confirmado.");
+            concluido = true;
+            GameObject item = itemNoSlot;
+            itemNoSlot = null; equipamentoNoSlot = null;
+            AtualizarValorNaTela(0f);
+            MoverItemParaSpawn(item);
+            if (mensagemSucesso != null) mensagemSucesso.SetActive(true);
         }
-
-        if (equip == null)
+        catch (Exception erro) { Debug.LogError("[Reparar] " + erro, this); }
+        finally
         {
-            return;
+            try { if (!concluido)
+            {
+                try { if (equip != null && estadoAnterior != null) {
+                    JsonUtility.FromJsonOverwrite(estadoAnterior, equip);
+                    InvocarAtualizacaoVisual(equip); AtualizarPersistenciaDurabilidade(equip);
+                } }
+                finally { if (pago > 0 && carteira != null) carteira.AdicionarReinUnidades(pago); }
+            }
+            } finally { save?.FinalizarOperacaoCritica(); reparoEmAndamento = false; }
         }
-
-        if (statusPlayer == null)
-            statusPlayer = FindFirstObjectByType<StatusPlayer>();
-
-        if (statusPlayer == null)
-            return;
-
-        var carteira = statusPlayer.ObterCarteiraRein();
-        if (carteira == null)
-            return;
-
-        long custoEmUnidades = (long)Mathf.Round(preco * 100000f);
-
-        if (carteira.ReinUnidades < custoEmUnidades)
-        {
-            if (mensagemSemDinheiro != null)
-                mensagemSemDinheiro.SetActive(true);
-
-            return;
-        }
-
-        if (!TentarRepararComponente(equip))
-            return;
-
-        carteira.AdicionarReinUnidades(-custoEmUnidades);
-
-        if (mensagemSucesso != null)
-            mensagemSucesso.SetActive(true);
-
     }
 
     private void MoverItemParaSpawn(GameObject item)
     {
         if (item == null) return;
+
+        // Mover o Transform nao encerra uma selecao XR. Libera antes de soltar
+        // para o socket nao puxar o item reparado de volta a cada frame.
+        if (socketSlot != null)
+        {
+            var selecionado = socketSlot.firstInteractableSelected;
+            if (selecionado != null && selecionado.transform.gameObject == item &&
+                socketSlot.interactionManager != null)
+                socketSlot.interactionManager.SelectExit(socketSlot, selecionado);
+        }
 
         item.transform.SetParent(null);
 

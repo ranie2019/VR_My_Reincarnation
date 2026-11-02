@@ -12,6 +12,8 @@ public class SaveManager : MonoBehaviour
     public static SaveManager Instancia { get; private set; }
     private const string TipoObjetoItemPersistente = "ItemPersistente";
     private const string PrefixoObjetoItemPersistente = "ITEM_";
+    private readonly List<KeyValuePair<ItemPersistente, string>> equipamentosParaRestaurar = new List<KeyValuePair<ItemPersistente, string>>();
+    private readonly Dictionary<string, SceneObjectSaveData> cogumelosIsolados = new Dictionary<string, SceneObjectSaveData>();
 
     [Header("Configuracao")]
     [SerializeField] private bool autoCarregar = true;
@@ -29,6 +31,70 @@ public class SaveManager : MonoBehaviour
     [Header("Inventario")]
     [SerializeField] private bool salvarInventario = true;
 
+    private readonly HashSet<string> removidosPermanentemente = new HashSet<string>();
+    private readonly Dictionary<string, ItemPersistente> originaisCena = new Dictionary<string, ItemPersistente>();
+    private Scene cenaDosOriginais;
+    private bool originaisRegistrados;
+    public void RegistrarRemocaoPermanente(string id)
+    {
+        if (EstadoCarregamento != EstadoCarga.EmAndamento && ItemPersistente.InstanciaIdEhGuidValido(id))
+            removidosPermanentemente.Add(id);
+    }
+    private void RegistrarOriginaisCena()
+    {
+        if (originaisRegistrados) return;
+        originaisRegistrados = true;
+        cenaDosOriginais = gameObject.scene;
+        foreach (var item in FindObjectsByType<ItemPersistente>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (item.gameObject.scene != cenaDosOriginais) continue;
+            string chave = item.gameObject.scene.path;
+            for (Transform t = item.transform; t != null; t = t.parent)
+                chave += "/" + t.name + "[" + t.GetSiblingIndex() + "]";
+            string id = item.OrigemCenaId;
+            if (ItemPersistente.InstanciaIdEhGuidValido(id))
+            { if (!item.PossuiRespawnIntencional()) originaisCena[id] = item; continue; }
+            id = item.ObterInstanciaIdSemGerar();
+            if (item.InstanciaIdFoiGeradoEmRuntime() || string.IsNullOrEmpty(id))
+                id = Hash128.Compute("OrigemCena:" + chave).ToString();
+            item.DefinirOrigemCena(id);
+            if (!item.PossuiRespawnIntencional()) originaisCena[id] = item;
+        }
+    }
+    private List<string> CapturarRemocoesPermanentes()
+    {
+        if (cenaDosOriginais.isLoaded)
+            foreach (var par in originaisCena)
+                if (par.Value == null) removidosPermanentemente.Add(par.Key);
+        return new List<string>(removidosPermanentemente);
+    }
+    private void AplicarRemocoesPermanentes(SaveData data)
+    {
+        foreach (var item in FindObjectsByType<ItemPersistente>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (!item.PossuiRespawnIntencional() && !string.IsNullOrEmpty(item.OrigemCenaId) &&
+                data.itensRemovidosPermanentemente != null && data.itensRemovidosPermanentemente.Contains(item.OrigemCenaId))
+            { item.gameObject.SetActive(false); remocoesDuranteCarga.Add(item.gameObject); }
+    }
+    private InventarioSaveAdapter adapterEmConfirmacao;
+    private void ConfirmarRemocoesPermanentes(SaveData data)
+    {
+        removidosPermanentemente.Clear();
+        if (data.itensRemovidosPermanentemente != null) removidosPermanentemente.UnionWith(data.itensRemovidosPermanentemente);
+        // Originais substituidos pela carga nao significam consumo. Reassocia as copias pelo ID de origem.
+        var vivos = FindObjectsByType<ItemPersistente>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var id in new List<string>(originaisCena.Keys))
+        {
+            originaisCena[id] = null;
+            foreach (var item in vivos)
+                if (item.OrigemCenaId == id && !(adapterEmConfirmacao != null && adapterEmConfirmacao.SeraDescartadoNaConfirmacao(item.gameObject)) && (remocoesDuranteCarga == null || !remocoesDuranteCarga.Contains(item.gameObject)))
+                { originaisCena[id] = item; break; }
+            if (originaisCena[id] == null && !removidosPermanentemente.Contains(id)) originaisCena.Remove(id);
+        }
+    }
+    private int operacoesCriticas;
+    internal void IniciarOperacaoCritica() { operacoesCriticas++; }
+    internal void FinalizarOperacaoCritica() { operacoesCriticas = Math.Max(0, operacoesCriticas - 1); }
+    private List<GameObject> remocoesDuranteCarga;
     private readonly List<ISalvavel> objetosRegistrados = new List<ISalvavel>();
 
     public enum EstadoCarga { NaoIniciado, EmAndamento, Concluido, Falhou, RecuperacaoNecessaria, SessaoNova }
@@ -51,6 +117,7 @@ public class SaveManager : MonoBehaviour
         public PlayerSaveData player;
         public List<InventorySaveData> inventario;
         public List<SceneObjectSaveData> objetosCena;
+        public List<string> itensRemovidosPermanentemente;
     }
 
     private string CaminhoSave
@@ -79,6 +146,7 @@ public class SaveManager : MonoBehaviour
 
     private void Start()
     {
+        RegistrarOriginaisCena();
         RegistrarObjetosSalvaveisNaCena();
 
         if (EstadoCarregamento != EstadoCarga.NaoIniciado) return;
@@ -110,7 +178,7 @@ public class SaveManager : MonoBehaviour
     public void SalvarJogo()
     {
         // Inclui chamadas automaticas de missoes e chamadas manuais: nenhuma pode contornar uma falha.
-        if (Instancia != this || (EstadoCarregamento != EstadoCarga.Concluido && EstadoCarregamento != EstadoCarga.SessaoNova))
+        if (operacoesCriticas > 0 || Instancia != this || (EstadoCarregamento != EstadoCarga.Concluido && EstadoCarregamento != EstadoCarga.SessaoNova))
         {
             Debug.LogWarning("[SaveManager] Save nao gravado. Estado: " + EstadoCarregamento);
             return;
@@ -121,10 +189,12 @@ public class SaveManager : MonoBehaviour
             SaveData data = new SaveData
             {
                 versaoSave = SaveData.VersaoAtual,
+                itensRemovidosPermanentemente = CapturarRemocoesPermanentes(),
                 dataSave = DateTime.Now.ToString("O"),
                 player = CriarPlayerSaveData(),
                 inventario = salvarInventario ? CapturarInventarioAtual() : new List<InventorySaveData>(),
                 objetosCena = CapturarObjetosCena(),
+                cogumelosPendentes = new List<RespawnNatureza.EstadoPontoCogumelo>(),
                 missoes = CapturarMissoes()
             };
             string json = JsonUtility.ToJson(data, true);
@@ -147,11 +217,46 @@ public class SaveManager : MonoBehaviour
             if (EstadoCarregamento == EstadoCarga.NaoIniciado) EstadoCarregamento = EstadoCarga.SessaoNova;
             return;
         }
+        RegistrarOriginaisCena();
         EstadoCarregamento = EstadoCarga.EmAndamento;
         ArquivoCarregado = null;
+        InventarioSaveAdapter adapterCarga = null;
+        var recuperacoes = new List<RecuperacaoItemCarga>();
+        var recuperarMundo = new List<Action>();
+        var existentes = new HashSet<ItemPersistente>(FindObjectsByType<ItemPersistente>(FindObjectsInactive.Include, FindObjectsSortMode.None));
+        PlayerSaveData playerAnterior = null;
+        bool iniciouAplicacao = false;
+        GerenciadorEquipamentosPlayer gerenciadorEquipamentos = null;
+        Action recuperarEquipamentos = null;
+        equipamentosParaRestaurar.Clear();
+        var isolamentoAnterior = new Dictionary<string, SceneObjectSaveData>(cogumelosIsolados);
+        var remocoesAnteriores = new HashSet<string>(removidosPermanentemente);
+        var originaisAnteriores = new Dictionary<string, ItemPersistente>(originaisCena);
+        remocoesDuranteCarga = new List<GameObject>();
         try
         {
+            gerenciadorEquipamentos = ResolverGerenciadorEquipamentos();
+            recuperarEquipamentos = gerenciadorEquipamentos != null ? gerenciadorEquipamentos.CapturarRecuperacaoEquipamentos() : null;
+            foreach (var item in existentes) recuperacoes.Add(new RecuperacaoItemCarga(item));
+            playerAnterior = CriarPlayerSaveData();
             RegistrarObjetosSalvaveisNaCena();
+            foreach (var objeto in objetosRegistrados)
+            {
+                if (ObjetoEhNulo(objeto) || ObjetoPossuiItemPersistente(objeto)) continue;
+                // Os implementadores atuais sao componentes de cena com snapshot reversivel.
+                if (!(objeto is MonoBehaviour componente))
+                    throw new InvalidOperationException("Objeto salvavel sem recuperacao de componente: " + objeto.ObterId());
+                var snapshot = new RecuperacaoItemCarga(componente);
+                recuperarMundo.Add(snapshot.Restaurar);
+            }
+            foreach (var gerenciador in FindObjectsByType<GerenciadorMissoes>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                recuperarMundo.Add(gerenciador.CapturarRecuperacaoSave());
+            var respawnAntes = RespawnNatureza.Instancia;
+            if (respawnAntes != null)
+            {
+                var pendentesAntes = respawnAntes.CapturarPontosPendentes();
+                recuperarMundo.Add(() => respawnAntes.RestaurarPontosPendentes(pendentesAntes));
+            }
             SaveData escolhido = null;
             var falhas = new List<string>();
             foreach (string caminho in ArquivoSaveSeguro.Candidatos(CaminhoSave))
@@ -171,22 +276,71 @@ public class SaveManager : MonoBehaviour
                 throw new InvalidDataException("Nenhuma geracao pode ser carregada. " + string.Join(" | ", falhas));
 
             // Nao tenta outro backup depois de iniciar mutacoes na cena.
-            if (salvarInventario) RestaurarInventario(escolhido.inventario);
-            RestaurarPlayer(escolhido.player);
+            iniciouAplicacao = true;
+            cogumelosIsolados.Clear();
+            gerenciadorEquipamentos?.PrepararRestauracaoEquipamentos();
+            if (salvarInventario)
+            {
+                adapterCarga = EncontrarInventarioSalvavel() as InventarioSaveAdapter;
+                string erroCarga = "Adapter indisponivel.";
+                if (adapterCarga == null || !adapterCarga.TentarCarregarInventario(escolhido.inventario, out erroCarga, true))
+                    throw new InvalidOperationException(adapterCarga == null ? "Adapter indisponivel." : erroCarga);
+            }
+            RestaurarPlayer(escolhido.player, false);
             RestaurarObjetosCena(escolhido.objetosCena, ExtrairInstanciaIdsInventario(escolhido.inventario));
+            foreach (var equipamento in equipamentosParaRestaurar)
+                gerenciadorEquipamentos.RestaurarEquipamentoVestido(equipamento.Key, equipamento.Value);
+            // HP/MP so sao sincronizados depois de recuperar os bonus vestidos.
+            var statusRestaurado = ResolverStatusPlayer();
+            if (statusRestaurado != null) RestaurarStatusPlayer(statusRestaurado, escolhido.player);
             RestaurarMissoes(escolhido.missoes);
+            RespawnNatureza.Instancia?.RestaurarPontosPendentes(new List<RespawnNatureza.EstadoPontoCogumelo>());
             if (EstadoCarregamento != EstadoCarga.EmAndamento)
                 throw new InvalidOperationException("Um componente informou falha durante a aplicacao.");
+            AplicarRemocoesPermanentes(escolhido);
+            adapterEmConfirmacao = adapterCarga;
+            ConfirmarRemocoesPermanentes(escolhido);
+            adapterEmConfirmacao = null;
+            adapterCarga?.ConfirmarCargaGlobal();
+            foreach (var objeto in remocoesDuranteCarga)
+                if (objeto != null) { objeto.SetActive(false); Destroy(objeto); }
             EstadoCarregamento = EstadoCarga.Concluido;
+            if (cogumelosIsolados.Count > 0)
+                Debug.LogWarning("[SaveManager] " + cogumelosIsolados.Count + " registros antigos de cogumelos com origem invalida foram isolados. Dados preservados no save; nenhuma copia recriada.", this);
             UltimoDiagnosticoCarga = "Carga concluida: " + ArquivoCarregado;
             Debug.Log("[SaveManager] " + UltimoDiagnosticoCarga +
                 (falhas.Count > 0 ? ". Recuperacao; originais preservados. " + string.Join(" | ", falhas) : ""));
         }
         catch (Exception erro)
         {
+            cogumelosIsolados.Clear(); foreach (var par in isolamentoAnterior) cogumelosIsolados.Add(par.Key, par.Value);
+            removidosPermanentemente.Clear(); removidosPermanentemente.UnionWith(remocoesAnteriores);
+            originaisCena.Clear(); foreach (var par in originaisAnteriores) originaisCena.Add(par.Key, par.Value);
+            if (iniciouAplicacao)
+            {
+                try { LiberarEquipamentosDaCarga(); }
+                catch (Exception rollback) { Debug.LogError("Limpeza de equipamento parcial incompleta: " + rollback); }
+                try { gerenciadorEquipamentos?.PrepararRestauracaoEquipamentos(); }
+                catch (Exception rollback) { Debug.LogError("Recuperacao de equipamentos incompleta: " + rollback); }
+                try { adapterCarga?.RecuperarCargaGlobal(); }
+                catch (Exception rollback) { Debug.LogError("Recuperacao do inventario incompleta: " + rollback); }
+                for (int i = recuperarMundo.Count - 1; i >= 0; i--)
+                    try { recuperarMundo[i](); }
+                    catch (Exception rollback) { Debug.LogError("Recuperacao do mundo incompleta: " + rollback); }
+                foreach (var estado in recuperacoes)
+                    try { estado.Restaurar(); }
+                    catch (Exception rollback) { Debug.LogError("Recuperacao de item incompleta: " + rollback); }
+                foreach (var item in FindObjectsByType<ItemPersistente>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    if (!existentes.Contains(item)) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
+                try { recuperarEquipamentos?.Invoke(); }
+                catch (Exception rollback) { Debug.LogError("Recuperacao de equipamentos incompleta: " + rollback); }
+                try { if (playerAnterior != null) RestaurarPlayer(playerAnterior); }
+                catch (Exception rollback) { Debug.LogError("Recuperacao do player incompleta: " + rollback); }
+            }
             EstadoCarregamento = EstadoCarga.Falhou;
             NotificarFalhaRestauracao(erro.Message);
         }
+        finally { remocoesDuranteCarga = null; adapterEmConfirmacao = null; equipamentosParaRestaurar.Clear(); }
     }
 
     private SaveData InterpretarEValidarSave(string conteudo)
@@ -203,9 +357,17 @@ public class SaveManager : MonoBehaviour
             envelope.inventario == null || envelope.objetosCena == null)
             throw new InvalidDataException("Estrutura obrigatoria do save ausente.");
         string numero = envelope.versaoSave.Split('-')[0];
-        if (!Version.TryParse(numero, out Version versao) || versao.Major != 0 || versao.Minor > 4)
+        if (!Version.TryParse(numero, out Version versao) || versao.Major != 0 || versao.Minor > 8)
             throw new InvalidDataException("Versao de save nao suportada: " + envelope.versaoSave);
+        if (versao.Minor >= 5 && envelope.itensRemovidosPermanentemente == null)
+            throw new InvalidDataException("Save novo sem registro de remocoes permanentes.");
         SaveData data = JsonUtility.FromJson<SaveData>(json);
+        RemoverCogumelosDoMundoSalvo(data);
+        var removidos = new HashSet<string>();
+        if (data.itensRemovidosPermanentemente != null)
+            foreach (string id in data.itensRemovidosPermanentemente)
+                if (!ItemPersistente.InstanciaIdEhGuidValido(id) || !removidos.Add(id))
+                    throw new InvalidDataException("ID de remocao permanente invalido ou repetido.");
         var slots = new HashSet<int>();
         var ids = new HashSet<string>();
         foreach (InventorySaveData item in data.inventario)
@@ -215,6 +377,10 @@ public class SaveManager : MonoBehaviour
                 float.IsNaN(item.durabilidade) || float.IsInfinity(item.durabilidade))
                 throw new InvalidDataException("Entrada de inventario invalida.");
             item.ValidarEstadosIndividuais();
+            if (item.estadosIndividuais != null)
+                foreach (var unidade in item.estadosIndividuais)
+                    if (!string.IsNullOrEmpty(unidade.origemCenaId) && removidos.Contains(unidade.origemCenaId))
+                        throw new InvalidDataException("Item vivo tambem consta como removido.");
             if (versao.Minor >= 4 && item.versaoEstadosIndividuais != 1)
                 throw new InvalidDataException("Save novo sem estados individuais.");
             var locais = new HashSet<string>();
@@ -232,6 +398,7 @@ public class SaveManager : MonoBehaviour
                 if (!InstanciaIdValido(id) || !ids.Add(id)) throw new InvalidDataException("ID invalido ou duplicado: " + id);
         }
         var objetos = new HashSet<string>();
+        var posicoesVestidas = new HashSet<string>();
         foreach (SceneObjectSaveData objeto in data.objetosCena)
         {
             if (objeto == null || string.IsNullOrWhiteSpace(objeto.objectId) || !objetos.Add(objeto.objectId) ||
@@ -244,6 +411,10 @@ public class SaveManager : MonoBehaviour
                 if (!string.IsNullOrWhiteSpace(objeto.estadoJson) && ItemPersistente.LerEstadoCenaJson(objeto.estadoJson) == null)
                     throw new InvalidDataException("Estado de item invalido: " + objeto.objectId);
                 var estado = LerEstadoItemCena(objeto);
+                ValidarPosicaoEquipamentoSalva(objeto, estado, posicoesVestidas);
+                ItemPersistente.ValidarPontoCogumelo(estado);
+                if (!string.IsNullOrEmpty(estado.origemCenaId) && removidos.Contains(estado.origemCenaId))
+                    throw new InvalidDataException("Item de cena vivo tambem consta como removido.");
                 if (string.IsNullOrWhiteSpace(estado.itemId)) throw new InvalidDataException("Tipo de item ausente.");
                 if (!string.IsNullOrWhiteSpace(estado.instanciaId) &&
                     (!InstanciaIdValido(estado.instanciaId) || !ids.Add(estado.instanciaId)))
@@ -260,6 +431,29 @@ public class SaveManager : MonoBehaviour
         return data;
     }
 
+    // Cogumelos do mundo pertencem ao layout atual da cena, nunca ao save.
+    // O inventario possui seu proprio caminho e nao e filtrado aqui.
+    private void RemoverCogumelosDoMundoSalvo(SaveData data)
+    {
+        data.cogumelosPendentes = new List<RespawnNatureza.EstadoPontoCogumelo>();
+        var cogumelos = FindObjectsByType<Cocumelo>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var database = ItemDatabaseLocal.Instancia;
+        data.objetosCena.RemoveAll(objeto =>
+        {
+            if (objeto == null || !EhDadoItemPersistente(objeto)) return false;
+            var estado = LerEstadoItemCena(objeto);
+            if (estado == null) return false;
+            if (estado.possuiPontoCogumelo || objeto.quarentenaCogumelo) return true;
+            foreach (var cogumelo in cogumelos)
+            {
+                var item = cogumelo.GetComponent<ItemPersistente>();
+                if (item != null && item.CorrespondeAoItemId(estado.itemId)) return true;
+            }
+            var prefab = database != null ? database.ObterPrefab(estado.itemId) : null;
+            return prefab != null && prefab.GetComponent<Cocumelo>() != null;
+        });
+    }
+
     private bool ConteudoSaveValido(string conteudo)
     {
         try { InterpretarEValidarSave(conteudo); return true; }
@@ -268,6 +462,11 @@ public class SaveManager : MonoBehaviour
 
     private void ValidarAplicacao(SaveData data)
     {
+        if (data.cogumelosPendentes != null && data.cogumelosPendentes.Count > 0)
+        {
+            if (RespawnNatureza.Instancia == null) throw new InvalidDataException("Gerenciador de respawn ausente.");
+            RespawnNatureza.Instancia.ValidarPontosPendentes(data.cogumelosPendentes);
+        }
         if (salvarInventario)
         {
             var adapter = EncontrarInventarioSalvavel() as InventarioSaveAdapter;
@@ -298,7 +497,9 @@ public class SaveManager : MonoBehaviour
                 continue;
             }
             var estado = LerEstadoItemCena(objeto);
-            var item = EncontrarItemSoltoPorInstancia(existentes, estado.instanciaId, usados);
+            if (DeveIsolarCogumelo(objeto, estado)) continue;
+            var item = EncontrarItemSoltoPorOrigem(existentes, estado.origemCenaId, estado.itemId, usados) ??
+                EncontrarItemSoltoPorInstancia(existentes, estado.instanciaId, usados);
             if (item == null)
             {
                 item = EncontrarItemSoltoComIdRuntimeParaMigrar(existentes, estado.itemId, usados, out int candidatos, idsReservados);
@@ -308,7 +509,46 @@ public class SaveManager : MonoBehaviour
             if (item != null) usados.Add(item);
             else if (database == null || database.ObterPrefab(estado.itemId) == null)
                 throw new InvalidDataException("Prefab de cena indisponivel: " + estado.itemId);
+            GameObject prefabValidacao = item != null ? item.gameObject : database.ObterPrefab(estado.itemId);
+            ItemPersistente.ValidarExtrasNoPrefab(prefabValidacao, estado.dadosExtrasJson);
+            ItemPersistente.ValidarDurabilidadeManoplaCena(prefabValidacao, estado);
+            ItemPersistente.ValidarPontoCogumelo(estado);
+            if (estado.possuiPontoCogumelo && prefabValidacao.GetComponent<Cocumelo>() == null)
+                throw new InvalidDataException("Prefab sem controlador do ponto de cogumelo: " + estado.itemId);
+            if (!string.IsNullOrEmpty(estado.posicaoEquipamento))
+            {
+                var gerenciador = ResolverGerenciadorEquipamentos();
+                if (gerenciador == null) throw new InvalidDataException("Gerenciador de equipamentos do player ausente.");
+                gerenciador.ValidarEquipamentoParaCarga(prefabValidacao, estado.posicaoEquipamento);
+            }
         }
+    }
+
+    internal static bool RegistroCogumeloDeveSerIsolado(SceneObjectSaveData data,
+        ItemPersistente.EstadoCenaItem estado, bool prefabCogumelo, bool pontoConhecido)
+    {
+        if (!prefabCogumelo || !string.IsNullOrEmpty(estado.posicaoEquipamento)) return false;
+        if (data.quarentenaCogumelo) return true;
+        // Assinatura exata das copias antigas restauradas em Instantiate(0,0,0).
+        return estado.possuiPontoCogumelo && estado.cogumeloReposicao && estado.cogumeloColetado &&
+            !estado.coletaJogadorConfirmada && string.IsNullOrEmpty(estado.origemCenaId) &&
+            estado.pontoCogumelo.x == 0f && estado.pontoCogumelo.y == 0f && estado.pontoCogumelo.z == 0f && !pontoConhecido;
+    }
+
+    private bool DeveIsolarCogumelo(SceneObjectSaveData data, ItemPersistente.EstadoCenaItem estado)
+    {
+        bool suspeito = data.quarentenaCogumelo || (estado.possuiPontoCogumelo && estado.cogumeloReposicao &&
+            estado.cogumeloColetado && !estado.coletaJogadorConfirmada && string.IsNullOrEmpty(estado.origemCenaId) &&
+            estado.pontoCogumelo.x == 0f && estado.pontoCogumelo.y == 0f && estado.pontoCogumelo.z == 0f);
+        if (!suspeito) return false;
+        // Os marcadores comprovam o registro legado sem resolver/instanciar
+        // um prefab que pode nem existir mais no projeto.
+        var respawn = RespawnNatureza.Instancia;
+        if (!data.quarentenaCogumelo && (respawn == null || !respawn.PodeClassificarLegados)) return false;
+        bool isolar = RegistroCogumeloDeveSerIsolado(data, estado, estado.possuiPontoCogumelo,
+            respawn != null && respawn.PossuiPontoOriginalNaPosicao(estado.pontoCogumelo));
+        if (data.quarentenaCogumelo && !isolar) throw new InvalidDataException("Registro isolado nao corresponde a cogumelo.");
+        return isolar;
     }
 
     private List<MissionSaveData> CapturarMissoes()
@@ -424,7 +664,7 @@ public class SaveManager : MonoBehaviour
         return data;
     }
 
-    private void RestaurarPlayer(PlayerSaveData data)
+    private void RestaurarPlayer(PlayerSaveData data, bool restaurarStatus = true)
     {
         if (data == null)
             return;
@@ -445,7 +685,7 @@ public class SaveManager : MonoBehaviour
                 playerResolvido.rotation = Quaternion.Euler(rotacao);
         }
 
-        if (status != null)
+        if (status != null && restaurarStatus)
             RestaurarStatusPlayer(status, data);
     }
 
@@ -509,10 +749,7 @@ public class SaveManager : MonoBehaviour
                 continue;
 
             if (!idsUsados.Add(id))
-            {
-                { }
-                continue;
-            }
+                throw new InvalidDataException("ID de objeto persistente duplicado: " + id);
 
             SceneObjectSaveData estado = objeto.SalvarEstado();
             if (estado != null)
@@ -564,6 +801,7 @@ public class SaveManager : MonoBehaviour
                 continue;
 
             ItemPersistente.EstadoCenaItem estadoItem = item.CriarEstadoCena();
+            if (estadoItem != null) estadoItem.posicaoEquipamento = GerenciadorEquipamentosPlayer.IdentificarPosicaoVestida(item.gameObject);
             if (estadoItem == null ||
                 string.IsNullOrWhiteSpace(estadoItem.itemId) ||
                 string.IsNullOrWhiteSpace(estadoItem.instanciaId))
@@ -642,6 +880,19 @@ public class SaveManager : MonoBehaviour
                 throw new InvalidOperationException("Item de cena nao restaurado: " + data.objectId);
             }
 
+            if (DeveIsolarCogumelo(data, estadoItem))
+            {
+                data.quarentenaCogumelo = true;
+                cogumelosIsolados[data.objectId] = data;
+                var legado = EncontrarItemSoltoPorInstancia(existentesAntes, estadoItem.instanciaId, itensUsados);
+                if (legado != null)
+                {
+                    itensUsados.Add(legado);
+                    if (remocoesDuranteCarga != null) remocoesDuranteCarga.Add(legado.gameObject);
+                }
+                continue;
+            }
+
             string instanciaId = NormalizarInstanciaId(estadoItem.instanciaId);
             if (!InstanciaIdValido(instanciaId))
             {
@@ -659,7 +910,8 @@ public class SaveManager : MonoBehaviour
 
             instanciaIdsSalvos.Add(instanciaId);
 
-            ItemPersistente item = EncontrarItemSoltoPorInstancia(existentesAntes, instanciaId, itensUsados);
+            ItemPersistente item = EncontrarItemSoltoPorOrigem(existentesAntes, estadoItem.origemCenaId, estadoItem.itemId, itensUsados) ??
+                EncontrarItemSoltoPorInstancia(existentesAntes, instanciaId, itensUsados);
 
             if (item == null)
             {
@@ -820,16 +1072,54 @@ public class SaveManager : MonoBehaviour
         return string.IsNullOrWhiteSpace(instanciaId) ? string.Empty : instanciaId.Trim();
     }
 
+    private static void ValidarPosicaoEquipamentoSalva(SceneObjectSaveData objeto,
+        ItemPersistente.EstadoCenaItem estado, HashSet<string> posicoes)
+    {
+        if (!GerenciadorEquipamentosPlayer.PosicaoSaveValida(estado.posicaoEquipamento) ||
+            (!string.IsNullOrEmpty(estado.posicaoEquipamento) &&
+            (!posicoes.Add(estado.posicaoEquipamento) || !objeto.ativo || estado.durabilidade == 0f ||
+            float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
+            (estado.durabilidade < 0f && estado.durabilidade != -1f))))
+            throw new InvalidDataException("Posicao de equipamento invalida, repetida ou item quebrado: " + objeto.objectId);
+    }
+
+    private void LiberarEquipamentosDaCarga()
+    {
+        // Inclui um encaixe que falhou antes de o gerenciador registrar a referencia.
+        foreach (var entrada in equipamentosParaRestaurar)
+        {
+            var item = entrada.Key;
+            if (item == null) continue;
+            item.GetComponent<EquiparManoplas>()?.Desequipar();
+            item.GetComponent<EquiparElmo>()?.Desequipar();
+            item.GetComponent<EquiparPeitoral>()?.Desequipar();
+        }
+    }
+
+    private GerenciadorEquipamentosPlayer ResolverGerenciadorEquipamentos()
+    {
+        var status = ResolverStatusPlayer();
+        var raiz = ResolverTransformPlayer(status);
+        return raiz != null ? raiz.GetComponentInChildren<GerenciadorEquipamentosPlayer>(true) : GerenciadorEquipamentosPlayer.Instancia;
+    }
+
     private void RestaurarItemSoltoCena(
         ItemPersistente item,
         SceneObjectSaveData data,
         ItemPersistente.EstadoCenaItem estadoItem)
     {
+        // Inicializa os encaixes/escala original de prefabs inativos antes de
+        // aplicar o Transform salvo, que pode estar compensado pelo osso do avatar.
+        if (!string.IsNullOrEmpty(estadoItem.posicaoEquipamento) && !item.gameObject.activeSelf)
+            item.gameObject.SetActive(true);
         item.AplicarEstadoCena(estadoItem);
         item.MarcarComoSoltoNaCena();
+        if (!string.IsNullOrEmpty(estadoItem.posicaoEquipamento))
+            equipamentosParaRestaurar.Add(new KeyValuePair<ItemPersistente, string>(item, estadoItem.posicaoEquipamento));
 
         Transform itemTransform = item.transform;
-        itemTransform.SetParent(null, true);
+        // Recursos originais conservam a pasta da cena durante a restauracao.
+        if (item.GetComponent<Respawnitem>() == null) itemTransform.SetParent(null, true);
 
         Vector3 posicao = new Vector3(data.posX, data.posY, data.posZ);
         if (VetorFinito(posicao))
@@ -854,6 +1144,23 @@ public class SaveManager : MonoBehaviour
             rb.detectCollisions = true;
             rb.WakeUp();
         }
+        item.GetComponent<Cocumelo>()?.OrganizarClone();
+        RespawnNatureza.Instancia?.OrganizarRecursoRestaurado(item);
+    }
+
+    private ItemPersistente EncontrarItemSoltoPorOrigem(
+        List<ItemPersistente> itens, string origemId, string tipoId, HashSet<ItemPersistente> usados)
+    {
+        if (!ItemPersistente.InstanciaIdEhGuidValido(origemId)) return null;
+        ItemPersistente encontrado = null;
+        foreach (var item in itens)
+        {
+            if (item == null || usados.Contains(item) || ItemEstaNoInventarioOuSlot(item) ||
+                item.OrigemCenaId != origemId || !item.CorrespondeAoItemId(tipoId)) continue;
+            if (encontrado != null) throw new InvalidDataException("Origem de cena duplicada: " + origemId);
+            encontrado = item;
+        }
+        return encontrado;
     }
 
     private ItemPersistente EncontrarItemSoltoPorInstancia(
@@ -986,14 +1293,15 @@ public class SaveManager : MonoBehaviour
             if (string.IsNullOrWhiteSpace(instanciaId) || !instanciaIdsSalvos.Contains(instanciaId.Trim()))
                 continue;
 
-            Destroy(item.gameObject);
+            if (remocoesDuranteCarga != null) remocoesDuranteCarga.Add(item.gameObject);
+            else Destroy(item.gameObject);
         }
     }
 
     private bool ItemDeveSerSalvoComoCena(ItemPersistente item)
     {
-        return item != null &&
-               item.DeveSalvarComoCena() &&
+        return item != null && item.GetComponent<Cocumelo>() == null &&
+               (item.DeveSalvarComoCena() || !string.IsNullOrEmpty(GerenciadorEquipamentosPlayer.IdentificarPosicaoVestida(item.gameObject))) &&
                !ItemEstaNoInventarioOuSlot(item);
     }
 
@@ -1025,8 +1333,10 @@ public class SaveManager : MonoBehaviour
                 continue;
 
             string id = objeto.ObterId();
-            if (string.IsNullOrWhiteSpace(id) || mapa.ContainsKey(id))
-                continue;
+            if (string.IsNullOrWhiteSpace(id))
+                throw new InvalidDataException("Objeto persistente sem ID.");
+            if (mapa.ContainsKey(id))
+                throw new InvalidDataException("ID de objeto persistente duplicado: " + id);
 
             mapa.Add(id, objeto);
         }
@@ -1094,9 +1404,9 @@ public class SaveManager : MonoBehaviour
             "GetExperienciaParaProximoNivel",
             "experienciaParaProximoNivel");
         data.vidaAtual = ObterInteiroStatus(status, "GetVidaAtual", "vidaAtual");
-        data.vidaMaxima = ObterInteiroStatus(status, "GetVidaMaxima", "vidaMaxima");
+        data.vidaMaxima = ObterInteiroStatus(status, "GetVidaMaximaBase", "vidaMaxima");
         data.manaAtual = ObterInteiroStatus(status, "GetManaAtual", "manaAtual");
-        data.manaMaxima = ObterInteiroStatus(status, "GetManaMaxima", "manaMaxima");
+        data.manaMaxima = ObterInteiroStatus(status, "GetManaMaximaBase", "manaMaxima");
         data.reinUnidades = ObterReinUnidadesStatus(status);
         data.statusDetalhadoSalvo = true;
         data.pontosStatusDisponiveis = ObterInteiroStatus(status, "GetPontosStatusDisponiveis", "pontosStatusDisponiveis");

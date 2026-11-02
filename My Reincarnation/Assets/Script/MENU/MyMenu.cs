@@ -102,9 +102,20 @@ public class MyMenu : MonoBehaviour
 
     // ── Abrir / Fechar ────────────────────────────────────────
 
+    private static GameObject ResolverRaizPainel(AbaMenuDados aba)
+    {
+        if (aba == null || aba.painel == null) return null;
+        if (aba.botao == null) return aba.painel;
+        Transform atual = aba.painel.transform;
+        while (atual.parent != null && atual.parent != aba.botao.transform)
+            atual = atual.parent;
+        return atual.parent == aba.botao.transform ? atual.gameObject : aba.painel;
+    }
+
     private static void AbrirPainelInterno(AbaMenuDados aba)
     {
         if (aba == null || aba.painel == null) return;
+        GameObject raiz = ResolverRaizPainel(aba);
 
         // Se o painel contiver um InventarioVR, usa a API dele para
         // garantir que todos os filhos e slots sejam reativados corretamente.
@@ -113,27 +124,30 @@ public class MyMenu : MonoBehaviour
         InventarioVR inv = EncontrarInventario(aba.painel);
         if (inv != null)
         {
+            raiz.SetActive(true);
             aba.painel.SetActive(true);
             inv.AbrirInventario();
             return;
         }
 
+        raiz.SetActive(true);
         aba.painel.SetActive(true);
     }
 
     private static void FecharPainelInterno(AbaMenuDados aba)
     {
         if (aba == null || aba.painel == null) return;
+        GameObject raiz = ResolverRaizPainel(aba);
 
         InventarioVR inv = EncontrarInventario(aba.painel);
         if (inv != null)
         {
             inv.FecharInventario();
-            aba.painel.SetActive(false);
+            raiz.SetActive(false);
             return;
         }
 
-        aba.painel.SetActive(false);
+        raiz.SetActive(false);
     }
 
     private static InventarioVR EncontrarInventario(GameObject painel)

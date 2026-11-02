@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -11,6 +11,7 @@ public static class ItemPersistenteIdEditorUtility
     private const string CampoTipoItemId = "tipoItemId";
     private const string CampoItemId = "itemId";
     private const string CampoInstanciaId = "instanciaId";
+    private const string CampoOrigemCenaId = "origemCenaId";
     private const string CampoItensDatabase = "itens";
     private const string CampoDatabaseItemId = "itemId";
     private const string CampoDatabasePrefab = "prefab";
@@ -57,6 +58,7 @@ public static class ItemPersistenteIdEditorUtility
 
         List<ItemPersistente> itens = ObterItensPersistentesDaCenaAtiva();
         HashSet<string> idsUsados = new HashSet<string>(StringComparer.Ordinal);
+        var origensUsadas = new HashSet<string>(StringComparer.Ordinal);
         int idsGerados = 0;
         int duplicadosCorrigidos = 0;
 
@@ -65,8 +67,18 @@ public static class ItemPersistenteIdEditorUtility
             ItemPersistente item = itens[i];
             string instanciaId = LerStringSerializada(item, CampoInstanciaId);
 
+            string origemId = LerStringSerializada(item, CampoOrigemCenaId);
             if (ItemPersistente.InstanciaIdEhGuidValido(instanciaId) && idsUsados.Add(instanciaId))
+            {
+                if (!ItemPersistente.InstanciaIdEhGuidValido(origemId) || !origensUsadas.Add(origemId))
+                {
+                    DefinirStringSerializada(item, CampoOrigemCenaId, instanciaId);
+                    origensUsadas.Add(instanciaId);
+                    if (PrefabUtility.IsPartOfPrefabInstance(item)) PrefabUtility.RecordPrefabInstancePropertyModifications(item);
+                    EditorUtility.SetDirty(item); EditorSceneManager.MarkSceneDirty(cena);
+                }
                 continue;
+            }
 
             bool eraDuplicado = !string.IsNullOrWhiteSpace(instanciaId);
             string novoId = CriarGuidUnico(idsUsados);
@@ -74,6 +86,10 @@ public static class ItemPersistenteIdEditorUtility
             if (registrarUndo)
                 Undo.RecordObject(item, "Gerar instanciaId persistente");
             DefinirStringSerializada(item, CampoInstanciaId, novoId);
+            if (!ItemPersistente.InstanciaIdEhGuidValido(origemId) || !origensUsadas.Add(origemId)) origemId = novoId;
+            DefinirStringSerializada(item, CampoOrigemCenaId, origemId);
+            origensUsadas.Add(origemId);
+            if (PrefabUtility.IsPartOfPrefabInstance(item)) PrefabUtility.RecordPrefabInstancePropertyModifications(item);
             EditorUtility.SetDirty(item);
 
             idsGerados++;
@@ -104,6 +120,17 @@ public static class ItemPersistenteIdEditorUtility
         string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" });
         int prefabsAlterados = 0;
         int idsLimpados = 0;
+        // Aplicar overrides ao prefab pode fazer a cena herdar seu GUID. Preserva
+        // a identidade das instancias carregadas antes de limpar o asset de origem.
+        var identidadesCena = new Dictionary<ItemPersistente, string[]>();
+        foreach (var item in Resources.FindObjectsOfTypeAll<ItemPersistente>())
+            if (item != null && !EditorUtility.IsPersistent(item) && item.gameObject.scene.IsValid() && item.gameObject.scene.isLoaded &&
+                !PrefabUtility.IsPartOfPrefabAsset(item) && !EditorSceneManager.IsPreviewScene(item.gameObject.scene))
+            {
+                string id = LerStringSerializada(item, CampoInstanciaId);
+                if (ItemPersistente.InstanciaIdEhGuidValido(id))
+                    identidadesCena[item] = new[] { id, LerStringSerializada(item, CampoOrigemCenaId) };
+            }
 
         AssetDatabase.StartAssetEditing();
         try
@@ -132,6 +159,8 @@ public static class ItemPersistenteIdEditorUtility
                             alterouPrefab = true;
                         }
 
+                        if (!string.IsNullOrWhiteSpace(LerStringSerializada(itens[j], CampoOrigemCenaId)))
+                        { DefinirStringSerializada(itens[j], CampoOrigemCenaId, string.Empty); alterouPrefab = true; }
                         string instanciaId = LerStringSerializada(itens[j], CampoInstanciaId);
                         if (string.IsNullOrWhiteSpace(instanciaId))
                             continue;
@@ -156,6 +185,20 @@ public static class ItemPersistenteIdEditorUtility
         finally
         {
             AssetDatabase.StopAssetEditing();
+            foreach (var par in identidadesCena)
+            {
+                if (par.Key == null) continue;
+                bool mudou = false;
+                if (LerStringSerializada(par.Key, CampoInstanciaId) != par.Value[0])
+                { DefinirStringSerializada(par.Key, CampoInstanciaId, par.Value[0]); mudou = true; }
+                if (ItemPersistente.InstanciaIdEhGuidValido(par.Value[1]) &&
+                    LerStringSerializada(par.Key, CampoOrigemCenaId) != par.Value[1])
+                { DefinirStringSerializada(par.Key, CampoOrigemCenaId, par.Value[1]); mudou = true; }
+                if (!mudou) continue;
+                if (PrefabUtility.IsPartOfPrefabInstance(par.Key)) PrefabUtility.RecordPrefabInstancePropertyModifications(par.Key);
+                EditorUtility.SetDirty(par.Key);
+                EditorSceneManager.MarkSceneDirty(par.Key.gameObject.scene);
+            }
         }
 
         if (salvarAssets && prefabsAlterados > 0)

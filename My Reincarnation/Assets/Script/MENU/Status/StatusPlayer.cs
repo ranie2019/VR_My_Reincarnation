@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Globalization;
 using System.Text;
@@ -149,9 +149,9 @@ public class StatusPlayer : MonoBehaviour
         pontosStatusDisponiveis = Mathf.Max(0, pontosStatusDisponiveis);
         pontosStatusPorNivel = Mathf.Max(0, pontosStatusPorNivel);
         vidaMaxima = Mathf.Max(1, vidaMaxima);
-        vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
+        vidaAtual = Mathf.Clamp(vidaAtual, 0, GetVidaMaxima());
         manaMaxima = Mathf.Max(1, manaMaxima);
-        manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+        manaAtual = Mathf.Clamp(manaAtual, 0, GetManaMaxima());
         quantidadeManaRecuperada = Mathf.Max(0, quantidadeManaRecuperada);
         intervaloRecuperacaoMana = Mathf.Max(0.1f, intervaloRecuperacaoMana);
         danoFallback = Mathf.Max(0f, danoFallback);
@@ -204,7 +204,7 @@ public class StatusPlayer : MonoBehaviour
             return;
         }
 
-        float defesaCalculada = Mathf.Max(0f, constituicao + resistencia);
+        float defesaCalculada = Mathf.Max(0f, (float)GetConstituicaoTotal() + GetResistenciaTotal());
         float danoFinal = ataqueBruto * (ataqueBruto / (ataqueBruto + defesaCalculada));
 
         if (danoFinal < 0.1f)
@@ -217,7 +217,7 @@ public class StatusPlayer : MonoBehaviour
 
         float vidaAntes = vidaAtualReal;
         vidaAtualReal = Mathf.Max(0f, vidaAtualReal - danoFinal);
-        vidaAtual = Mathf.Clamp(Mathf.CeilToInt(vidaAtualReal), 0, vidaMaxima);
+        vidaAtual = Mathf.Clamp(Mathf.CeilToInt(vidaAtualReal), 0, GetVidaMaxima());
         proximoTempoPodeReceberDano = Time.time + intervaloEntreDanos;
 
         if (vidaAtualReal <= 0f)
@@ -247,6 +247,10 @@ public class StatusPlayer : MonoBehaviour
 
     private void ProcessarContatoDeDano(Collider outro, string evento)
     {
+        if (outro != null && (outro.GetComponentInParent<Flecha>() != null ||
+            (outro.attachedRigidbody != null && outro.attachedRigidbody.GetComponent<Flecha>() != null)))
+            return; // O impacto lancado e processado exclusivamente pela Flecha.
+
         if (outro == null)
         {
             LogDano($"{evento} ignorado: collider nulo.");
@@ -392,12 +396,13 @@ public class StatusPlayer : MonoBehaviour
 
     private void SincronizarVidaAtualReal()
     {
-        vidaAtualReal = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
+        vidaAtualReal = Mathf.Clamp(vidaAtual, 0, GetVidaMaxima());
         vidaAtualRealInicializada = true;
     }
 
     private void SincronizarVidaAtualRealSeNecessario()
     {
+        vidaAtual = Mathf.Clamp(vidaAtual, 0, GetVidaMaxima());
         if (!vidaAtualRealInicializada || Mathf.CeilToInt(vidaAtualReal) != vidaAtual)
             SincronizarVidaAtualReal();
     }
@@ -479,7 +484,7 @@ public class StatusPlayer : MonoBehaviour
 
     private void RestaurarVidaAposRespawn()
     {
-        vidaAtualReal = vidaMaxima;
+        vidaAtualReal = GetVidaMaxima();
         vidaAtual = Mathf.CeilToInt(vidaAtualReal);
         vidaAtualRealInicializada = true;
     }
@@ -514,8 +519,8 @@ public class StatusPlayer : MonoBehaviour
             Mathf.CeilToInt(experienciaParaProximoNivel * Mathf.Max(1.01f, multiplicadorExperienciaPorNivel)));
         vidaMaxima = Mathf.Max(1, Mathf.CeilToInt(vidaMaxima * MultiplicadorVidaManaPorNivel));
         manaMaxima = Mathf.Max(1, Mathf.CeilToInt(manaMaxima * MultiplicadorVidaManaPorNivel));
-        vidaAtual = vidaMaxima;
-        manaAtual = manaMaxima;
+        vidaAtual = GetVidaMaxima();
+        manaAtual = GetManaMaxima();
         TocarFeedbackLevelUp();
     }
 
@@ -805,22 +810,54 @@ public class StatusPlayer : MonoBehaviour
 
     public int GetVidaAtual()
     {
-        return vidaAtual;
+        return Mathf.Clamp(vidaAtual, 0, GetVidaMaxima());
     }
 
     public int GetVidaMaxima()
     {
-        return vidaMaxima;
+        return SomarLimiteRecurso(vidaMaxima, GetBonusHP());
     }
+
+    public int GetVidaMaximaBase() => Mathf.Max(1, vidaMaxima);
+    public int GetManaMaximaBase() => Mathf.Max(1, manaMaxima);
 
     public int GetManaAtual()
     {
-        return manaAtual;
+        return Mathf.Clamp(manaAtual, 0, GetManaMaxima());
     }
 
     public int GetManaMaxima()
     {
-        return manaMaxima;
+        return SomarLimiteRecurso(manaMaxima, GetManaTotal());
+    }
+
+    internal static int SomarLimiteRecurso(int limiteBase, int adicional)
+    {
+        return (int)Math.Min(int.MaxValue, Math.Max(1L, (long)limiteBase + adicional));
+    }
+
+    public int GetBonusHP()
+    {
+        return ObterBonusManoplas(TipoAtributoManopla.HP) + ObterBonusPeitoral(TipoAtributoManopla.HP) + ObterBonusElmo(TipoAtributoManopla.HP);
+    }
+
+    private int ultimoLimiteHP = -1, ultimoLimiteMP = -1;
+
+    private void LateUpdate()
+    {
+        AtualizarLimitesRecursos();
+    }
+
+    public void AtualizarLimitesRecursos()
+    {
+        int hp = GetVidaMaxima(), mp = GetManaMaxima();
+        int anteriorHP = vidaAtual, anteriorMP = manaAtual;
+        vidaAtual = Mathf.Clamp(vidaAtual, 0, hp);
+        manaAtual = Mathf.Clamp(manaAtual, 0, mp);
+        if (vidaAtualRealInicializada) vidaAtualReal = Mathf.Clamp(vidaAtualReal, 0f, hp);
+        bool mudou = hp != ultimoLimiteHP || mp != ultimoLimiteMP || anteriorHP != vidaAtual || anteriorMP != manaAtual;
+        ultimoLimiteHP = hp; ultimoLimiteMP = mp;
+        if (mudou) NotificarStatusAlterado();
     }
 
     public bool TentarConsumirMana(int quantidade)
@@ -829,7 +866,7 @@ public class StatusPlayer : MonoBehaviour
             return true;
 
         manaMaxima = Mathf.Max(1, manaMaxima);
-        manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+        manaAtual = Mathf.Clamp(manaAtual, 0, GetManaMaxima());
 
         if (manaAtual < quantidade)
             return false;
@@ -845,8 +882,8 @@ public class StatusPlayer : MonoBehaviour
             return;
 
         manaMaxima = Mathf.Max(1, manaMaxima);
-        int manaAnterior = Mathf.Clamp(manaAtual, 0, manaMaxima);
-        manaAtual = Mathf.Clamp(manaAnterior + quantidade, 0, manaMaxima);
+        int manaAnterior = Mathf.Clamp(manaAtual, 0, GetManaMaxima());
+        manaAtual = (int)Math.Min(GetManaMaxima(), (long)manaAnterior + quantidade);
 
         if (manaAtual != manaAnterior)
             NotificarStatusAlterado();
@@ -887,9 +924,9 @@ public class StatusPlayer : MonoBehaviour
                 continue;
 
             manaMaxima = Mathf.Max(1, manaMaxima);
-            manaAtual = Mathf.Clamp(manaAtual, 0, manaMaxima);
+            manaAtual = Mathf.Clamp(manaAtual, 0, GetManaMaxima());
 
-            if (manaAtual >= manaMaxima)
+            if (manaAtual >= GetManaMaxima())
                 continue;
 
             RecuperarMana(quantidadeManaRecuperada);
@@ -972,154 +1009,188 @@ public class StatusPlayer : MonoBehaviour
         return defesa;
     }
 
+    private int ObterBonusElmo(TipoAtributoManopla atributo)
+    {
+        var equipamentos = GetComponent<GerenciadorEquipamentosPlayer>();
+        var elmo = equipamentos != null ? equipamentos.ElmoAtual : null;
+        if (elmo == null || !elmo.JaEquipado || !elmo.gameObject.activeInHierarchy) return 0;
+        var dados = elmo.GetComponent<AtributosElmo>();
+        return dados != null ? dados.ObterValor(atributo) : 0;
+    }
+
+    private int ObterBonusPeitoral(TipoAtributoManopla atributo)
+    {
+        var equipamentos = GetComponent<GerenciadorEquipamentosPlayer>();
+        var peitoral = equipamentos != null ? equipamentos.PeitoralAtual : null;
+        if (peitoral == null || !peitoral.JaEquipado || !peitoral.gameObject.activeInHierarchy) return 0;
+        var dados = peitoral.GetComponent<AtributosPeitoral>();
+        return dados != null ? dados.ObterValor(atributo) : 0;
+    }
+
+    private int ObterBonusManoplas(TipoAtributoManopla atributo)
+    {
+        var equipamentos = GetComponent<GerenciadorEquipamentosPlayer>();
+        if (equipamentos == null) return 0;
+        return ObterBonusManopla(equipamentos.LuvaDireita, atributo) +
+            (equipamentos.LuvaEsquerda != equipamentos.LuvaDireita ?
+                ObterBonusManopla(equipamentos.LuvaEsquerda, atributo) : 0);
+    }
+
+    private static int ObterBonusManopla(EquiparManoplas luva, TipoAtributoManopla atributo)
+    {
+        if (luva == null || !luva.JaEquipado || !luva.gameObject.activeInHierarchy) return 0;
+        var dados = luva.GetComponent<AtributosManoplas>();
+        return dados != null ? dados.ObterValor(atributo) : 0;
+    }
+
     public int GetBonusForca()
     {
-        return bonusForca;
+        return bonusForca + ObterBonusManoplas(TipoAtributoManopla.Forca) + ObterBonusPeitoral(TipoAtributoManopla.Forca) + ObterBonusElmo(TipoAtributoManopla.Forca);
     }
 
     public int GetBonusConstituicao()
     {
-        return bonusConstituicao;
+        return bonusConstituicao + ObterBonusManoplas(TipoAtributoManopla.Constituicao) + ObterBonusPeitoral(TipoAtributoManopla.Constituicao) + ObterBonusElmo(TipoAtributoManopla.Constituicao);
     }
 
     public int GetBonusAgilidade()
     {
-        return bonusAgilidade;
+        return bonusAgilidade + ObterBonusManoplas(TipoAtributoManopla.Agilidade) + ObterBonusPeitoral(TipoAtributoManopla.Agilidade) + ObterBonusElmo(TipoAtributoManopla.Agilidade);
     }
 
     public int GetBonusVelocidade()
     {
-        return bonusVelocidade;
+        return bonusVelocidade + ObterBonusManoplas(TipoAtributoManopla.Velocidade) + ObterBonusPeitoral(TipoAtributoManopla.Velocidade) + ObterBonusElmo(TipoAtributoManopla.Velocidade);
     }
 
     public int GetBonusInteligencia()
     {
-        return bonusInteligencia;
+        return bonusInteligencia + ObterBonusManoplas(TipoAtributoManopla.Inteligencia) + ObterBonusPeitoral(TipoAtributoManopla.Inteligencia) + ObterBonusElmo(TipoAtributoManopla.Inteligencia);
     }
 
     public int GetBonusEspirito()
     {
-        return bonusEspirito;
+        return bonusEspirito + ObterBonusManoplas(TipoAtributoManopla.Espirito) + ObterBonusPeitoral(TipoAtributoManopla.Espirito) + ObterBonusElmo(TipoAtributoManopla.Espirito);
     }
 
     public int GetBonusSorte()
     {
-        return bonusSorte;
+        return bonusSorte + ObterBonusManoplas(TipoAtributoManopla.Sorte) + ObterBonusPeitoral(TipoAtributoManopla.Sorte) + ObterBonusElmo(TipoAtributoManopla.Sorte);
     }
 
     public int GetBonusDestreza()
     {
-        return bonusDestreza;
+        return bonusDestreza + ObterBonusManoplas(TipoAtributoManopla.Destreza) + ObterBonusPeitoral(TipoAtributoManopla.Destreza) + ObterBonusElmo(TipoAtributoManopla.Destreza);
     }
 
     public int GetBonusVigor()
     {
-        return bonusVigor;
+        return bonusVigor + ObterBonusManoplas(TipoAtributoManopla.Vigor) + ObterBonusPeitoral(TipoAtributoManopla.Vigor) + ObterBonusElmo(TipoAtributoManopla.Vigor);
     }
 
     public int GetBonusPercepcao()
     {
-        return bonusPercepcao;
+        return bonusPercepcao + ObterBonusManoplas(TipoAtributoManopla.Percepcao) + ObterBonusPeitoral(TipoAtributoManopla.Percepcao) + ObterBonusElmo(TipoAtributoManopla.Percepcao);
     }
 
     public int GetBonusResistencia()
     {
-        return bonusResistencia;
+        return bonusResistencia + ObterBonusManoplas(TipoAtributoManopla.Resistencia) + ObterBonusPeitoral(TipoAtributoManopla.Resistencia) + ObterBonusElmo(TipoAtributoManopla.Resistencia);
     }
 
     public int GetBonusMana()
     {
-        return bonusMana;
+        return bonusMana + ObterBonusManoplas(TipoAtributoManopla.Mana) + ObterBonusPeitoral(TipoAtributoManopla.Mana) + ObterBonusElmo(TipoAtributoManopla.Mana);
     }
 
     public int GetBonusCarisma()
     {
-        return bonusCarisma;
+        return bonusCarisma + ObterBonusManoplas(TipoAtributoManopla.Carisma) + ObterBonusPeitoral(TipoAtributoManopla.Carisma) + ObterBonusElmo(TipoAtributoManopla.Carisma);
     }
 
     public int GetBonusCritico()
     {
-        return bonusCritico;
+        return bonusCritico + ObterBonusManoplas(TipoAtributoManopla.Critico) + ObterBonusPeitoral(TipoAtributoManopla.Critico) + ObterBonusElmo(TipoAtributoManopla.Critico);
     }
 
     public int GetBonusDefesa()
     {
-        return bonusDefesa;
+        return bonusDefesa + ObterBonusManoplas(TipoAtributoManopla.Defesa) + ObterBonusPeitoral(TipoAtributoManopla.Defesa) + ObterBonusElmo(TipoAtributoManopla.Defesa);
     }
 
     public int GetForcaTotal()
     {
-        return forca + bonusForca;
+        return forca + GetBonusForca();
     }
 
     public int GetConstituicaoTotal()
     {
-        return constituicao + bonusConstituicao;
+        return constituicao + GetBonusConstituicao();
     }
 
     public int GetAgilidadeTotal()
     {
-        return agilidade + bonusAgilidade;
+        return agilidade + GetBonusAgilidade();
     }
 
     public int GetVelocidadeTotal()
     {
-        return velocidade + bonusVelocidade;
+        return velocidade + GetBonusVelocidade();
     }
 
     public int GetInteligenciaTotal()
     {
-        return inteligencia + bonusInteligencia;
+        return inteligencia + GetBonusInteligencia();
     }
 
     public int GetEspiritoTotal()
     {
-        return espirito + bonusEspirito;
+        return espirito + GetBonusEspirito();
     }
 
     public int GetSorteTotal()
     {
-        return sorte + bonusSorte;
+        return sorte + GetBonusSorte();
     }
 
     public int GetDestrezaTotal()
     {
-        return destreza + bonusDestreza;
+        return destreza + GetBonusDestreza();
     }
 
     public int GetVigorTotal()
     {
-        return vigor + bonusVigor;
+        return vigor + GetBonusVigor();
     }
 
     public int GetPercepcaoTotal()
     {
-        return percepcao + bonusPercepcao;
+        return percepcao + GetBonusPercepcao();
     }
 
     public int GetResistenciaTotal()
     {
         GarantirResistenciaInicial();
-        return resistencia + bonusResistencia;
+        return resistencia + GetBonusResistencia();
     }
 
     public int GetManaTotal()
     {
-        return mana + bonusMana;
+        return mana + GetBonusMana();
     }
 
     public int GetCarismaTotal()
     {
-        return carisma + bonusCarisma;
+        return carisma + GetBonusCarisma();
     }
 
     public int GetCriticoTotal()
     {
-        return critico + bonusCritico;
+        return critico + GetBonusCritico();
     }
 
     public int GetDefesaTotal()
     {
-        return defesa + bonusDefesa;
+        return defesa + GetBonusDefesa();
     }
 }

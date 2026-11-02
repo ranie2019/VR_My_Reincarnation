@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Text;
 using TMPro;
@@ -17,6 +17,10 @@ public class StatusUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI textoRacaValor;
     [SerializeField] private TextMeshProUGUI textoClasseValor;
     [SerializeField] private TextMeshProUGUI textoTituloValor;
+
+    [Header("Rotulos HP / MP")]
+    [SerializeField] private TextMeshProUGUI textoRotuloHP;
+    [SerializeField] private TextMeshProUGUI textoRotuloMP;
 
     [Header("Textos Level")]
     [SerializeField] private TextMeshProUGUI textoNivelValor;
@@ -158,6 +162,8 @@ public class StatusUI : MonoBehaviour
         DefinirTexto(textoExperienciaAtualValor, statusPlayer.GetExperienciaAtual().ToString());
         DefinirTexto(textoExperienciaMaximaValor, statusPlayer.GetExperienciaParaProximoNivel().ToString());
         DefinirTexto(textoReinRotulo, "REIN");
+        DefinirTexto(textoRotuloHP, "HP:");
+        DefinirTexto(textoRotuloMP, "MP:");
         DefinirTexto(textoReinValor, statusPlayer.ObterReinFormatado());
 
         DefinirTexto(textoForcaBaseValor, statusPlayer.GetForca().ToString());
@@ -452,8 +458,12 @@ public class StatusUI : MonoBehaviour
         textoTituloValor = EncontrarTexto(textoTituloValor, textos, "TITLE (1)", "TITLES (1)");
         textoNivelValor = EncontrarTexto(textoNivelValor, textos, "LEVEL (1)");
         textoPontosStatusValor = EncontrarTexto(textoPontosStatusValor, textos, "STATUS POINTS (1)");
-        textoManaAtualValor = EncontrarTexto(textoManaAtualValor, textos, "MANNA (1)", "MANA (1)");
-        textoManaMaximaValor = EncontrarTexto(textoManaMaximaValor, textos, "MANNA (3)", "MANA (3)");
+        textoRotuloHP = EncontrarTexto(textoRotuloHP, textos, "HP", "BLOOD", "VIDA", "SANGUE");
+        textoRotuloMP = EncontrarTexto(textoRotuloMP, textos, "MP", "MANNA", "MANA");
+        textoVidaAtualValor = EncontrarTexto(textoVidaAtualValor, textos, "HP (1)", "BLOOD (1)");
+        textoVidaMaximaValor = EncontrarTexto(textoVidaMaximaValor, textos, "HP (3)", "BLOOD (3)");
+        textoManaAtualValor = EncontrarTexto(textoManaAtualValor, textos, "MP (1)", "MANNA (1)", "MANA (1)");
+        textoManaMaximaValor = EncontrarTexto(textoManaMaximaValor, textos, "MP (3)", "MANNA (3)", "MANA (3)");
         textoExperienciaAtualValor = EncontrarTexto(textoExperienciaAtualValor, textos, "EXPERIENCE (1)");
         textoExperienciaMaximaValor = EncontrarTexto(textoExperienciaMaximaValor, textos, "EXPERIENCE (3)");
         textoReinRotulo = EncontrarTexto(textoReinRotulo, textos, "REIN", "GOLD", "MOEDA", "CURRENCY");

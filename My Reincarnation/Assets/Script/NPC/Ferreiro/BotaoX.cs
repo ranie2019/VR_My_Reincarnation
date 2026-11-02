@@ -43,9 +43,9 @@ public class BotaoX : MonoBehaviour
 
     private void OnHoverEntered(HoverEnterEventArgs args)
     {
-        if (canvasPai == null)
-            return;
-
+        var ferreiro = GetComponentInParent<FerreiroUI>(true);
+        if (ferreiro != null) { ferreiro.OnClickFechar(); return; }
+        if (canvasPai == null) return;
         canvasPai.gameObject.SetActive(false);
     }
 }

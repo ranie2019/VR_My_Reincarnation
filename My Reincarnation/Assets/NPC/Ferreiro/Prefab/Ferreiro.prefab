@@ -251,7 +251,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 8081493180502253609}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &2290830947717880313
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1851,7 +1851,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 6.5001, y: 5.8914}
+  m_AnchoredPosition: {x: 6.5001, y: 2.8}
   m_SizeDelta: {x: 13, y: 18.217}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &271047744913781847
@@ -2570,7 +2570,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 6.4999, y: 2.2}
+  m_AnchoredPosition: {x: 6.4999, y: 0.3}
   m_SizeDelta: {x: 13, y: 25.6}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &6414138826200825763
@@ -3755,7 +3755,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 4488201692545618008}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &3853505750113962945
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4438,7 +4438,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 8819173935959153987}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &9020344000923897470
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6766,7 +6766,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 2626782104009224469}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &4193011937775691440
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7909,7 +7909,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 6.4998894, y: -3.5}
+  m_AnchoredPosition: {x: 6.4998894, y: -9.3}
   m_SizeDelta: {x: 13, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &6567982621546395188
@@ -8102,7 +8102,6 @@ GameObject:
   - component: {fileID: 3482426662982691480}
   - component: {fileID: 1303744705263460701}
   - component: {fileID: 8342484539177843702}
-  - component: {fileID: 4755363912548024227}
   - component: {fileID: 5876939603839985954}
   - component: {fileID: 2274567339117238599}
   m_Layer: 0
@@ -8176,39 +8175,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.5, y: 0.5, z: 0.010254875}
   m_Center: {x: -2.461941e-17, y: 0, z: 0.0010786981}
---- !u!114 &4755363912548024227
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2493713675250902958}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2e3be885e8ddb1f4198c566a38f7e1e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SlotInventario
-  visualSlot: {fileID: 3514086945629873142}
-  socketInteractor: {fileID: 5876939603839985954}
-  pontoEncaixe: {fileID: 0}
-  margemDeSeguranca: 0.8
-  tamanhoVisualMaximoSlot: {x: 0, y: 0, z: 0}
-  permitirRetiradaPorLaserNoSlot: 1
-  interactableRetiradaPorSlot: {fileID: 0}
-  collidersRetiradaPorSlot:
-  - {fileID: 8342484539177843702}
-  areaRetiradaLaserSlot: {fileID: 0}
-  contadorTMP: {fileID: 0}
-  limiteStack: 99
-  diagnosticoQuantidadePilha: 0
-  diagnosticoRenderersAtivosTopo: 0
-  diagnosticoRenderersAtivosEscondidos: 0
-  diagnosticoTopoPilha: 
-  diagnosticoAtualizacoesDaPilha: 0
-  diagnosticoAlteracoesFisicasReais: 0
-  audioSource: {fileID: 2274567339117238599}
-  somAdicionarItem: {fileID: 8300000, guid: 02e01164404134d2c9265aa08b65ba96, type: 3}
-  somRetirarItem: {fileID: 8300000, guid: 4469071d9ffe04738b4c4992bda32cf2, type: 3}
 --- !u!114 &5876939603839985954
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8585,7 +8551,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &7573544244500123164
 RectTransform:
   m_ObjectHideFlags: 0
@@ -8605,7 +8571,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0.081, y: 2.332}
+  m_AnchoredPosition: {x: 0.081, y: 2.35}
   m_SizeDelta: {x: 13, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &2461585522794630321
@@ -8718,7 +8684,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 1.995, y: 1.98}
+  m_AnchoredPosition: {x: 1.995, y: 1.977}
   m_SizeDelta: {x: 13, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &4108298899410288225
@@ -9317,7 +9283,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 6.5, y: 5.8914}
+  m_AnchoredPosition: {x: 6.5, y: 2.1}
   m_SizeDelta: {x: 13, y: 18.217}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &2244703400117947197
@@ -10338,7 +10304,6 @@ GameObject:
   - component: {fileID: 5887683771019226037}
   - component: {fileID: 714940957392537591}
   - component: {fileID: 3676594312793593242}
-  - component: {fileID: 1958305883298237822}
   - component: {fileID: 6596958717363663278}
   - component: {fileID: 2547389105207949965}
   m_Layer: 0
@@ -10412,39 +10377,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.5, y: 0.5, z: 0.010254875}
   m_Center: {x: -2.461941e-17, y: 0, z: 0.0010786981}
---- !u!114 &1958305883298237822
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3451424240610768348}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2e3be885e8ddb1f4198c566a38f7e1e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SlotInventario
-  visualSlot: {fileID: 3745011943908499093}
-  socketInteractor: {fileID: 6596958717363663278}
-  pontoEncaixe: {fileID: 0}
-  margemDeSeguranca: 0.8
-  tamanhoVisualMaximoSlot: {x: 0, y: 0, z: 0}
-  permitirRetiradaPorLaserNoSlot: 1
-  interactableRetiradaPorSlot: {fileID: 0}
-  collidersRetiradaPorSlot:
-  - {fileID: 3676594312793593242}
-  areaRetiradaLaserSlot: {fileID: 0}
-  contadorTMP: {fileID: 0}
-  limiteStack: 99
-  diagnosticoQuantidadePilha: 0
-  diagnosticoRenderersAtivosTopo: 0
-  diagnosticoRenderersAtivosEscondidos: 0
-  diagnosticoTopoPilha: 
-  diagnosticoAtualizacoesDaPilha: 0
-  diagnosticoAlteracoesFisicasReais: 0
-  audioSource: {fileID: 2547389105207949965}
-  somAdicionarItem: {fileID: 8300000, guid: 02e01164404134d2c9265aa08b65ba96, type: 3}
-  somRetirarItem: {fileID: 8300000, guid: 4469071d9ffe04738b4c4992bda32cf2, type: 3}
 --- !u!114 &6596958717363663278
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11048,7 +10980,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 6578738647077497481}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &2444536934485015179
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12322,7 +12254,6 @@ GameObject:
   - component: {fileID: 3708220740758998196}
   - component: {fileID: 3572313630738931105}
   - component: {fileID: 8716324709651177506}
-  - component: {fileID: 6614907856614819496}
   - component: {fileID: 4257041675889433961}
   - component: {fileID: 5251361639204718820}
   m_Layer: 0
@@ -12397,39 +12328,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.5, y: 0.5, z: 0.010254875}
   m_Center: {x: -2.461941e-17, y: 0, z: 0.0010786981}
---- !u!114 &6614907856614819496
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3881159800803297619}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2e3be885e8ddb1f4198c566a38f7e1e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SlotInventario
-  visualSlot: {fileID: 1765602938288353256}
-  socketInteractor: {fileID: 4257041675889433961}
-  pontoEncaixe: {fileID: 5406081625288563368}
-  margemDeSeguranca: 0.8
-  tamanhoVisualMaximoSlot: {x: 0, y: 0, z: 0}
-  permitirRetiradaPorLaserNoSlot: 1
-  interactableRetiradaPorSlot: {fileID: 0}
-  collidersRetiradaPorSlot:
-  - {fileID: 8716324709651177506}
-  areaRetiradaLaserSlot: {fileID: 0}
-  contadorTMP: {fileID: 0}
-  limiteStack: 99
-  diagnosticoQuantidadePilha: 0
-  diagnosticoRenderersAtivosTopo: 0
-  diagnosticoRenderersAtivosEscondidos: 0
-  diagnosticoTopoPilha: 
-  diagnosticoAtualizacoesDaPilha: 0
-  diagnosticoAlteracoesFisicasReais: 0
-  audioSource: {fileID: 5251361639204718820}
-  somAdicionarItem: {fileID: 8300000, guid: 02e01164404134d2c9265aa08b65ba96, type: 3}
-  somRetirarItem: {fileID: 8300000, guid: 4469071d9ffe04738b4c4992bda32cf2, type: 3}
 --- !u!114 &4257041675889433961
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14625,7 +14523,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1021530563918897349
 RectTransform:
   m_ObjectHideFlags: 0
@@ -15619,7 +15517,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 8622659451115258148}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &6958260872275264956
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17892,7 +17790,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 8673284386771077760}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &812120168810414279
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18334,7 +18232,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 1
+  m_Interactable: 0
   m_TargetGraphic: {fileID: 2991960006374127655}
   m_OnClick:
     m_PersistentCalls:
@@ -18367,7 +18265,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7023624506723553965}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a35f6cfbfba9b548aaa00d52cfe8a50, type: 3}
   m_Name: 
@@ -18442,7 +18340,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7023624506723553965}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f854826773879a04db1135aab2e178cc, type: 3}
   m_Name: 
@@ -18451,19 +18349,7 @@ MonoBehaviour:
   acaoConfirmarMaoDireita: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   aoConfirmar:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 7023624506723553965}
-        m_TargetAssemblyTypeName: Reparar, Assembly-CSharp
-        m_MethodName: 
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!1 &7158254770146642907
 GameObject:
   m_ObjectHideFlags: 0
@@ -19677,7 +19563,7 @@ MonoBehaviour:
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
-  m_ParentInteractableObject: {fileID: 5942887259913103234}
+  m_ParentInteractableObject: {fileID: 0}
 --- !u!114 &3957674817528838478
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21104,7 +20990,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 6.4998894, y: 7.500001}
+  m_AnchoredPosition: {x: 6.4998894, y: 3.7}
   m_SizeDelta: {x: 13, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &2922489611495844632

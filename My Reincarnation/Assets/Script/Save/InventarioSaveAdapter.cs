@@ -28,6 +28,11 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
     [SerializeField] private bool ultimoLoadDiretoPorPrefab;
 
     private List<GameObject> destruicoesPendentesCarga;
+    private readonly HashSet<GameObject> objetosSubstituidos = new HashSet<GameObject>();
+    internal bool SeraDescartadoNaConfirmacao(GameObject objeto) => objetosSubstituidos.Contains(objeto);
+    private System.Action confirmarCarga, recuperarCarga;
+    internal void ConfirmarCargaGlobal() { var acao = confirmarCarga; confirmarCarga = null; recuperarCarga = null; acao?.Invoke(); }
+    internal void RecuperarCargaGlobal() { var acao = recuperarCarga; confirmarCarga = null; recuperarCarga = null; acao?.Invoke(); }
 
     private void Awake()
     {
@@ -194,10 +199,27 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         catch (System.Exception ex) { erro = ex.Message; return false; }
     }
 
-    public bool TentarCarregarInventario(List<InventorySaveData> itens, out string erro)
+    public bool TentarCarregarInventario(List<InventorySaveData> itens, out string erro, bool adiarConfirmacao = false)
     {
         if (!ValidarRestauracao(itens, out erro)) return false;
-        if (destruicoesPendentesCarga != null) { erro = "Restauracao ja em andamento."; return false; }
+        if (destruicoesPendentesCarga != null || confirmarCarga != null) { erro = "Restauracao ja em andamento."; return false; }
+        objetosSubstituidos.Clear();
+        var recuperacoesSlots = new List<System.Action>();
+        foreach (var slot in slots) if (slot != null) recuperacoesSlots.Add(slot.CapturarRecuperacaoCarga());
+        var existentes = new HashSet<ItemPersistente>(FindObjectsByType<ItemPersistente>(FindObjectsInactive.Include, FindObjectsSortMode.None));
+        var recuperacoesItens = new List<RecuperacaoItemCarga>();
+        foreach (var item in existentes) recuperacoesItens.Add(new RecuperacaoItemCarga(item));
+        System.Action recuperar = () => {
+            StopAllCoroutines();
+            var falhas = new List<System.Exception>();
+            foreach (var acao in recuperacoesSlots)
+                try { acao(); } catch (System.Exception ex) { falhas.Add(ex); }
+            foreach (var estado in recuperacoesItens)
+                try { estado.Restaurar(); } catch (System.Exception ex) { falhas.Add(ex); }
+            foreach (var item in FindObjectsByType<ItemPersistente>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (!existentes.Contains(item)) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
+            if (falhas.Count > 0) throw new System.AggregateException("Recuperacao incompleta.", falhas);
+        };
         var anteriores = new Dictionary<SlotInventario, List<XRGrabInteractable>>();
         var quantidadesEsperadas = new Dictionary<SlotInventario, int>();
         foreach (InventorySaveData data in itens)
@@ -352,50 +374,33 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                         var esperado = data.CriarDataParaInstancia(data.instanciaIds[i]);
                         var atual = persistente.CriarSaveData(data.slot, 1, false);
                         if (atual.instanciaId != esperado.instanciaId || atual.itemId != esperado.itemId ||
-                            atual.durabilidade != esperado.durabilidade || atual.dadosExtrasJson != esperado.dadosExtrasJson ||
+                            (!ItemPersistente.EhMigracaoDurabilidadeManopla(persistente.gameObject, esperado) && atual.durabilidade != esperado.durabilidade) || atual.dadosExtrasJson != esperado.dadosExtrasJson ||
                             (esperado.possuiDurabilidadeMaxima &&
                              (!atual.possuiDurabilidadeMaxima || atual.durabilidadeMaxima != esperado.durabilidadeMaxima)))
                             throw new System.InvalidOperationException("Estado ou ordem individual nao restaurado: " + esperado.instanciaId);
                     }
                 }
             }
-            if (slotsRestaurados.Count > 0 && isActiveAndEnabled)
-                StartCoroutine(FinalizarVisualAposLoadNosProximosFrames(new List<SlotInventario>(slotsRestaurados)));
-            foreach (GameObject original in destruicoesPendentesCarga)
-                if (original != null) { original.SetActive(false); Destroy(original); }
-            // Confirma antes de destruir as instancias do inventario anterior.
-            foreach (var par in anteriores)
-                foreach (XRGrabInteractable item in par.Value)
-                    if (item != null) Destroy(item.gameObject);
+            var pendentes = new List<GameObject>(destruicoesPendentesCarga);
+            objetosSubstituidos.UnionWith(pendentes);
+            foreach (var par in anteriores) foreach (var item in par.Value)
+                if (item != null) objetosSubstituidos.Add(item.gameObject);
+            confirmarCarga = () => {
+                if (slotsRestaurados.Count > 0 && isActiveAndEnabled)
+                    StartCoroutine(FinalizarVisualAposLoadNosProximosFrames(new List<SlotInventario>(slotsRestaurados)));
+                foreach (var original in pendentes)
+                    if (original != null) { original.SetActive(false); Destroy(original); }
+                foreach (var par in anteriores)
+                    foreach (var item in par.Value) if (item != null) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
+            };
+            recuperarCarga = recuperar;
+            if (!adiarConfirmacao) ConfirmarCargaGlobal();
             return true;
         }
         catch (System.Exception ex)
         {
             erro = "Aplicacao do inventario falhou: " + ex.Message;
-            // Recupera as mesmas instancias antigas, preservando seus atributos individuais.
-            try
-            {
-                foreach (var par in anteriores)
-                {
-                    var parciais = par.Key.ObterItensParaSave();
-                    par.Key.LimparItensSalvosDoSlot(false);
-                    foreach (XRGrabInteractable item in parciais)
-                        if (item != null && !originaisCena.Contains(item.GetComponent<ItemPersistente>()))
-                        {
-                            item.gameObject.SetActive(false);
-                            Destroy(item.gameObject);
-                        }
-                    for (int i = 0; i < par.Value.Count; i++)
-                    {
-                        XRGrabInteractable item = par.Value[i];
-                        if (item == null) throw new System.InvalidOperationException("Instancia anterior indisponivel.");
-                        item.gameObject.SetActive(true);
-                        if (!par.Key.RestaurarItemSalvoNoSlot(item, i < par.Value.Count - 1))
-                            throw new System.InvalidOperationException("Nao foi possivel recuperar o slot anterior.");
-                    }
-                    par.Key.FinalizarRestauracaoDoSave();
-                }
-            }
+            try { recuperar(); }
             catch (System.Exception rollback) { erro += " Recuperacao em memoria incompleta: " + rollback.Message; }
             if (SaveManager.Instancia != null) SaveManager.Instancia.NotificarFalhaRestauracao(erro);
             return false;
@@ -542,6 +547,20 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         if (original == null)
             return;
 
+        // Saves anteriores a 0.5 nao carregavam a origem da cena. Transfere-a
+        // somente do original ja identificado para a copia com o mesmo GUID salvo.
+        if (string.IsNullOrEmpty(data.origemCenaId) && !string.IsNullOrEmpty(original.OrigemCenaId))
+            foreach (var slot in slots)
+            {
+                if (slot == null) continue;
+                foreach (var grab in slot.ObterItensParaSave())
+                {
+                    var restaurado = grab.GetComponent<ItemPersistente>();
+                    if (restaurado != null && restaurado != original &&
+                        restaurado.ObterInstanciaIdSemGerar() == data.instanciaId)
+                        restaurado.DefinirOrigemCena(original.OrigemCenaId);
+                }
+            }
         originaisUsados?.Add(original);
         originaisCena.Remove(original);
 
@@ -1043,7 +1062,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                 data.instanciaIds.Add(unidade.instanciaId);
                 data.estadosIndividuais.Add(new InventoryItemState
                 {
-                    instanciaId = unidade.instanciaId, itemId = unidade.itemId, nomeItem = unidade.nomeItem,
+                    instanciaId = unidade.instanciaId, origemCenaId = unidade.origemCenaId, itemId = unidade.itemId, nomeItem = unidade.nomeItem,
                     durabilidade = unidade.durabilidade,
                     possuiDurabilidadeMaxima = unidade.possuiDurabilidadeMaxima,
                     durabilidadeMaxima = unidade.durabilidadeMaxima,

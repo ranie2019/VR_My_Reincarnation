@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 [Serializable]
@@ -7,6 +7,7 @@ public class InventorySaveData
     public string itemId;
     public string nomeItem;
     public string instanciaId;
+    public string origemCenaId;
     public List<string> instanciaIds = new List<string>();
     // 0 = legado representativo; 1 = estado individual associado por GUID.
     public int versaoEstadosIndividuais;
@@ -59,6 +60,7 @@ public class InventorySaveData
             itemId = estado != null ? estado.itemId : itemId,
             nomeItem = estado != null ? estado.nomeItem : nomeItem,
             instanciaId = id,
+            origemCenaId = estado != null ? estado.origemCenaId : origemCenaId,
             instanciaIds = new List<string> { id },
             instanciaCriadaEmRuntime = estado != null ? estado.instanciaCriadaEmRuntime : instanciaCriadaEmRuntime,
             quantidade = 1, slot = slot, estaNoInventario = true,
@@ -75,6 +77,7 @@ public class InventorySaveData
 public class InventoryItemState
 {
     public string instanciaId;
+    public string origemCenaId;
     public string itemId;
     public string nomeItem;
     public float durabilidade;

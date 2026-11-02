@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -14,6 +14,8 @@ public class Espada : MonoBehaviour, IDano
 {
     [Header("Dano")]
     [SerializeField] private int danoEspada = 1;
+    [Tooltip("Dano final = dano da espada + Forca total do dono x multiplicador. Zero mantem somente o dano da espada.")]
+    [SerializeField, Min(0f)] private float multiplicadorForca = 1f;
 
     [Header("Vida / Durabilidade")]
     [SerializeField] private int vidaMaxima = 20;
@@ -168,9 +170,20 @@ public class Espada : MonoBehaviour, IDano
         return donoAtualPlayer != null ? donoAtualPlayer.gameObject : null;
     }
 
-    public float ObterDano()
+    public float ObterDano() => ObterDanoCalculado();
+
+    private int ObterDanoCalculado()
     {
-        return Mathf.Max(0, danoEspada);
+        GameObject dono = GetDonoAtual();
+        StatusPlayer status = dono != null ? dono.GetComponentInChildren<StatusPlayer>(true) : null;
+        return CalcularDanoComForca(danoEspada, status != null ? status.GetForcaTotal() : 0, multiplicadorForca);
+    }
+
+    internal static int CalcularDanoComForca(int baseArma, int forcaTotal, float multiplicador)
+    {
+        double fator = float.IsNaN(multiplicador) || float.IsInfinity(multiplicador) ? 0d : Math.Max(0d, multiplicador);
+        double total = Math.Max(0, baseArma) + (double)Math.Max(0, forcaTotal) * fator;
+        return (int)Math.Min(int.MaxValue, Math.Round(total, MidpointRounding.AwayFromZero));
     }
 
     public GameObject ObterDono()
@@ -252,7 +265,7 @@ public class Espada : MonoBehaviour, IDano
         if (!PodeAplicarDanoAgora(alvoResolvido))
             return;
 
-        bool danoAplicado = TentarAplicarDano(alvoResolvido, danoEspada);
+        bool danoAplicado = TentarAplicarDano(alvoResolvido, ObterDanoCalculado());
         if (!danoAplicado)
             return;
 

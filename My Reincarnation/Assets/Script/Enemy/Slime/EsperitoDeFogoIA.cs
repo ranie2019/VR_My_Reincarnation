@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
 
@@ -62,6 +62,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
     private bool viuJogador;
     private Vector3 ultimaPosicaoConhecida;
     private bool morto;
+    public bool Morto => morto;
 
     private const float VelocidadeRotacao = 8f;
     private const float AlturaOlhos = 0.7f;

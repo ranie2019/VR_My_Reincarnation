@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -35,12 +35,14 @@ public class NPCPopup : MonoBehaviour
     [SerializeField] private float tempoParaFecharPorInatividade = 30f;
 
     private XRSimpleInteractable interactable;
+    private FerreiroUI interfaceFerreiro;
     private bool botaoYesEmHover;
     private float ultimaInteracaoPopup;
 
     private void Awake()
     {
         interactable = GetComponent<XRSimpleInteractable>();
+        interfaceFerreiro = GetComponent<FerreiroUI>();
 
         if (popupCanvas != null)
             popupCanvas.SetActive(false);
@@ -59,26 +61,29 @@ public class NPCPopup : MonoBehaviour
 
     private void OnDisable()
     {
+        botaoYesEmHover = false;
+        UsoAcaoCompartilhada.LiberarTodas(this);
         interactable.hoverEntered.RemoveListener(OnHoverEntered);
 
         DesabilitarAcao(acaoConfirmarMaoEsquerda);
         DesabilitarAcao(acaoConfirmarMaoDireita);
     }
 
-    private static void HabilitarAcao(InputActionReference acaoRef)
+    private void HabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Enable();
+            UsoAcaoCompartilhada.Adquirir(acaoRef.action, this);
     }
 
-    private static void DesabilitarAcao(InputActionReference acaoRef)
+    private void DesabilitarAcao(InputActionReference acaoRef)
     {
         if (acaoRef != null && acaoRef.action != null)
-            acaoRef.action.Disable();
+            UsoAcaoCompartilhada.Liberar(acaoRef.action, this);
     }
 
     private void Update()
     {
+        if (interfaceFerreiro != null) return;
         VerificarConfirmacaoBotaoYes();
         VerificarFechamentoPorInatividade();
     }
@@ -146,6 +151,7 @@ public class NPCPopup : MonoBehaviour
     /// </summary>
     public void AbrirPopup()
     {
+        if (interfaceFerreiro != null) { interfaceFerreiro.AbrirPopupSaudacao(); return; }
         if (InventarioEstaAberto())
         {
             return;
@@ -177,6 +183,7 @@ public class NPCPopup : MonoBehaviour
     /// </summary>
     public void FecharInventario()
     {
+        if (interfaceFerreiro != null) { interfaceFerreiro.OnClickFechar(); return; }
         if (inventarioFerreiroCanvas != null && inventarioFerreiroCanvas.activeSelf)
             inventarioFerreiroCanvas.SetActive(false);
     }
@@ -187,6 +194,7 @@ public class NPCPopup : MonoBehaviour
     /// </summary>
     public void AbrirInventario()
     {
+        if (interfaceFerreiro != null) { interfaceFerreiro.OnClickYes(); return; }
         FecharPopup();
 
         if (inventarioFerreiroCanvas != null)

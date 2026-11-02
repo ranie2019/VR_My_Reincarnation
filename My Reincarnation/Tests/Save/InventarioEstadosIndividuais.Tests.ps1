@@ -11,6 +11,10 @@ $capture = $adapter.Substring($start, $end-$start).Replace('private void Aplicar
 # Actual production DTO, ItemPersistente and capture method; fake Unity host.
 # Does not execute Unity lifecycle, physics, sockets or Unity JsonUtility.
 $stub = @'
+// Component absent in these legacy fixtures; generation/selection has its own tests.
+public class AtributosManoplas:UnityEngine.MonoBehaviour { public float vidaMaxima=100,vidaAtual=100; public float VidaMaxima=>vidaMaxima; public void AtualizarDurabilidadeVisual(){}  public bool Gerado; public string estado; public string ExportarEstadoJson()=>estado; public void RestaurarEstadoJson(string json){estado=json;Gerado=true;} public void PrepararMigracaoSaveLegado(){Gerado=false;} public static object LerEValidarEstadoJson(string json){if(json!=null&&json.StartsWith("roll:"))return null;throw new System.IO.InvalidDataException("Bad roll");} }
+public class AtributosPeitoral:UnityEngine.MonoBehaviour { public float vidaMaxima=100,vidaAtual=100; public float VidaMaxima=>vidaMaxima; public void AtualizarDurabilidadeVisual(){}  public bool Gerado; public string estado; public string ExportarEstadoJson()=>estado; public void RestaurarEstadoJson(string json){estado=json;Gerado=true;} public void PrepararMigracaoSaveLegado(){Gerado=false;} public static object LerEValidarEstadoJson(string json){if(json!=null&&json.StartsWith("roll:"))return null;throw new System.IO.InvalidDataException("Bad roll");} }
+public class AtributosElmo:UnityEngine.MonoBehaviour { public float vidaMaxima=100,vidaAtual=100; public float VidaMaxima=>vidaMaxima; public void AtualizarDurabilidadeVisual(){}  public bool Gerado; public string estado; public string ExportarEstadoJson()=>estado; public void RestaurarEstadoJson(string json){estado=json;Gerado=true;} public void PrepararMigracaoSaveLegado(){Gerado=false;} public static object LerEValidarEstadoJson(string json){if(json!=null&&json.StartsWith("roll:"))return null;throw new System.IO.InvalidDataException("Bad roll");} }
 namespace UnityEngine {
  [AttributeUsage(AttributeTargets.Class)] public class DisallowMultipleComponent : Attribute {}
  [AttributeUsage(AttributeTargets.Field)] public class Header : Attribute { public Header(string x) {} }
@@ -26,11 +30,14 @@ namespace UnityEngine {
   public T GetComponent<T>() where T:Component { return components.OfType<T>().FirstOrDefault(); }
   public Component GetComponent(string name) { return components.FirstOrDefault(x=>x.GetType().Name==name); }
  }
+ public struct Vector3 {public float x,y,z;}
  public static class Application { public static bool isPlaying=true; }
  public static class Mathf { public static int Max(int a,int b)=>Math.Max(a,b); public static int RoundToInt(float x)=>(int)Math.Round(x); }
  public struct Hash128 { public static Hash128 Compute(string x)=>new Hash128(); public override string ToString()=>"test-type"; }
  public static class JsonUtility { public static string ToJson<T>(T x)=>System.Text.Json.JsonSerializer.Serialize(x, Audit05.Options); public static T FromJson<T>(string x)=>System.Text.Json.JsonSerializer.Deserialize<T>(x,Audit05.Options); }
 }
+public class SaveManager { public static SaveManager Instancia; public void RegistrarRemocaoPermanente(string id) {} }
+public class Cocumelo:UnityEngine.Component {public bool collected;public bool EstaDesarmadoComoItemColetado()=>collected;public void DesarmarComoItemColetado(){collected=true;}public void NotificarEntradaInventario(){}public void CapturarEstadoRespawn(ItemPersistente.EstadoCenaItem s){}public void RestaurarEstadoRespawn(ItemPersistente.EstadoCenaItem s,bool original){} }
 public class EstadoItemInventario:UnityEngine.Component { public bool estaNoInventario; }
 public class Respawnitem:UnityEngine.Component { public bool EstaDesarmadoComoItemColetado()=>false; public void DesarmarComoItemColetado() {} }
 public class XRGrabInteractable:UnityEngine.Component {}
@@ -66,6 +73,9 @@ public static class Audit05 {
   d.ValidarEstadosIndividuais();var stack=new List<XRGrabInteractable>();
   foreach(var id in d.instanciaIds) {
    var unit=d.CriarDataParaInstancia(id);var grab=New(id,100,unit.durabilidade>=0);
+   if(unit.dadosExtrasJson!=null&&unit.dadosExtrasJson.Contains("my-reincarnation.manoplas.v1"))grab.gameObject.Add<AtributosManoplas>();
+   if(unit.dadosExtrasJson!=null&&unit.dadosExtrasJson.Contains("my-reincarnation.peitoral.v1"))grab.gameObject.Add<AtributosPeitoral>();
+   if(unit.dadosExtrasJson!=null&&unit.dadosExtrasJson.Contains("my-reincarnation.elmo.v1"))grab.gameObject.Add<AtributosElmo>();
    if(d.versaoEstadosIndividuais==1)ItemPersistente.ValidarEstadoIndividualNoPrefab(grab.gameObject,unit);
    grab.GetComponent<ItemPersistente>().AplicarSaveData(unit);stack.Add(grab);
   }return stack;
@@ -103,6 +113,13 @@ public static class Audit05 {
   Fail(()=>d.CriarDataParaInstancia(Guid.NewGuid().ToString("N")));
   var variant=Copy(d);variant.estadosIndividuais[0].itemId="variant-type";variant.ValidarEstadosIndividuais();
   Check(variant.CriarDataParaInstancia(variant.estadosIndividuais[0].instanciaId).itemId=="variant-type","Per-instance prefab");
+  var originStack=new List<XRGrabInteractable>{New(ids[0],70)};
+  originStack[0].GetComponent<ItemPersistente>().DefinirOrigemCena(ids[2]);
+  var originData=Copy(Save(originStack));
+  Check(originData.estadosIndividuais[0].origemCenaId==ids[2],"Origin lost in per-unit capture");
+  Check(originData.CriarDataParaInstancia(ids[0]).origemCenaId==ids[2],"Origin lost in per-unit DTO");
+  Check(Load(originData)[0].GetComponent<ItemPersistente>().OrigemCenaId==ids[2],"Origin lost restoring clone");
+  Check(Load(originData)[0].GetComponent<ItemPersistente>().CriarEstadoCena().origemCenaId==ids[2],"Origin lost in scene state");
   var unit=d.CriarDataParaInstancia(ids[1]);unit.durabilidade=35.5f;Fail(()=>ItemPersistente.ValidarEstadoIndividualNoPrefab(New(ids[1],100).gameObject,unit));
   foreach(var type in new[]{typeof(Espada),typeof(Equipamento),typeof(Machado),typeof(Picareta),typeof(Escudo),typeof(Arco)}){
    var go=new UnityEngine.GameObject();var comp=(UnityEngine.Component)Activator.CreateInstance(type);comp.gameObject=go;go.components.Add(comp);
@@ -114,6 +131,64 @@ public static class Audit05 {
    state.durabilidade=35;persistent.AplicarSaveData(state);Check(persistent.LerDurabilidade()==35,type.Name+" current");
    Check(!(bool)broken.GetValue(comp),type.Name+" restored flag");
   }
+  var gloves=new List<XRGrabInteractable>{New(ids[0],100),New(ids[1],35)};
+  for(int i=0;i<2;i++){var stats=gloves[i].gameObject.Add<AtributosManoplas>();stats.Gerado=true;stats.estado="roll:"+i;}
+  var gloveSave=Save(gloves);var restoredGloves=Load(gloveSave);
+  var badGlove=gloveSave.CriarDataParaInstancia(ids[0]);
+  badGlove.dadosExtrasJson=badGlove.dadosExtrasJson.Replace("roll:0","invalid");
+  Fail(()=>ItemPersistente.ValidarExtrasNoPrefab(New(ids[0],100).gameObject,badGlove.dadosExtrasJson));
+  var noStats=new UnityEngine.GameObject();
+  Fail(()=>ItemPersistente.ValidarExtrasNoPrefab(noStats,gloveSave.CriarDataParaInstancia(ids[0]).dadosExtrasJson));
+  for(int i=0;i<2;i++){
+   var stats=restoredGloves[i].GetComponent<AtributosManoplas>();
+   Check(stats.Gerado&&stats.estado=="roll:"+i,"Individual glove roll lost");
+   var expected=gloveSave.CriarDataParaInstancia(ids[i]);
+   Check(restoredGloves[i].GetComponent<ItemPersistente>().CriarSaveData(0,1,false).dadosExtrasJson==expected.dadosExtrasJson,"Extra wrapper changed during validation");
+   var scene=restoredGloves[i].GetComponent<ItemPersistente>().CriarEstadoCena();
+   var next=New(ids[i],100);next.gameObject.Add<AtributosManoplas>();next.GetComponent<ItemPersistente>().AplicarEstadoCena(scene);
+   Check(next.GetComponent<AtributosManoplas>().estado=="roll:"+i,"World glove roll lost");
+   next.GetComponent<ItemPersistente>().AplicarSaveData(d.CriarDataParaInstancia(ids[i]));
+   Check(!next.GetComponent<AtributosManoplas>().Gerado,"Legacy migration must defer roll until after validation");
+  }
+  var gloveGo=new UnityEngine.GameObject();var glovePersist=gloveGo.Add<ItemPersistente>();
+  Field(glovePersist,"tipoItemId","glove-type");glovePersist.DefinirInstanciaId(ids[0]);
+  var durability=gloveGo.Add<AtributosManoplas>();durability.vidaMaxima=150;durability.vidaAtual=99.5f;
+  var durableData=glovePersist.CriarSaveData(0,1,false);
+  Check(durableData.durabilidade==99.5f&&durableData.possuiDurabilidadeMaxima&&durableData.durabilidadeMaxima==150,"Float glove durability capture");
+  ItemPersistente.ValidarEstadoIndividualNoPrefab(gloveGo,durableData);
+  durability.vidaMaxima=100;durability.vidaAtual=100;glovePersist.AplicarSaveData(durableData);
+  Check(durability.vidaAtual==99.5f&&durability.vidaMaxima==150,"Float glove durability restore");
+  var gloveScene=glovePersist.CriarEstadoCena();durability.vidaMaxima=100;durability.vidaAtual=100;glovePersist.AplicarEstadoCena(gloveScene);
+  Check(durability.vidaAtual==99.5f&&durability.vidaMaxima==150,"World glove durability restore");
+  var legacyGlove=new InventorySaveData{durabilidade=-1};
+  Check(ItemPersistente.EhMigracaoDurabilidadeManopla(gloveGo,legacyGlove),"Legacy glove migration");
+  ItemPersistente.ValidarEstadoIndividualNoPrefab(gloveGo,legacyGlove);
+  var chestGo=new UnityEngine.GameObject();var chestPersist=chestGo.Add<ItemPersistente>();
+  Field(chestPersist,"tipoItemId","chest-type");chestPersist.DefinirInstanciaId(ids[1]);
+  var chest=chestGo.Add<AtributosPeitoral>();chest.vidaMaxima=200;chest.vidaAtual=123.5f;chest.Gerado=true;chest.estado="roll:chest";
+  var chestData=chestPersist.CriarSaveData(0,1,false);
+  Check(chestData.durabilidade==123.5f&&chestData.durabilidadeMaxima==200,"Chest float durability capture");
+  ItemPersistente.ValidarEstadoIndividualNoPrefab(chestGo,chestData);
+  chest.vidaMaxima=100;chest.vidaAtual=100;chest.estado="changed";chestPersist.AplicarSaveData(chestData);
+  Check(chest.vidaAtual==123.5f&&chest.vidaMaxima==200&&chest.estado=="roll:chest","Chest inventory persistence");
+  var chestScene=chestPersist.CriarEstadoCena();chest.vidaAtual=1;chest.vidaMaxima=100;chest.estado="changed";chestPersist.AplicarEstadoCena(chestScene);
+  Check(chest.vidaAtual==123.5f&&chest.vidaMaxima==200&&chest.estado=="roll:chest","Chest world persistence");
+  Check(chestPersist.CriarSaveData(0,1,false).dadosExtrasJson==chestData.dadosExtrasJson,"Chest payload stable during verification");
+  Check(ItemPersistente.EhMigracaoDurabilidadeManopla(chestGo,legacyGlove),"Chest legacy durability migration");
+  Fail(()=>ItemPersistente.ValidarExtrasNoPrefab(gloveGo,chestData.dadosExtrasJson));
+  var helmetGo=new UnityEngine.GameObject();var helmetPersist=helmetGo.Add<ItemPersistente>();
+  Field(helmetPersist,"tipoItemId","helmet-type");helmetPersist.DefinirInstanciaId(ids[1]);
+  var helmet=helmetGo.Add<AtributosElmo>();helmet.vidaMaxima=200;helmet.vidaAtual=123.5f;helmet.Gerado=true;helmet.estado="roll:helmet";
+  var helmetData=helmetPersist.CriarSaveData(0,1,false);
+  Check(helmetData.durabilidade==123.5f&&helmetData.durabilidadeMaxima==200,"Helmet float durability capture");
+  ItemPersistente.ValidarEstadoIndividualNoPrefab(helmetGo,helmetData);
+  helmet.vidaMaxima=100;helmet.vidaAtual=100;helmet.estado="changed";helmetPersist.AplicarSaveData(helmetData);
+  Check(helmet.vidaAtual==123.5f&&helmet.vidaMaxima==200&&helmet.estado=="roll:helmet","Helmet inventory persistence");
+  var helmetScene=helmetPersist.CriarEstadoCena();helmet.vidaAtual=1;helmet.vidaMaxima=100;helmet.estado="changed";helmetPersist.AplicarEstadoCena(helmetScene);
+  Check(helmet.vidaAtual==123.5f&&helmet.vidaMaxima==200&&helmet.estado=="roll:helmet","Helmet world persistence");
+  Check(helmetPersist.CriarSaveData(0,1,false).dadosExtrasJson==helmetData.dadosExtrasJson,"Helmet payload stable during verification");
+  Check(ItemPersistente.EhMigracaoDurabilidadeManopla(helmetGo,legacyGlove),"Helmet legacy durability migration");
+  Fail(()=>ItemPersistente.ValidarExtrasNoPrefab(gloveGo,helmetData.dadosExtrasJson));
   var folder=System.IO.Path.Combine(System.IO.Path.GetTempPath(),"AUD05File-"+Guid.NewGuid().ToString("N"));
   System.IO.Directory.CreateDirectory(folder);var path=System.IO.Path.Combine(folder,"disposable.json");
   Func<string,bool> validator=json=>{try{System.Text.Json.JsonSerializer.Deserialize<InventorySaveData>(json,Options).ValidarEstadosIndividuais();return true;}catch{return false;}};

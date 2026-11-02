@@ -36,6 +36,8 @@ public class NPCMissao : MonoBehaviour
 
     private void OnHoverEntered(HoverEnterEventArgs args)
     {
+        var ferreiro = GetComponent<FerreiroUI>();
+        if (ferreiro != null) { ferreiro.AbrirPopupSaudacao(); return; }
         if (gerenciador != null)
             gerenciador.NotificarHoverNPC();
     }
