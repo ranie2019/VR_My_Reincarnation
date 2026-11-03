@@ -33,6 +33,9 @@ public class StatusVR : MonoBehaviour
     private bool botaoPressionadoPorCallback;
     private bool alturaOriginalMenuCapturada;
     private float alturaOriginalMenuRelativaCamera;
+    private Vector3 posicaoMundoMenuAberto;
+    private Quaternion rotacaoMundoMenuAberto;
+    private bool poseMundoMenuCapturada;
 
     private void Awake()
     {
@@ -100,10 +103,12 @@ public class StatusVR : MonoBehaviour
         if (painelStatus == null || !painelStatus.activeInHierarchy || cameraJogador == null || !alturaOriginalMenuCapturada)
             return;
 
-        // Mantem X/Z e a rotacao atuais do menu; acompanha apenas a altura do headset.
-        Vector3 posicao = painelStatus.transform.position;
+        // Preserva a pose de abertura no mundo, mesmo quando o Player pai gira.
+        // Acompanha apenas a altura do headset; reabrir reposiciona a frente.
+        if (!poseMundoMenuCapturada) return;
+        Vector3 posicao = posicaoMundoMenuAberto;
         posicao.y = cameraJogador.position.y + alturaOriginalMenuRelativaCamera + alturaMenuNaCamera;
-        painelStatus.transform.position = posicao;
+        painelStatus.transform.SetPositionAndRotation(posicao, rotacaoMundoMenuAberto);
     }
 
     private void OnValidate()
@@ -173,6 +178,9 @@ public class StatusVR : MonoBehaviour
         Quaternion rotacao = Quaternion.LookRotation(frenteHorizontal, Vector3.up);
 
         painelStatus.transform.SetPositionAndRotation(posicao, rotacao);
+        posicaoMundoMenuAberto = posicao;
+        rotacaoMundoMenuAberto = rotacao;
+        poseMundoMenuCapturada = true;
     }
 
     private void CapturarAlturaOriginalMenuSeNecessario()

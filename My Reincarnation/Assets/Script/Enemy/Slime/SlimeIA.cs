@@ -142,6 +142,14 @@ public class SlimeIA : MonoBehaviour, IDano
     [SerializeField] private bool usarNavMeshAgent = true;
     private NavMeshAgent agent;
     private CharacterController characterController;
+    private SlimeMovimento movimentoVerde;
+    private SlimeDeteccao deteccaoVerde;
+    private RaycastHit[] hitsVerde;
+    private Collider[] sobreposicoesVerde;
+    private readonly List<GameObject> pontosAutoProprios = new List<GameObject>();
+    internal bool UsaMovimentoVerde => movimentoVerde != null;
+    private Vector3 PosicaoAlvo(Transform alvo) => deteccaoVerde != null ? deteccaoVerde.PosicaoJogador(alvo) : alvo.position;
+
 
     private const float VelocidadeRotacao = 8f;
     private const float IntervaloBuscaPlayer = 0.35f;
@@ -210,6 +218,9 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void Awake()
     {
+        movimentoVerde = GetComponent<SlimeMovimento>();
+        if (movimentoVerde != null) { hitsVerde = new RaycastHit[32]; sobreposicoesVerde = new Collider[16]; }
+        deteccaoVerde = GetComponent<SlimeDeteccao>();
         if (animacao == null)
             animacao = GetComponent<SlimeAnimacao>();
 
@@ -279,6 +290,7 @@ public class SlimeIA : MonoBehaviour, IDano
             GameObject ponto = new GameObject($"PontoAuto_{gameObject.name}_{i}");
             ponto.transform.position = posicaoFinal;
             pontosValidos.Add(ponto.transform);
+            if (movimentoVerde != null) pontosAutoProprios.Add(ponto);
         }
 
         if (pontosValidos.Count == 0)
@@ -298,8 +310,13 @@ public class SlimeIA : MonoBehaviour, IDano
         }
     }
 
+    private void OnDestroy()
+    {
+        foreach (var ponto in pontosAutoProprios) if (ponto != null) Destroy(ponto);
+    }
     private void OnDisable()
     {
+        if (movimentoVerde != null) movimentoVerde.Parar();
         CancelarImpactoAtaquePendente();
         PararSomAndar();
     }
@@ -388,6 +405,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     public void ReceberDano(int dano, GameObject origemDano)
     {
+        if (movimentoVerde != null && (morto || dano <= 0)) return;
         RegistrarPrimeiroAtacante(origemDano);
         AplicarDanoRecebido(dano, IdentificarPlayerResponsavel(null, origemDano != null ? origemDano.transform : null));
     }
@@ -424,9 +442,11 @@ public class SlimeIA : MonoBehaviour, IDano
             StopCoroutine(rotinaDano);
 
         if (estadoAtual != EstadoSlime.TomandoDano)
-            estadoAntesDano = estadoAtual;
+            estadoAntesDano = movimentoVerde != null && estadoAtual == EstadoSlime.Atacando ? EstadoSlime.Perseguindo : estadoAtual;
+        if (movimentoVerde != null) CancelarImpactoAtaquePendente();
 
         rotinaDano = StartCoroutine(RotinaDano());
+        if (movimentoVerde != null && movimentoVerde.PreservarArcoInvestida) animacao?.ReiniciarAcaoConfigurada("Dano");
     }
 
     public void AcionarDano()
@@ -461,6 +481,9 @@ public class SlimeIA : MonoBehaviour, IDano
 
         if (morto || outroCollider == null)
             return;
+        // Fontes que ja processam seu impacto nao devem causar outro dano pela IA.
+        if (movimentoVerde != null && (outroCollider.GetComponentInParent<Espada>() != null ||
+            outroCollider.GetComponentInParent<BolaDeFogo>() != null || outroCollider.GetComponentInParent<EfeitoFogoArea>() != null)) return;
 
         if (!TentarObterTagAutorizada(outroCollider, out Transform origemTag))
             return;
@@ -768,9 +791,15 @@ public class SlimeIA : MonoBehaviour, IDano
             return;
         }
 
+        if (movimentoVerde != null && movimentoVerde.RotaBloqueada)
+        {
+            movimentoVerde.Parar(); EscolherProximoPontoAleatorio();
+            tempoRestanteObservando = tempoObservando; MudarEstado(EstadoSlime.Observando); return;
+        }
         MoverPara(ponto.position, velocidadePatrulha);
 
-        if (DistanciaXZ(transform.position, ponto.position) <= distanciaChegadaPonto)
+        if (DistanciaXZ(transform.position, ponto.position) <= distanciaChegadaPonto &&
+            (movimentoVerde == null || movimentoVerde.AlturaDestinoCompativel(ponto.position)))
         {
             tempoRestanteObservando = tempoObservando;
             MudarEstado(EstadoSlime.Observando);
@@ -804,21 +833,28 @@ public class SlimeIA : MonoBehaviour, IDano
         }
 
         PararMovimento();
-        OlharPara(alvoPlayer.position);
+        OlharPara(PosicaoAlvo(alvoPlayer));
 
-        if (DistanciaXZ(transform.position, alvoPlayer.position) <= distanciaIniciarPerseguicao)
+        if (DistanciaXZ(transform.position, PosicaoAlvo(alvoPlayer)) <= distanciaIniciarPerseguicao)
             MudarEstado(EstadoSlime.Perseguindo);
     }
 
     private void AtualizarPerseguicao()
     {
+        if (movimentoVerde != null && movimentoVerde.RotaBloqueada)
+        {
+            movimentoVerde.Parar(); alvoPlayer = null;
+            proximaBuscaPlayer = Time.time + Mathf.Max(0.5f, tempoObservando);
+            tempoRestanteObservando = Mathf.Max(0.5f, tempoObservando);
+            MudarEstado(EstadoSlime.Observando); return;
+        }
         if (!TemAlvoVisivel())
         {
             PerderAlvoEVoltarPatrulha();
             return;
         }
 
-        float distancia = DistanciaXZ(transform.position, alvoPlayer.position);
+        float distancia = DistanciaXZ(transform.position, PosicaoAlvo(alvoPlayer));
         if (distancia <= distanciaAtaque ||
             (ExisteBloqueadorEntreInimigoEPlayer(alvoPlayer, out RaycastHit hitBloqueio) && hitBloqueio.distance <= AlcanceEfetivoAtaque()))
         {
@@ -826,8 +862,8 @@ public class SlimeIA : MonoBehaviour, IDano
             return;
         }
 
-        MoverPara(alvoPlayer.position, velocidadePerseguicao);
-        OlharPara(alvoPlayer.position);
+        MoverPara(PosicaoAlvo(alvoPlayer), velocidadePerseguicao);
+        OlharPara(PosicaoAlvo(alvoPlayer));
     }
 
     private void AtualizarAtaque()
@@ -840,14 +876,14 @@ public class SlimeIA : MonoBehaviour, IDano
 
         if (investidaAtaqueEmAndamento)
         {
-            OlharPara(alvoPlayer.position);
+            OlharPara(PosicaoAlvo(alvoPlayer));
             return;
         }
 
         PararMovimento();
-        OlharPara(alvoPlayer.position);
+        OlharPara(PosicaoAlvo(alvoPlayer));
 
-        float distancia = DistanciaXZ(transform.position, alvoPlayer.position);
+        float distancia = DistanciaXZ(transform.position, PosicaoAlvo(alvoPlayer));
         bool bloqueadorEmAlcance = ExisteBloqueadorEntreInimigoEPlayer(alvoPlayer, out RaycastHit hitBloqueio) &&
                                    hitBloqueio.distance <= AlcanceEfetivoAtaque();
 
@@ -893,11 +929,18 @@ public class SlimeIA : MonoBehaviour, IDano
         if (rotinaInvestidaAtaque != null)
             StopCoroutine(rotinaInvestidaAtaque);
 
+        if (movimentoVerde != null && movimentoVerde.PreservarArcoInvestida) animacao?.ReiniciarAcaoConfigurada("Ataque");
         rotinaInvestidaAtaque = StartCoroutine(InvestidaAtaque());
     }
 
     private IEnumerator InvestidaAtaque()
     {
+        if (movimentoVerde != null)
+        {
+            if (movimentoVerde.PreservarArcoInvestida) yield return InvestidaArcoVermelho();
+            else yield return InvestidaFisicaVerde();
+            yield break;
+        }
         investidaAtaqueEmAndamento = true;
         impactoAtaqueResolvido = false;
 
@@ -951,6 +994,65 @@ public class SlimeIA : MonoBehaviour, IDano
         rotinaInvestidaAtaque = null;
     }
 
+    private IEnumerator InvestidaArcoVermelho()
+    {
+        Vector3 inicio = rb.position;
+        Vector3 direcao = ObterDirecaoHorizontalInvestida();
+        if (!movimentoVerde.PodeSaltarPara(inicio + direcao * distanciaInvestida)) yield break;
+        investidaAtaqueEmAndamento = true; impactoAtaqueResolvido = false;
+        movimentoVerde.IniciarArco(direcao);
+        float tempo = 0f;
+        try
+        {
+            while (!morto && estadoAtual == EstadoSlime.Atacando && tempo < duracaoInvestida)
+            {
+                yield return new WaitForFixedUpdate();
+                if (morto || estadoAtual != EstadoSlime.Atacando) break;
+                tempo += Time.fixedDeltaTime;
+                Vector3 alvo = SlimeMovimento.CalcularArco(inicio, direcao, distanciaInvestida, alturaInvestida, tempo / Mathf.Max(0.01f, duracaoInvestida));
+                if (movimentoVerde.MoverArco(alvo, out var bloqueio))
+                { if (bloqueio != null) ResolverImpactoCollider(bloqueio); break; }
+            }
+            if (!morto && estadoAtual == EstadoSlime.Atacando && !impactoAtaqueResolvido) ResolverImpactoAtaque();
+        }
+        finally
+        {
+            movimentoVerde.Suspender(false);
+            investidaAtaqueEmAndamento = false; rotinaInvestidaAtaque = null;
+        }
+    }
+
+    private IEnumerator InvestidaFisicaVerde()
+    {
+        Vector3 direcao = ObterDirecaoHorizontalInvestida();
+        if (!movimentoVerde.PodeSaltarPara(transform.position + direcao * distanciaInvestida))
+        { rotinaInvestidaAtaque = null; yield break; }
+        investidaAtaqueEmAndamento = true; impactoAtaqueResolvido = false;
+        movimentoVerde.Suspender(true);
+        float gravidade = Mathf.Max(0.1f, -Physics.gravity.y);
+        float subida = Mathf.Sqrt(2f * gravidade * Mathf.Max(0f, alturaInvestida));
+        float duracao = Mathf.Max(duracaoInvestida, 2f * subida / gravidade);
+        Vector3 velocidadeSalto = direcao * (distanciaInvestida / Mathf.Max(0.01f, duracao));
+        rb.MoveRotation(Quaternion.LookRotation(direcao, Vector3.up));
+        rb.angularVelocity = Vector3.zero;
+        rb.linearVelocity = velocidadeSalto + Vector3.up * subida;
+        float tempo = 0f;
+        while (!morto && estadoAtual == EstadoSlime.Atacando && tempo < duracao)
+        {
+            yield return new WaitForFixedUpdate();
+            if (morto || estadoAtual != EstadoSlime.Atacando) break;
+            tempo += Time.fixedDeltaTime;
+            if (TentarObterBloqueioInvestida(rb.position, direcao, velocidadeSalto.magnitude * Time.fixedDeltaTime, out var hit))
+            {
+                ResolverImpactoCollider(hit.collider); break;
+            }
+            rb.linearVelocity = new Vector3(velocidadeSalto.x, rb.linearVelocity.y, velocidadeSalto.z);
+        }
+        if (!morto && estadoAtual == EstadoSlime.Atacando && !impactoAtaqueResolvido) ResolverImpactoAtaque();
+        movimentoVerde.Suspender(false);
+        investidaAtaqueEmAndamento = false; rotinaInvestidaAtaque = null;
+    }
+
     private void PausarAgentParaInvestida()
     {
         if (!UsandoAgent())
@@ -987,7 +1089,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private Vector3 ObterDirecaoHorizontalInvestida()
     {
-        Vector3 direcao = alvoPlayer != null ? alvoPlayer.position - transform.position : transform.forward;
+        Vector3 direcao = alvoPlayer != null ? PosicaoAlvo(alvoPlayer) - transform.position : transform.forward;
         direcao.y = 0f;
 
         if (direcao.sqrMagnitude <= 0.0001f)
@@ -1046,6 +1148,16 @@ public class SlimeIA : MonoBehaviour, IDano
         if (direcao.sqrMagnitude <= 0.0001f || distancia <= 0f)
             return false;
 
+        if (movimentoVerde != null)
+        {
+            int n = Physics.SphereCastNonAlloc(ObterOrigemCastInvestida(origem), raioVerificacaoColisaoInvestida,
+                direcao.normalized, hitsVerde, distancia + margemParedeInvestida, layersBloqueioInvestida, QueryTriggerInteraction.Ignore);
+            if (n == hitsVerde.Length) return true; // Cancela o deslocamento; nao aplica impacto sem collider conhecido.
+            float menor = float.PositiveInfinity;
+            for (int i = 0; i < n; i++) if (hitsVerde[i].collider != null && !PertenceAEsteInimigo(hitsVerde[i].collider) && hitsVerde[i].distance < menor)
+            { hitBloqueio = hitsVerde[i]; menor = hitBloqueio.distance; }
+            return hitBloqueio.collider != null;
+        }
         RaycastHit[] hits = Physics.SphereCastAll(
             ObterOrigemCastInvestida(origem),
             raioVerificacaoColisaoInvestida,
@@ -1074,6 +1186,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private Vector3 ObterOrigemCastInvestida(Vector3 posicaoBase)
     {
+        if (movimentoVerde != null) return posicaoBase + movimentoVerde.CentroCorpo - transform.position;
         float alturaCast = Mathf.Max(alturaOrigemAtaque, raioVerificacaoColisaoInvestida + 0.05f);
         return posicaoBase + Vector3.up * alturaCast;
     }
@@ -1131,6 +1244,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void ResolverImpactoCollider(Collider col)
     {
+        if (movimentoVerde != null && (morto || estadoAtual != EstadoSlime.Atacando)) return;
         if (col == null || alvoPlayer == null || impactoAtaqueResolvido)
             return;
 
@@ -1150,6 +1264,21 @@ public class SlimeIA : MonoBehaviour, IDano
         if (morto || alvoPlayer == null || estadoAtual != EstadoSlime.Atacando)
             return;
 
+        if (movimentoVerde != null)
+        {
+            int n = Physics.OverlapSphereNonAlloc(ObterOrigemAtaque(), raioAtaque, sobreposicoesVerde, layersAtaque, QueryTriggerInteraction.Ignore);
+            if (n == sobreposicoesVerde.Length) return;
+            Collider contato = null; float menor = float.PositiveInfinity;
+            for (int i = 0; i < n; i++)
+            {
+                var candidato = sobreposicoesVerde[i];
+                if (candidato == null || PertenceAEsteInimigo(candidato)) continue;
+                if (ColliderBloqueiaMesmoSendoDoPlayer(candidato)) { contato = candidato; break; }
+                float d = (candidato.ClosestPoint(ObterOrigemAtaque()) - ObterOrigemAtaque()).sqrMagnitude;
+                if (d < menor) { menor = d; contato = candidato; }
+            }
+            if (contato != null) { ResolverImpactoCollider(contato); return; }
+        }
         if (!TentarObterPrimeiroHitAtaque(alvoPlayer, out RaycastHit hit))
             return;
 
@@ -1166,6 +1295,15 @@ public class SlimeIA : MonoBehaviour, IDano
 
         Vector3 origem = ObterOrigemAtaque();
         Vector3 direcao = ObterDirecaoAtaque(playerAlvo);
+        if (movimentoVerde != null)
+        {
+            int n = Physics.SphereCastNonAlloc(origem, raioAtaque, direcao, hitsVerde, AlcanceEfetivoAtaque(), layersAtaque, QueryTriggerInteraction.Ignore);
+            if (n == hitsVerde.Length) return false;
+            float menor = float.PositiveInfinity;
+            for (int i = 0; i < n; i++) if (hitsVerde[i].collider != null && !PertenceAEsteInimigo(hitsVerde[i].collider) && hitsVerde[i].distance < menor)
+            { primeiroHit = hitsVerde[i]; menor = primeiroHit.distance; }
+            return primeiroHit.collider != null;
+        }
         float alcance = AlcanceEfetivoAtaque();
 
         if (direcao.sqrMagnitude <= 0.0001f || alcance <= 0f)
@@ -1206,6 +1344,12 @@ public class SlimeIA : MonoBehaviour, IDano
         if (danoConfigurado <= 0f)
             return false;
 
+        if (movimentoVerde != null)
+        {
+            var status = ObterStatusPlayerEmTransform(playerAlvo);
+            if (status == null) return false;
+            status.ReceberDano(danoConfigurado, gameObject); return true;
+        }
         Component[] componentes = playerAlvo.GetComponentsInChildren<Component>(true);
         for (int i = 0; i < componentes.Length; i++)
         {
@@ -1306,6 +1450,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private Vector3 ObterOrigemAtaque()
     {
+        if (movimentoVerde != null) return movimentoVerde.CentroCorpo;
         if (pontoOrigemAtaque != null)
             return pontoOrigemAtaque.position;
 
@@ -1316,7 +1461,7 @@ public class SlimeIA : MonoBehaviour, IDano
     {
         Vector3 origem = ObterOrigemAtaque();
         Vector3 direcao = playerAlvo != null
-            ? playerAlvo.position + Vector3.up * alturaOrigemAtaque - origem
+            ? (deteccaoVerde != null ? PosicaoAlvo(playerAlvo) : playerAlvo.position + Vector3.up * alturaOrigemAtaque) - origem
             : ObterFrenteAtaque();
 
         if (direcao.sqrMagnitude <= 0.0001f)
@@ -1348,6 +1493,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
         investidaAtaqueEmAndamento = false;
         impactoAtaqueResolvido = false;
+        if (movimentoVerde != null) movimentoVerde.Suspender(false);
         RetomarAgentDepoisInvestida();
     }
 
@@ -1373,6 +1519,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private Transform ProcurarPrimeiroPlayerVisivel()
     {
+        if (deteccaoVerde != null) return deteccaoVerde.ProcurarJogador(tagPlayer, ObterOrigemVisao(), ObterFrentePlana(), raioCampoVisao, anguloCampoVisao, layersObstaculo);
         if (string.IsNullOrWhiteSpace(tagPlayer))
             return null;
 
@@ -1402,6 +1549,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private bool EstaNoCampoDeVisao(Transform alvo)
     {
+        if (deteccaoVerde != null) return deteccaoVerde.Visivel(alvo, ObterOrigemVisao(), ObterFrentePlana(), raioCampoVisao, anguloCampoVisao, layersObstaculo);
         if (!EstaDentroDoRaioEAngulo(alvo, out float distancia))
             return false;
 
@@ -1453,6 +1601,9 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private Vector3 ObterOrigemVisao()
     {
+        if (movimentoVerde != null && movimentoVerde.PreservarArcoInvestida)
+            return pontoOlhos != null && pontoOlhos != transform ? pontoOlhos.position : transform.position + Vector3.up * alturaOlhos;
+        if (movimentoVerde != null) return movimentoVerde.CentroCorpo;
         return pontoOlhos != null ? pontoOlhos.position : transform.position + Vector3.up * alturaOlhos;
     }
 
@@ -1563,6 +1714,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void MoverPara(Vector3 destino, float velocidade)
     {
+        if (movimentoVerde != null) { movimentoVerde.SolicitarMovimento(destino, velocidade); movimentoVerde.Olhar(destino); return; }
         if (UsandoAgent())
         {
             agent.isStopped = false;
@@ -1586,6 +1738,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void PararMovimento()
     {
+        if (movimentoVerde != null) { movimentoVerde.Parar(); return; }
         if (UsandoAgent())
         {
             agent.isStopped = true;
@@ -1599,6 +1752,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void OlharPara(Vector3 alvo)
     {
+        if (movimentoVerde != null) { movimentoVerde.Olhar(alvo); return; }
         Vector3 direcao = alvo - transform.position;
         direcao.y = 0f;
 
@@ -1612,6 +1766,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void CorrigirInclinacao()
     {
+        if (movimentoVerde != null) return;
         Vector3 euler = transform.eulerAngles;
         transform.rotation = Quaternion.Euler(0f, euler.y, 0f);
     }
@@ -1624,6 +1779,7 @@ public class SlimeIA : MonoBehaviour, IDano
         if (estadoAtual == novoEstado)
             return;
 
+        if (movimentoVerde != null && estadoAtual == EstadoSlime.Atacando && novoEstado != EstadoSlime.Atacando) CancelarImpactoAtaquePendente();
         estadoAtual = novoEstado;
         AtualizarAnimatorPorEstado();
         AtualizarAudioPorEstado();
@@ -1745,6 +1901,11 @@ public class SlimeIA : MonoBehaviour, IDano
         PararSomAndar();
         MudarEstado(EstadoSlime.Morto);
         TocarSomMorrer();
+        if (movimentoVerde != null)
+        {
+            movimentoVerde.Morrer();
+            FinalizarMorteVerde(); return;
+        }
         EntregarExperienciaAoMorrer();
         PagarRecompensaReinAoPrimeiroAtacante();
         NotificarMissaoDeMorte();
@@ -1763,6 +1924,39 @@ public class SlimeIA : MonoBehaviour, IDano
             canvasVida.gameObject.SetActive(false);
 
         Destroy(gameObject, tempoParaMorrer);
+    }
+
+    private void ExecutarEtapaMorteVerde(Action etapa)
+    {
+        try { etapa(); } catch (Exception erro) { Debug.LogException(erro, this); }
+    }
+    private void FinalizarMorteVerde()
+    {
+        try
+        {
+            ExecutarEtapaMorteVerde(EntregarExperienciaAoMorrer);
+            ExecutarEtapaMorteVerde(PagarRecompensaReinAoPrimeiroAtacante);
+            ExecutarEtapaMorteVerde(NotificarMissaoDeMorte);
+            ExecutarEtapaMorteVerde(SpawnarPrefabsNormais);
+            ExecutarEtapaMorteVerde(SpawnarPrefabsMissao);
+            ExecutarEtapaMorteVerde(() =>
+            {
+                if (RespawnMonstro.Instancia == null) return;
+                // Pontos manuais continuam externos; pontos automaticos serao recriados pela nova IA.
+                Transform[] pontos = pontosAutoProprios.Count > 0 ? null : pontosPatrulha;
+                if (movimentoVerde.PreservarArcoInvestida)
+                    RespawnMonstro.Instancia.AgendarRespawnVermelho(idRespawnMonstro, transform.position, transform.rotation, pontos, GetInstanceID(),
+                        movimentoVerde.RaioMundial, movimentoVerde.AlturaMundial, movimentoVerde.CentroRelativo);
+                else RespawnMonstro.Instancia.AgendarRespawnVerde(idRespawnMonstro, transform.position, transform.rotation, pontos, GetInstanceID());
+            });
+        }
+        finally
+        {
+            if (esconderCanvasAoMorrer && canvasVida != null) canvasVida.gameObject.SetActive(false);
+            float esperaMorte = tempoParaMorrer;
+            if (movimentoVerde.PreservarArcoInvestida && animacao != null) esperaMorte = Mathf.Max(esperaMorte, animacao.ObterTempoMorteConfigurado());
+            Destroy(gameObject, esperaMorte);
+        }
     }
 
     private void EntregarExperienciaAoMorrer()
@@ -2127,6 +2321,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     public void ReiniciarAposRespawn()
     {
+        if (movimentoVerde != null) movimentoVerde.Reiniciar();
         morto = false;
         experienciaJaEntregue = false;
         recompensaReinJaPaga = false;

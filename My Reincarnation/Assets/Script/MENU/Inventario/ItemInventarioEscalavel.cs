@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 [DisallowMultipleComponent]
@@ -202,6 +202,15 @@ public class ItemInventarioEscalavel : MonoBehaviour
 
         coube = BoundsDentroDoPermitido(boundsRenderers, boundsPermitido);
         return true;
+    }
+
+    public bool CentralizarVisualAtualNoSlot(Transform slotTransform, Bounds boundsPermitido)
+    {
+        if (slotTransform == null || !TamanhoValido(boundsPermitido.size) ||
+            !TentarObterRendererBoundsNoEspacoDoSlot(slotTransform, boundsPermitido.center, out Bounds boundsItem))
+            return false;
+        CentralizarNoSlot(slotTransform, boundsItem, boundsPermitido);
+        return EscalaVisualAtualCabeNoSlot(slotTransform, boundsPermitido);
     }
 
     public bool EscalaVisualAtualCabeNoSlot(Transform slotTransform, Bounds boundsPermitido)

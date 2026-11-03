@@ -156,6 +156,26 @@ public class SaveManager : MonoBehaviour
             CarregarJogo();
     }
 
+    private bool salvamentoInventarioPendente;
+    private float instanteSalvarInventario;
+
+    public void SolicitarSalvamentoInventario()
+    {
+        if (EstadoCarregamento != EstadoCarga.Concluido && EstadoCarregamento != EstadoCarga.SessaoNova)
+            return;
+        salvamentoInventarioPendente = true;
+        instanteSalvarInventario = Time.unscaledTime + 1f;
+    }
+
+    private void Update()
+    {
+        if (!salvamentoInventarioPendente || Time.unscaledTime < instanteSalvarInventario || operacoesCriticas > 0)
+            return;
+        salvamentoInventarioPendente = false;
+        // Usa o mesmo bloqueio e a escrita segura dos saves manuais/Pause/Quit.
+        SalvarJogo();
+    }
+
     private void OnApplicationQuit()
     {
         if (salvarAoSair)
@@ -502,8 +522,8 @@ public class SaveManager : MonoBehaviour
                 EncontrarItemSoltoPorInstancia(existentes, estado.instanciaId, usados);
             if (item == null)
             {
-                item = EncontrarItemSoltoComIdRuntimeParaMigrar(existentes, estado.itemId, usados, out int candidatos, idsReservados);
-                if (item == null && (candidatos > 1 || EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(existentes, estado.itemId, usados, idsReservados) != null))
+                item = EncontrarItemSoltoComIdRuntimeParaMigrar(existentes, estado.itemId, usados, out int candidatos, idsReservados, string.IsNullOrEmpty(estado.origemCenaId));
+                if (item == null && (candidatos > 1 || EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(existentes, estado.itemId, usados, idsReservados, string.IsNullOrEmpty(estado.origemCenaId)) != null))
                     throw new InvalidDataException("Restauracao de cena ambigua: " + objeto.objectId);
             }
             if (item != null) usados.Add(item);
@@ -919,7 +939,7 @@ public class SaveManager : MonoBehaviour
                     existentesAntes,
                     estadoItem.itemId,
                     itensUsados,
-                    out int candidatosMigracao, idsReservados);
+                    out int candidatosMigracao, idsReservados, string.IsNullOrEmpty(estadoItem.origemCenaId));
 
                 if (itemMigravel != null)
                 {
@@ -937,7 +957,7 @@ public class SaveManager : MonoBehaviour
                 ItemPersistente itemMesmoTipo = EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(
                     existentesAntes,
                     estadoItem.itemId,
-                    itensUsados, idsReservados);
+                    itensUsados, idsReservados, string.IsNullOrEmpty(estadoItem.origemCenaId));
 
                 if (itemMesmoTipo != null)
                 {
@@ -978,7 +998,11 @@ public class SaveManager : MonoBehaviour
         {
             if (objeto == null || !EhDadoItemPersistente(objeto)) continue;
             var estado = LerEstadoItemCena(objeto);
-            if (estado != null) AdicionarInstanciaIdSeValido(ids, estado.instanciaId);
+            if (estado != null)
+            {
+                AdicionarInstanciaIdSeValido(ids, estado.instanciaId);
+                AdicionarInstanciaIdSeValido(ids, estado.origemCenaId);
+            }
         }
         return ids;
     }
@@ -1191,7 +1215,7 @@ public class SaveManager : MonoBehaviour
         List<ItemPersistente> itens,
         string itemId,
         HashSet<ItemPersistente> itensUsados,
-        HashSet<string> idsReservados = null)
+        HashSet<string> idsReservados = null, bool ignorarOriginaisComOrigem = false)
     {
         if (string.IsNullOrWhiteSpace(itemId))
             return null;
@@ -1205,6 +1229,13 @@ public class SaveManager : MonoBehaviour
                 continue;
 
             if (ItemEstaNoInventarioOuSlot(item))
+                continue;
+
+            // Uma instancia sem origem pode ser um clone legitimo ao lado de
+            // originais da cena. Nao adotar nem bloquear esses originais por tipo.
+            // Objetos sem origem continuam sujeitos a ambiguidade e bloqueio.
+            if (ignorarOriginaisComOrigem && idsReservados != null &&
+                ItemPersistente.InstanciaIdEhGuidValido(item.OrigemCenaId) && idsReservados.Contains(item.OrigemCenaId))
                 continue;
 
             // Este objeto pertence a outro registro do mesmo save, mesmo que seja processado depois.
@@ -1223,7 +1254,7 @@ public class SaveManager : MonoBehaviour
         string itemId,
         HashSet<ItemPersistente> itensUsados,
         out int candidatos,
-        HashSet<string> idsReservados = null)
+        HashSet<string> idsReservados = null, bool ignorarOriginaisComOrigem = false)
     {
         candidatos = 0;
 
@@ -1240,6 +1271,13 @@ public class SaveManager : MonoBehaviour
                 continue;
 
             if (ItemEstaNoInventarioOuSlot(item))
+                continue;
+
+            // Uma instancia sem origem pode ser um clone legitimo ao lado de
+            // originais da cena. Nao adotar nem bloquear esses originais por tipo.
+            // Objetos sem origem continuam sujeitos a ambiguidade e bloqueio.
+            if (ignorarOriginaisComOrigem && idsReservados != null &&
+                ItemPersistente.InstanciaIdEhGuidValido(item.OrigemCenaId) && idsReservados.Contains(item.OrigemCenaId))
                 continue;
 
             // Este objeto pertence a outro registro do mesmo save, mesmo que seja processado depois.

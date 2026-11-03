@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// Centraliza toda a logica de animacao de um inimigo (Slime, Tartaruga, etc).
@@ -39,6 +39,22 @@ public class SlimeAnimacao : MonoBehaviour
     private bool temDano;
     private bool temMorrer;
     private bool temCorrer;
+
+    [Header("Acoes repetidas e morte (opt-in do Vermelho)")]
+    [SerializeField] private bool reiniciarAcoesPorGolpe;
+    [SerializeField] private AnimationClip clipMorte;
+    [SerializeField, Min(0f)] private float margemTransicaoMorte = 0.25f;
+    public void ReiniciarAcaoConfigurada(string estado)
+    {
+        if (!reiniciarAcoesPorGolpe || animator == null || !animator.isActiveAndEnabled || animator.runtimeAnimatorController == null) return;
+        int hash = Animator.StringToHash(animator.GetLayerName(0) + "." + estado);
+        if (animator.HasState(0, hash)) animator.Play(hash, 0, 0f);
+    }
+    public float ObterTempoMorteConfigurado()
+    {
+        if (!reiniciarAcoesPorGolpe || animator == null || clipMorte == null) return 0f;
+        return clipMorte.length / Mathf.Max(0.01f, Mathf.Abs(animator.speed)) + margemTransicaoMorte;
+    }
 
     private void Awake()
     {
@@ -173,6 +189,12 @@ public class SlimeAnimacao : MonoBehaviour
         SetBoolSeguro(DanoHash, temDano, dano);
         SetBoolSeguro(MorrerHash, temMorrer, morrer);
         SetBoolSeguro(CorrerHash, temCorrer, correr);
+        if (reiniciarAcoesPorGolpe)
+        {
+            string estado = morrer ? "Morto" : dano ? "Dano" : ataque ? "Ataque" : alerta ? "Alerta" :
+                patrulha ? "Patrulha" : (andar || correr) ? "Andar" : "Parado";
+            ReiniciarAcaoConfigurada(estado);
+        }
     }
 
     private void SetBoolSeguro(int hash, bool existeParametro, bool valor)

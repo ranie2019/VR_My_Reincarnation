@@ -185,7 +185,7 @@ public class AtributosPeitoral : MonoBehaviour
     }
 
     [SerializeField, HideInInspector] private EstadoGerado resultado;
-    public bool Gerado => resultado != null;
+    public bool Gerado => resultado != null && !EhResultadoVazioLegado(resultado);
     public ClasseManopla Classe => Gerado ? resultado.classe : ClasseManopla.Comum;
     public AfinidadeDivinaManopla Afinidade => Gerado ? resultado.afinidade : AfinidadeDivinaManopla.Nenhuma;
 
@@ -420,12 +420,29 @@ public class AtributosPeitoral : MonoBehaviour
     public void RestaurarEstadoJson(string json)
     {
         resultado = LerEValidarEstadoJson(json);
+        if (resultado == null)
+        {
+            PrepararMigracaoSaveLegado();
+            return;
+        }
         AtualizarPopup();
+    }
+
+    // Unity serializa classes inline como objetos vazios, mesmo antes do primeiro sorteio.
+    // Nao confundir esse placeholder com um Comum valido que sorteou zero atributos.
+    internal static bool EhResultadoVazioLegado(EstadoGerado estado)
+    {
+        return estado != null && estado.versao == 1 &&
+            string.IsNullOrEmpty(estado.nome) && string.IsNullOrEmpty(estado.descricao) &&
+            estado.classe == ClasseManopla.Comum && estado.afinidade == AfinidadeDivinaManopla.Nenhuma &&
+            estado.atributos != null && estado.atributos.Count == 0 &&
+            estado.cor == default(Color);
     }
 
     public static EstadoGerado LerEValidarEstadoJson(string json)
     {
         EstadoGerado estado = JsonUtility.FromJson<EstadoGerado>(json);
+        if (EhResultadoVazioLegado(estado)) return null; // Migra somente o placeholder conhecido.
         if (estado == null || estado.versao != 1 || string.IsNullOrWhiteSpace(estado.nome) || estado.atributos == null ||
             !Enum.IsDefined(typeof(ClasseManopla), estado.classe) ||
             !Enum.IsDefined(typeof(AfinidadeDivinaManopla), estado.afinidade))

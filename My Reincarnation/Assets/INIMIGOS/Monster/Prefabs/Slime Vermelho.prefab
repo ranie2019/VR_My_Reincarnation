@@ -433,9 +433,12 @@ GameObject:
   - component: {fileID: 95457531584545886}
   - component: {fileID: 5059410286140779520}
   - component: {fileID: 1096767107570290110}
+  - component: {fileID: 920000000000000001}
   - component: {fileID: 7736080303872402827}
   - component: {fileID: 3707928165010360}
   - component: {fileID: 5674452608295596609}
+  - component: {fileID: 920000000000000002}
+  - component: {fileID: 920000000000000003}
   - component: {fileID: 2866822354514501489}
   m_Layer: 0
   m_Name: Slime Vermelho
@@ -529,9 +532,32 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
+  m_Interpolate: 1
+  m_Constraints: 80
   m_CollisionDetection: 2
+--- !u!136 &920000000000000001
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1931298151966786}
+  m_Material: {fileID: 13400000, guid: 27f57991930f4364b7bbeffe411c76e8, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.45
+  m_Height: 0.97819334
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.4361424, z: 0}
 --- !u!114 &7736080303872402827
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -570,11 +596,11 @@ MonoBehaviour:
   anguloCampoVisao: 210
   layersObstaculo:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 65
   distanciaIniciarPerseguicao: 10
   velocidadePerseguicao: 2.4
   distanciaAtaque: 1.3
-  danoAtaque: 5
+  danoAtaque: 7
   pontoOrigemAtaque: {fileID: 4047972025199878}
   alturaOrigemAtaque: 0.87
   raioAtaque: 0.62
@@ -616,7 +642,7 @@ MonoBehaviour:
   volumeMorrer: 1
   animacao: {fileID: 3707928165010360}
   rb: {fileID: 1096767107570290110}
-  usarNavMeshAgent: 1
+  usarNavMeshAgent: 0
 --- !u!114 &3707928165010360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -630,6 +656,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SlimeAnimacao
   animator: {fileID: 95457531584545886}
+  reiniciarAcoesPorGolpe: 1
+  clipMorte: {fileID: 7400000, guid: 35bb20ecf5de4fdd8dcd8e28e4053f3d, type: 3}
+  margemTransicaoMorte: 0.25
 --- !u!114 &5674452608295596609
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -643,6 +672,41 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
   experienciaAoMorrer: 4
+--- !u!114 &920000000000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1931298151966786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35b2f953ca21484499a55292f94a96fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeMovimento
+  camadasSolo:
+    serializedVersion: 2
+    m_Bits: 67
+  inclinacaoMaxima: 45
+  toleranciaSolo: 0.12
+  toleranciaDesnivel: 0.18
+  quedaMaxima: 0.6
+  tempoRotaBloqueada: 2
+  colliderModelo: {fileID: 5059410286140779520}
+  perfilVermelho: 1
+--- !u!114 &920000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1931298151966786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e955dffaf2344469a3d3f71881b72001, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeDeteccao
+  intervaloVisao: 0.15
 --- !u!82 &2866822354514501489
 AudioSource:
   m_ObjectHideFlags: 0
@@ -740,6 +804,81 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!1 &3282683746004628661
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4478114401568815599}
+  - component: {fileID: 2826752120693441565}
+  - component: {fileID: 2529255434728104807}
+  m_Layer: 5
+  m_Name: Nivel Level
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &4478114401568815599
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3282683746004628661}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1079648685644869563}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -100.5, y: -10}
+  m_SizeDelta: {x: 50, y: 50}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &2826752120693441565
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3282683746004628661}
+  m_CullTransparentMesh: 1
+--- !u!114 &2529255434728104807
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3282683746004628661}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 6c2635342ca2deb41af0a45aee92bfc9, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &4167054133023377830
 GameObject:
   m_ObjectHideFlags: 0
@@ -773,6 +912,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5728425886857342908}
+  - {fileID: 4478114401568815599}
   - {fileID: 3879263482850697009}
   m_Father: {fileID: 4047972025199878}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1027,7 +1167,7 @@ GameObject:
   - component: {fileID: 666912474947725362}
   - component: {fileID: 8747518771214223398}
   m_Layer: 5
-  m_Name: Nivel
+  m_Name: Nivel Fundo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1080,7 +1220,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 752b60317d99db34a96bedcddfc9617d, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 5d94a9bf530ac5f4eba658160453679f, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1

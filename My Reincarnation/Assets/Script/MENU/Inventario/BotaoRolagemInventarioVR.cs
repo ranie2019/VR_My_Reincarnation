@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
@@ -19,7 +19,7 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
     [SerializeField] private bool aceitarSomenteInteractorXR = true;
     [SerializeField] private bool aceitarComponentesXRRelacionados = true;
     [SerializeField] private bool procurarInteractorXRNosFilhos = true;
-    [SerializeField] private bool rolarEnquantoPermaneceEmContato = true;
+    [SerializeField] private bool rolarEnquantoPermaneceEmContato = false;
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip somClique;
 
@@ -72,7 +72,7 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
 
     private void TentarExecutarRolagem(Collider other)
     {
-        if (!botaoAtivo)
+        if (!botaoAtivo || !isActiveAndEnabled)
             return;
 
         if (other == null)
@@ -80,6 +80,9 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
 
         if (Time.time < proximoToquePermitido)
             return;
+
+        // A propria UI/slots nunca representam uma mao tocando no botao.
+        if (other.GetComponentInParent<InventarioVR>(true) != null) return;
 
         if (!ColliderPassaFiltroDono(other))
             return;
@@ -214,7 +217,8 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
         if (!aceitarSomenteInteractorXR)
             return true;
 
-        if (other == null)
+        if (other == null || other is CharacterController ||
+            other.transform == ObterRaizPlayerDono())
             return false;
 
         if (other.GetComponentInParent<XRBaseInteractor>() != null)
@@ -229,9 +233,6 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
             if (other.GetComponentInChildren<XRBaseInteractor>(true) != null)
                 return true;
 
-            Transform raiz = other.transform.root;
-            if (raiz != null && raiz.GetComponentInChildren<XRBaseInteractor>(true) != null)
-                return true;
         }
 
         return aceitarComponentesXRRelacionados && BuscarComponenteXRRelacionado(other) != null;
@@ -255,11 +256,9 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
                 return componente;
         }
 
-        Transform raiz = other.transform.root;
-        if (raiz != null)
-            componente = BuscarComponenteXRRelacionadoEmComponentes(raiz.GetComponentsInChildren<MonoBehaviour>(true));
-
-        return componente;
+        // Nao procurar na raiz Player: isso qualificava corpo, slots e UI
+        // apenas porque existia um controle XR em outro ramo da hierarquia.
+        return null;
     }
 
     private Component BuscarComponenteXRRelacionadoEmComponentes(MonoBehaviour[] componentes)
@@ -292,9 +291,6 @@ public class BotaoRolagemInventarioVR : MonoBehaviour
 
         return nome.Contains("Interactor") ||
                nome.Contains("Controller") ||
-               nome.Contains("Hand") ||
-               nome.Contains("Tracked") ||
-               nome.Contains("Pose") ||
-               nomeCompleto.Contains("Interaction.Toolkit");
+               nome.Contains("Hand");
     }
 }

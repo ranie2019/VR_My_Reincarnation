@@ -1037,8 +1037,17 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         // O XR pode reaplicar a escala-alvo capturada antes do encaixe. Reaplica
         // a escala visual calculada e verifica novamente o limite do slot.
         Vector3 escalaAtual = item.transform.lossyScale;
+        // Rotacao do menu, troca de slot e o pivot de encaixe podem invalidar
+        // os limites sem alterar a escala numerica do item.
         if ((escalaAtual - escalaVisual).sqrMagnitude <= 0.00000001f)
-            return;
+        {
+            if (EscalaVisualAtualCabeNoSlot(item)) return;
+            // O encaixe alinha o pivot, mas meshes como flechas possuem centro
+            // deslocado. Recentraliza antes de tentar reduzir a escala outra vez.
+            var escalavel = item.GetComponent<ItemInventarioEscalavel>();
+            if (escalavel != null && TryObterBoundsVisualPermitido(out Bounds permitido) &&
+                escalavel.CentralizarVisualAtualNoSlot(transform, permitido)) return;
+        }
 
         Vector3 escalaLocal = ConverterEscalaMundoParaLocal(escalaVisual, item.transform.parent);
         item.transform.localScale = escalaLocal;
@@ -3021,8 +3030,16 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         return true;
     }
 
+    private int ultimaQuantidadeNotificada = -1;
+
     private void AtualizarContadorTMP()
     {
+        if (ultimaQuantidadeNotificada != pilhaItens.Count)
+        {
+            if (ultimaQuantidadeNotificada >= 0)
+                SaveManager.Instancia?.SolicitarSalvamentoInventario();
+            ultimaQuantidadeNotificada = pilhaItens.Count;
+        }
         if (contadorTMP != null)
             contadorTMP.text = pilhaItens.Count.ToString();
 
