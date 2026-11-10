@@ -356,7 +356,7 @@ public class RespawnNatureza : MonoBehaviour
             ? rotacaoMorte
             : config.prefabRespawn.transform.rotation;
 
-        string chaveRespawn = CriarChaveRespawn(idNormalizado, posicaoFinal);
+        string chaveRespawn = CriarChaveRespawn(config.idNatureza.Trim(), posicaoFinal);
         if (!respawnsAgendados.Add(chaveRespawn))
             return;
 
