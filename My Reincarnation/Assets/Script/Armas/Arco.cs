@@ -68,7 +68,7 @@ public class Arco : MonoBehaviour
     [SerializeField] private bool mostrarLinhaDebugCorda = false;
 
     [Header("Flecha")]
-    [SerializeField] private GameObject prefabFlecha;
+    [SerializeField, InspectorName("Prefab Flecha (teste sem inventário)")] private GameObject prefabFlecha;
     [SerializeField, HideInInspector] private Transform pontoFlecha;
     [SerializeField] private Transform pontoDirecaoDisparo;
     [SerializeField] private bool criarFlechaAutomaticamente = true;
@@ -184,7 +184,6 @@ public class Arco : MonoBehaviour
     [SerializeField] private TMP_Text textoValorTotal;
     [SerializeField] private bool destruirAoQuebrar = false;
     [SerializeField] private bool desativarAoQuebrar = true;
-    [SerializeField] private float desgastePorDisparo = 1f;
 
     [Header("Texto Durabilidade")]
     [SerializeField] private Color corTextoA = Color.white;
@@ -211,6 +210,8 @@ public class Arco : MonoBehaviour
     private Transform maoPuxando;
     private Transform maoCanceladaAteSoltarCorda;
     private GameObject flechaPreparada;
+    private Flecha fonteBonusPreparada;
+    private bool UsaMunicaoDoInventario => !permitirDisparoSemFlechaParaTeste && consumirFlechaDoInventario;
     private Vector3 escalaMundialFlechaPreparada;
     private bool escalaMundialFlechaPreparadaValida;
     private bool animacaoMirarAtiva;
@@ -257,9 +258,9 @@ public class Arco : MonoBehaviour
     private readonly Vector3[] pontosCalculadosMira = new Vector3[64];
     private readonly RaycastHit[] resultadosRaycastMira = new RaycastHit[16];
 
-    public float DurabilidadeAtual => durabilidadeAtual;
-    public float DurabilidadeMaxima => durabilidadeMaxima;
-    public bool Quebrado => arcoQuebrado || durabilidadeAtual <= 0f;
+    public float DurabilidadeAtual => GetComponent<Arcopopup>() is Arcopopup dados ? dados.VidaAtual : durabilidadeAtual;
+    public float DurabilidadeMaxima => GetComponent<Arcopopup>() is Arcopopup dados ? dados.VidaMaxima : durabilidadeMaxima;
+    public bool Quebrado => GetComponent<Arcopopup>() != null ? DurabilidadeAtual <= 0f : arcoQuebrado || durabilidadeAtual <= 0f;
 
     private void Awake()
     {
@@ -284,9 +285,11 @@ public class Arco : MonoBehaviour
             areaPuxarCorda.isTrigger = true;
 
         NormalizarValores();
-        EncontrarTextosDurabilidadeSeNecessario(true);
-        AtualizarTextoDurabilidade(true);
-        AplicarCorTexto(corTextoA);
+        if (GetComponent<Arcopopup>() == null)
+        {
+            AtualizarTextoDurabilidade(true);
+            AplicarCorTexto(corTextoA);
+        }
         ConfigurarRepassadorTriggerCorda();
         ConfigurarCordaRealComBonesSeNecessario();
         ConfigurarVisualizacaoLinhaCorda();
@@ -310,7 +313,7 @@ public class Arco : MonoBehaviour
         InvalidarCapturaVisualPrincipalProtegido();
         NormalizarValores();
         GarantirConfiguracaoVisualPrincipal();
-        AtualizarTextoDurabilidade(false);
+        if (GetComponent<Arcopopup>() == null) AtualizarTextoDurabilidade();
     }
 
     /// <summary>
@@ -348,10 +351,8 @@ public class Arco : MonoBehaviour
 
         if (!permitirDisparoSemFlechaParaTeste)
         {
-            bool temPrefab = prefabFlecha != null || prefabFlechaEquipada != null;
-            bool temInventario = inventarioFlechas != null;
-            if (!temPrefab && !temInventario)
-                Debug.LogWarning($"[Arco:{nome}] Sem prefab de flecha e sem InventarioFlechas. Disparo bloqueado (teste desligado).", this);
+            if (inventarioFlechas == null)
+                Debug.LogWarning($"[Arco:{nome}] Sem InventarioFlechas. Disparo bloqueado (teste desligado).", this);
         }
 
         if (usarMiraArco && !criarMiraAutomaticamente && linhaMiraTrajetoria == null)
@@ -368,7 +369,7 @@ public class Arco : MonoBehaviour
         if (renderersPrincipaisDoArco == null || renderersPrincipaisDoArco.Length == 0)
             Debug.LogWarning($"[Arco:{nome}] Renderers principais do arco vazios. Visual de inventário pode sumir.", this);
 
-        if (durabilidadeMaxima <= 0f)
+        if (DurabilidadeMaxima <= 0f)
             Debug.LogWarning($"[Arco:{nome}] Durabilidade máxima inválida (<= 0).", this);
 
         if (forcaMaximaDisparo < forcaMinimaDisparo)
@@ -457,6 +458,9 @@ public class Arco : MonoBehaviour
     private void Update()
     {
         SincronizarModoInventarioPorParent();
+        if (UsaMunicaoDoInventario && !ReferenceEquals(fonteBonusPreparada, null) &&
+            (fonteBonusPreparada == null || !EstadoItemInventario.EstaNoInventario(fonteBonusPreparada)))
+            CancelarPuxadaSemDisparar();
         if (estaNoInventario || attachDuasMao == null ||
             (!attachDuasMao.EstaSeguradoPelaDireita() && !attachDuasMao.EstaSeguradoPelaEsquerda()))
             UsoAcaoCompartilhada.LiberarTodas(this);
@@ -495,8 +499,11 @@ public class Arco : MonoBehaviour
         }
 
         AtualizarLinhaCorda();
-        RotacionarTextoParaCamera();
-        AtualizarEfeitoLedTexto();
+        if (GetComponent<Arcopopup>() == null)
+        {
+            RotacionarTextoParaCamera();
+            AtualizarEfeitoLedTexto();
+        }
     }
 
     private void OnDisable()
@@ -1328,7 +1335,9 @@ public class Arco : MonoBehaviour
         }
 
         if (DispararFlecha())
-            ReduzirDurabilidade(desgastePorDisparo);
+            ReduzirDurabilidade(Mathf.Max(1, GetComponent<Arcopopup>()?.desgastePorDisparo ?? 1));
+        else
+            LimparFlechaPreparada(true);
 
         ResetarCorda();
     }
@@ -1341,6 +1350,14 @@ public class Arco : MonoBehaviour
         if (Quebrado)
             return false;
 
+        var dadosArco = GetComponent<Arcopopup>();
+        if (dadosArco != null &&
+            (!dadosArco.GarantirGeracao() || !dadosArco.PodeUsar(dadosArco.GetStatusPlayerDonoAtual())))
+        {
+            LimparFlechaPreparada(true);
+            return false;
+        }
+
         Transform pontoFlechaAtual = ObterPontoFlechaAtual();
         if (!ObterOrigemEDirecaoDisparo(out Vector3 origemDisparo, out Vector3 direcao))
             return false;
@@ -1348,11 +1365,34 @@ public class Arco : MonoBehaviour
         if (!TentarPrepararPrefabFlechaParaDisparo(out GameObject prefabParaDisparo))
             return false;
 
+        var jogador = ObterDonoFlecha()?.GetComponentInChildren<StatusPlayer>(true);
+        SlotInventario slotOrigem = null;
+        XRGrabInteractable unidade = null;
         GameObject flecha = flechaPreparada;
-
-        if (flecha == null && prefabParaDisparo != null && pontoFlechaAtual != null)
+        if (UsaMunicaoDoInventario)
+        {
+            if (inventarioFlechas == null ||
+                !inventarioFlechas.RetirarFlechaParaDisparo(idTipoFlechaEquipada, jogador, this,
+                    fonteBonusPreparada, out unidade, out slotOrigem))
+            {
+                LimparFlechaPreparada(true);
+                return false;
+            }
+            LimparFlechaPreparada(true, manterBonus: true);
+            flecha = unidade.gameObject;
+            escalaMundialFlechaPreparada = flecha.transform.lossyScale;
+            escalaMundialFlechaPreparadaValida = EscalaValida(escalaMundialFlechaPreparada);
+        }
+        else if ((flecha != null ? flecha : prefabParaDisparo)?.GetComponentInChildren<Flecha>(true) is Flecha dadosFlecha &&
+                 !dadosFlecha.PodeUsar(jogador))
+        {
+            LimparFlechaPreparada(true);
+            return false;
+        }
+        else if (flecha == null && prefabParaDisparo != null && pontoFlechaAtual != null)
         {
             flecha = Instantiate(prefabParaDisparo, origemDisparo, pontoFlechaAtual.rotation);
+            flecha.GetComponent<ItemPersistente>()?.MarcarComoNoInventario();
             escalaMundialFlechaPreparada = flecha.transform.lossyScale;
             escalaMundialFlechaPreparadaValida = EscalaValida(escalaMundialFlechaPreparada);
         }
@@ -1371,33 +1411,34 @@ public class Arco : MonoBehaviour
             RestaurarEscalaMundial(flechaTransform, escalaMundialFlechaPreparada);
 
         GarantirComponenteFlecha(flecha);
+        var projetil = flecha.GetComponentInChildren<Flecha>(true);
         ValidarSentidoVisualFlecha(flecha, direcao, pontoFlechaAtual);
-        ConfigurarDonoFlecha(flecha);
+        ReativarCollidersDaFlecha(flecha);
         ConfigurarColisoesIgnoradasDaFlecha(flecha);
-        PrepararRigidbodyParaDisparo(flecha);
+        projetil.DefinirDono(ObterDonoFlecha() ?? gameObject);
 
         float forcaBase = Mathf.Lerp(forcaMinimaDisparo, forcaMaximaDisparo, percentualPuxada);
         float forcaFinal = forcaBase + energiaAcumulada;
         float multiplicadorDano = CalcularMultiplicadorDano();
 
-        TentarAplicarMultiplicadorDano(flecha, multiplicadorDano);
-        ReativarCollidersDaFlecha(flecha);
+        projetil.DefinirMultiplicadorDano(multiplicadorDano);
 
-        bool disparou = TentarChamarDispararFlecha(flecha, direcao, forcaFinal);
-        if (!disparou)
-            disparou = DispararPorRigidbody(flecha, direcao, forcaFinal);
-
-        if (!disparou)
-            return false;
-
-        if (!ConsumirFlechaEquipadaAposDisparo())
+        if (!projetil.Disparar(direcao, forcaFinal))
         {
-            Destroy(flecha);
+            projetil.ResetarEstadoParaInventarioOuPrefab();
+            if (unidade != null) inventarioFlechas.DevolverFlecha(unidade, slotOrigem);
+            else Destroy(flecha);
             flechaPreparada = null;
             return false;
         }
 
-        MarcarFlechaComoLancada(flecha);
+        fonteBonusPreparada = null;
+        if (unidade != null)
+        {
+            projetil.DefinirRetorno(inventarioFlechas, slotOrigem, unidade, this);
+            AtualizarInventarioArcoUI();
+            SaveManager.Instancia?.SolicitarSalvamentoInventario();
+        }
         TocarSom(somSoltarFlecha);
         flechaPreparada = null;
         escalaMundialFlechaPreparadaValida = false;
@@ -2508,11 +2549,36 @@ public class Arco : MonoBehaviour
         ReduzirDurabilidade(danoRecebido);
     }
 
+    public void RepararCompleto()
+    {
+        var dados = GetComponent<Arcopopup>();
+        if (dados != null)
+        {
+            dados.RepararCompleto();
+            return;
+        }
+
+        durabilidadeAtual = durabilidadeMaxima;
+        arcoQuebrado = false;
+        AtualizarTextoDurabilidade();
+    }
+
     private void ReduzirDurabilidade(float valor)
     {
         if (valor <= 0f || Quebrado)
             return;
 
+        var dados = GetComponent<Arcopopup>();
+        if (dados != null)
+        {
+            dados.AplicarDesgasteCombate(valor);
+            if (dados.EstaQuebrada && gameObject.activeInHierarchy)
+            {
+                LimparFlechaPreparada(true);
+                ResetarCorda();
+            }
+            return;
+        }
         durabilidadeAtual = Mathf.Max(0f, durabilidadeAtual - valor);
         AtualizarTextoDurabilidade(true);
 
@@ -2712,10 +2778,15 @@ public class Arco : MonoBehaviour
 
     private void AtualizarTextoDurabilidade(bool criarSeNecessario = false)
     {
+        if (GetComponent<Arcopopup>() is Arcopopup dados)
+        {
+            dados.AtualizarPopup();
+            return;
+        }
         EncontrarTextosDurabilidadeSeNecessario(criarSeNecessario);
 
-        string atual = FormatarValorDurabilidade(durabilidadeAtual);
-        string total = FormatarValorDurabilidade(durabilidadeMaxima);
+        string atual = FormatarValorDurabilidade(DurabilidadeAtual);
+        string total = FormatarValorDurabilidade(DurabilidadeMaxima);
 
         if (textoValorAtual != null)
             textoValorAtual.text = atual;
@@ -2989,6 +3060,7 @@ public class Arco : MonoBehaviour
             return;
 
         flechaPreparada = Instantiate(prefabParaPreparar, pontoFlechaAtual.position, pontoFlechaAtual.rotation);
+        flechaPreparada.GetComponent<ItemPersistente>()?.MarcarComoNoInventario();
         escalaMundialFlechaPreparada = flechaPreparada.transform.lossyScale;
         escalaMundialFlechaPreparadaValida = EscalaValida(escalaMundialFlechaPreparada);
         GarantirMalhaFlechaVisivel(flechaPreparada);
@@ -2996,6 +3068,15 @@ public class Arco : MonoBehaviour
 
         GarantirComponenteFlecha(flechaPreparada);
         ConfigurarDonoFlecha(flechaPreparada);
+        var dados = UsaMunicaoDoInventario ? inventarioFlechas.ObterFlechaParaPreparar(idTipoFlechaEquipada) :
+            flechaPreparada.GetComponentInChildren<Flecha>(true);
+        var jogador = ObterDonoFlecha()?.GetComponentInChildren<StatusPlayer>(true);
+        if (dados == null || !dados.IniciarBonusPreparado(this, jogador))
+        {
+            LimparFlechaPreparada(true);
+            return;
+        }
+        fonteBonusPreparada = dados;
 
         Rigidbody rb = flechaPreparada.GetComponent<Rigidbody>();
         if (rb != null)
@@ -3127,6 +3208,7 @@ public class Arco : MonoBehaviour
         string id = NormalizarIdFlecha(idTipoFlecha);
         if (string.IsNullOrWhiteSpace(id))
         {
+            LimparFlechaPreparada(true);
             idTipoFlechaEquipada = string.Empty;
             prefabFlechaEquipada = null;
             return;
@@ -3144,6 +3226,7 @@ public class Arco : MonoBehaviour
         if (prefabEncontrado == null)
             return;
 
+        if (!string.Equals(idTipoFlechaEquipada, id, StringComparison.Ordinal)) LimparFlechaPreparada(true);
         idTipoFlechaEquipada = id;
         prefabFlechaEquipada = prefabEncontrado;
         AtualizarInventarioArcoUI();
@@ -3209,27 +3292,11 @@ public class Arco : MonoBehaviour
         if (prefabParaDisparo == null)
             inventarioFlechas.TentarObterPrefabFlecha(id, out prefabParaDisparo);
 
-        if (prefabParaDisparo == null)
-            prefabParaDisparo = ObterPrefabConfiguradoPorId(id);
 
         if (prefabParaDisparo != null)
             prefabFlechaEquipada = prefabParaDisparo;
 
         return prefabParaDisparo != null;
-    }
-
-    private bool ConsumirFlechaEquipadaAposDisparo()
-    {
-        if (permitirDisparoSemFlechaParaTeste || !consumirFlechaDoInventario)
-            return true;
-
-        EncontrarInventarioFlechasSeNecessario();
-        if (inventarioFlechas == null)
-            return false;
-
-        bool consumiu = inventarioFlechas.ConsumirUmaFlecha(idTipoFlechaEquipada);
-        AtualizarInventarioArcoUI();
-        return consumiu;
     }
 
     private void AtualizarEntradaSeletorFlechas()
@@ -3321,7 +3388,7 @@ public class Arco : MonoBehaviour
             inventarioArcoUI = uis[0];
     }
 
-    private void AtualizarInventarioArcoUI()
+    internal void AtualizarInventarioArcoUI()
     {
         EncontrarInventarioArcoUISeNecessario();
         if (inventarioArcoUI != null)
@@ -3390,8 +3457,13 @@ public class Arco : MonoBehaviour
         }
     }
 
-    private void LimparFlechaPreparada(bool destruir)
+    private void LimparFlechaPreparada(bool destruir, bool manterBonus = false)
     {
+        if (!manterBonus)
+        {
+            if (fonteBonusPreparada != null) fonteBonusPreparada.CancelarBonusPreparado(this);
+            fonteBonusPreparada = null;
+        }
         if (flechaPreparada == null)
             return;
 
@@ -3431,31 +3503,6 @@ public class Arco : MonoBehaviour
                     extras);
             }
         }
-    }
-
-    private static void PrepararRigidbodyParaDisparo(GameObject flecha)
-    {
-        if (flecha == null)
-            return;
-
-        Flecha componenteFlecha = flecha.GetComponentInChildren<Flecha>(true);
-        if (componenteFlecha != null)
-        {
-            componenteFlecha.PrepararFisicaParaDisparo(true);
-            return;
-        }
-
-        Rigidbody rb = flecha.GetComponent<Rigidbody>();
-        if (rb == null)
-            rb = flecha.GetComponentInChildren<Rigidbody>();
-
-        if (rb == null)
-            return;
-
-        rb.isKinematic = false;
-        rb.useGravity = true;
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
     }
 
     private void ValidarSentidoVisualFlecha(GameObject flecha, Vector3 direcao, Transform pontoFlechaAtual)
@@ -3623,88 +3670,6 @@ public class Arco : MonoBehaviour
         return 1f + (energiaAcumulada / energiaExtraMaxima) * multiplicadorDanoEnergia;
     }
 
-    private bool TentarChamarDispararFlecha(GameObject flecha, Vector3 direcao, float forcaFinal)
-    {
-        MonoBehaviour[] componentes = flecha.GetComponentsInChildren<MonoBehaviour>(true);
-
-        for (int i = 0; i < componentes.Length; i++)
-        {
-            MonoBehaviour componente = componentes[i];
-            if (componente == null)
-                continue;
-
-            MethodInfo metodo = componente.GetType().GetMethod(
-                "Disparar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                null,
-                new[] { typeof(Vector3), typeof(float) },
-                null
-            );
-
-            if (metodo == null)
-                continue;
-
-            try
-            {
-                object resultado = metodo.Invoke(componente, new object[] { direcao, forcaFinal });
-                return resultado is bool disparou ? disparou : true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        return false;
-    }
-
-    private void TentarAplicarMultiplicadorDano(GameObject flecha, float multiplicadorDano)
-    {
-        string[] nomesMetodos =
-        {
-            "DefinirMultiplicadorDano",
-            "DefinirMultiplicadorDeDano",
-            "SetMultiplicadorDano",
-            "AplicarMultiplicadorDano",
-            "ConfigurarMultiplicadorDano"
-        };
-
-        MonoBehaviour[] componentes = flecha.GetComponentsInChildren<MonoBehaviour>(true);
-
-        for (int i = 0; i < componentes.Length; i++)
-        {
-            MonoBehaviour componente = componentes[i];
-            if (componente == null)
-                continue;
-
-            Type tipo = componente.GetType();
-
-            for (int j = 0; j < nomesMetodos.Length; j++)
-            {
-                MethodInfo metodo = tipo.GetMethod(
-                    nomesMetodos[j],
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null,
-                    new[] { typeof(float) },
-                    null
-                );
-
-                if (metodo == null)
-                    continue;
-
-                try
-                {
-                    metodo.Invoke(componente, new object[] { multiplicadorDano });
-                    return;
-                }
-                catch
-                {
-                    continue;
-                }
-            }
-        }
-    }
-
     private static void GarantirComponenteFlecha(GameObject flecha)
     {
         if (flecha == null)
@@ -3728,23 +3693,6 @@ public class Arco : MonoBehaviour
         {
             if (componentesFlecha[i] != null)
                 componentesFlecha[i].DefinirDono(donoFlecha);
-        }
-    }
-
-    private void MarcarFlechaComoLancada(GameObject flecha)
-    {
-        if (flecha == null)
-            return;
-
-        GameObject donoFlecha = ObterDonoFlecha();
-        if (donoFlecha == null)
-            donoFlecha = gameObject;
-
-        Flecha[] componentesFlecha = flecha.GetComponentsInChildren<Flecha>(true);
-        for (int i = 0; i < componentesFlecha.Length; i++)
-        {
-            if (componentesFlecha[i] != null)
-                componentesFlecha[i].MarcarComoLancada(donoFlecha);
         }
     }
 
@@ -3773,23 +3721,6 @@ public class Arco : MonoBehaviour
         }
 
         return null;
-    }
-
-    private static bool DispararPorRigidbody(GameObject flecha, Vector3 direcao, float forcaFinal)
-    {
-        Rigidbody rb = flecha.GetComponent<Rigidbody>();
-        if (rb == null)
-            rb = flecha.GetComponentInChildren<Rigidbody>();
-
-        if (rb == null)
-            return false;
-
-        rb.isKinematic = false;
-        rb.useGravity = true;
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        rb.AddForce(direcao * forcaFinal, ForceMode.Impulse);
-        return true;
     }
 
     private void TocarSom(AudioClip clip)
@@ -3868,7 +3799,6 @@ public class Arco : MonoBehaviour
 
         durabilidadeMaxima = Mathf.Max(1f, durabilidadeMaxima);
         durabilidadeAtual = Mathf.Clamp(durabilidadeAtual, 0f, durabilidadeMaxima);
-        desgastePorDisparo = Mathf.Max(0f, desgastePorDisparo);
         velocidadePiscarTexto = Mathf.Max(0f, velocidadePiscarTexto);
         arcoQuebrado = durabilidadeAtual <= 0f;
     }

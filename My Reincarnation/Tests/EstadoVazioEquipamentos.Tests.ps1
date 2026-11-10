@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-foreach ($script in @('AtributosManoplas','AtributosPeitoral','AtributosElmo')) {
+foreach ($script in @('AtributosManoplas','AtributosPeitoral','EquiparElmo')) {
     $source = Get-Content -Raw (Join-Path $project "Assets/Script/Equipamento/$script.cs")
     $a = $source.IndexOf('    internal static bool EhResultadoVazioLegado(')
     $b = $source.IndexOf('    private static List<ConfiguracaoClasse> CriarClassesPadrao()', $a)

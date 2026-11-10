@@ -47,9 +47,16 @@ $status = Get-Content -Raw (Join-Path $project 'Assets/Script/MENU/Status/Status
 $start = $status.IndexOf('    private int ObterBonusElmo(')
 $end = $status.IndexOf('    public int GetBonusConstituicao()', $start)
 $bonus = $status.Substring($start, $end - $start)
+$a=$status.IndexOf('    internal static int SaturarAtributo(')
+$b=$status.IndexOf('    internal static int SomarLimiteRecurso(', $a)
+if($b -lt 0){$b=$status.IndexOf('    private static int SomarLimiteRecurso(', $a)}
+$bonus += $status.Substring($a,$b-$a)
 $start = $status.IndexOf('    public int GetForcaTotal()')
 $end = $status.IndexOf('    public int GetConstituicaoTotal()', $start)
 $total = $status.Substring($start, $end - $start)
+$inicioArmas = $status.IndexOf('    private long ObterBonusArmas(')
+$fimArmas = $status.IndexOf('    public int GetBonusHP()', $inicioArmas)
+$bonus += $status.Substring($inicioArmas, $fimArmas - $inicioArmas)
 $bonusCode = @'
 using System;
 public enum TipoAtributoManopla { Forca }
@@ -61,9 +68,13 @@ public class EquiparManoplas {
 }
 public class AtributosPeitoral {public int value;public int ObterValor(TipoAtributoManopla a)=>value;}
 public class EquiparPeitoral {public bool JaEquipado=true;public FakeObject gameObject=new FakeObject();public AtributosPeitoral data;public T GetComponent<T>() where T:class=>data as T;}
-public class AtributosElmo {public int value;public int ObterValor(TipoAtributoManopla a)=>value;}
-public class EquiparElmo {public bool JaEquipado=true;public FakeObject gameObject=new FakeObject();public AtributosElmo data;public T GetComponent<T>() where T:class=>data as T;}
+public class EquiparElmo {public bool JaEquipado=true;public FakeObject gameObject=new FakeObject();public int value;public int ObterValor(TipoAtributoManopla a)=>value;}
 public class GerenciadorEquipamentosPlayer { public EquiparManoplas LuvaDireita, LuvaEsquerda; public EquiparPeitoral PeitoralAtual; public EquiparElmo ElmoAtual; }
+public static class Machado {public static long value; public static long ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>value;}
+public static class Picareta {public static long ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>0;}
+public static class Escudo {public static long ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>0;}
+public static class Flecha {public static long ObterBonusEmUso(object player,TipoAtributoManopla tipo)=>0;}
+public static class Espada {public static int ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>0;}
 public class BonusManoplasTests {
  public int forca=21,bonusForca=0; public GerenciadorEquipamentosPlayer manager=new GerenciadorEquipamentosPlayer();
  public T GetComponent<T>() where T:class=>manager as T;
@@ -85,8 +96,11 @@ public class BonusManoplasTests {
   player.manager.LuvaDireita=new EquiparManoplas{data=new AtributosManoplas{value=5}};
   player.manager.LuvaEsquerda=new EquiparManoplas{data=new AtributosManoplas{value=3}};
   check(player.GetBonusForca(),14);check(player.GetForcaTotal(),35);
-  player.manager.ElmoAtual=new EquiparElmo{data=new AtributosElmo{value=6}};
+  player.manager.ElmoAtual=new EquiparElmo{value=6};
   check(player.GetForcaTotal(),41);player.manager.ElmoAtual.JaEquipado=false;check(player.GetForcaTotal(),35);
+  player.manager.ElmoAtual.JaEquipado=true;
+  player.manager.LuvaDireita.data.value=int.MaxValue;player.manager.LuvaEsquerda.data.value=int.MaxValue;
+  check(player.GetBonusForca(),int.MaxValue);check(player.GetForcaTotal(),int.MaxValue);
   return checks;
  }
 }

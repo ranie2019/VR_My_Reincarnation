@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
@@ -12,6 +13,7 @@ public class ItemPersistente : MonoBehaviour
     [Header("Identificacao do Item")]
     [Tooltip("ID automatico e imutavel do TIPO do item. Objetos do mesmo prefab compartilham este valor.")]
     [SerializeField, HideInInspector] private string tipoItemId = "";
+    [SerializeField] private string[] idsDeTipoAnteriores;
     [Tooltip("Nome/ID antigo mantido somente para migrar saves existentes.")]
     [SerializeField, HideInInspector] private string itemId = "";
     [SerializeField] private string nomeItem = "";
@@ -76,6 +78,8 @@ public class ItemPersistente : MonoBehaviour
         public float durabilidadeMaximaPeitoral;
         public bool possuiDurabilidadeElmo;
         public float durabilidadeMaximaElmo;
+        public bool possuiDurabilidadeEspada;
+        public float durabilidadeMaximaEspada;
     }
 
     private void Awake()
@@ -83,6 +87,45 @@ public class ItemPersistente : MonoBehaviour
         GarantirTipoItemId();
         GarantirInstanciaIdRuntime();
         ValidarIdentificacaoRuntime();
+    }
+
+    private bool poseMonitorada;
+    private bool poseAlterada;
+    private Vector3 ultimaPosicaoMonitorada;
+    private Quaternion ultimaRotacaoMonitorada;
+    private float instanteUltimaMudanca;
+
+    private void Update()
+    {
+        var save = SaveManager.Instancia;
+        if (save == null || (save.EstadoCarregamento != SaveManager.EstadoCarga.Concluido &&
+            save.EstadoCarregamento != SaveManager.EstadoCarga.SessaoNova) ||
+            !DeveSalvarComoCena() || PossuiRespawnIntencional())
+        {
+            poseMonitorada = false;
+            poseAlterada = false;
+            return;
+        }
+        if (!poseMonitorada)
+        {
+            ultimaPosicaoMonitorada = transform.position;
+            ultimaRotacaoMonitorada = transform.rotation;
+            poseMonitorada = true;
+            return;
+        }
+        if ((transform.position - ultimaPosicaoMonitorada).sqrMagnitude > 0.000001f ||
+            Quaternion.Angle(transform.rotation, ultimaRotacaoMonitorada) > 0.1f)
+        {
+            ultimaPosicaoMonitorada = transform.position;
+            ultimaRotacaoMonitorada = transform.rotation;
+            instanteUltimaMudanca = Time.unscaledTime;
+            poseAlterada = true;
+        }
+        if (!poseAlterada || Time.unscaledTime - instanteUltimaMudanca < 0.5f) return;
+        var pegavel = GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+        if (pegavel != null && pegavel.isSelected) return;
+        poseAlterada = false;
+        save.SolicitarSalvamentoInventario();
     }
 
     private void Reset()
@@ -113,6 +156,21 @@ public class ItemPersistente : MonoBehaviour
         return string.IsNullOrWhiteSpace(itemId) ? string.Empty : itemId.Trim();
     }
 
+    internal IReadOnlyList<string> IdsDeTipoAnteriores => idsDeTipoAnteriores;
+
+    internal bool CorrespondeAIdDeTipoAnterior(string id)
+    {
+        if (idsDeTipoAnteriores == null || string.IsNullOrWhiteSpace(id))
+            return false;
+
+        string normalizado = id.Trim();
+        foreach (string anterior in idsDeTipoAnteriores)
+            if (string.Equals(anterior?.Trim(), normalizado, StringComparison.Ordinal))
+                return true;
+
+        return false;
+    }
+
     public bool CorrespondeAoItemId(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -120,6 +178,7 @@ public class ItemPersistente : MonoBehaviour
 
         string normalizado = id.Trim();
         return string.Equals(ObterTipoItemId(), normalizado, StringComparison.Ordinal) ||
+               CorrespondeAIdDeTipoAnterior(normalizado) ||
                string.Equals(ObterItemIdLegado(), normalizado, StringComparison.Ordinal) ||
                string.Equals(ObterNomeItem(), normalizado, StringComparison.Ordinal);
     }
@@ -211,6 +270,9 @@ public class ItemPersistente : MonoBehaviour
 
     public InventorySaveData CriarSaveData(int slot, int quantidade, bool equipado)
     {
+        GetComponent<Machado>()?.PrepararSorteioParaSalvar();
+        GetComponent<Picareta>()?.PrepararSorteioParaSalvar();
+        GetComponent<Escudo>()?.PrepararSorteioParaSalvar();
         float durabilidade = LerDurabilidade();
         float maxima = LerDurabilidadeMaxima();
 
@@ -255,6 +317,7 @@ public class ItemPersistente : MonoBehaviour
                  !TentarEscreverNumero(componente, "durabilidadeMaxima", data.durabilidadeMaxima)))
                 throw new InvalidOperationException("Componente de durabilidade incompativel: " + data.instanciaId);
         }
+        maximaEspadaLegadaParaCarga = data.possuiDurabilidadeMaxima ? data.durabilidadeMaxima : 0f;
         durabilidadeAtual = data.durabilidade;
         dadosExtrasJson = data.dadosExtrasJson;
         RestaurarExtrasManoplas();
@@ -338,9 +401,47 @@ public class ItemPersistente : MonoBehaviour
         catch (Exception) { return null; }
     }
 
+    [Serializable]
+    private class ExtrasEspada
+    {
+        public string formato;
+        public string anteriores;
+        public string espada;
+    }
+    private static ExtrasEspada LerExtrasEspada(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            var extras = JsonUtility.FromJson<ExtrasEspada>(json);
+            return extras != null && extras.formato == "my-reincarnation.espada.v1" ? extras : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     private string CapturarExtrasManoplas()
     {
-        var elmo = GetComponent<AtributosElmo>();
+        var flecha = GetComponentInChildren<Flecha>(true);
+        if (flecha != null) return flecha.CapturarUsosJson() ?? dadosExtrasJson;
+
+        var machado = GetComponent<Machado>();
+        if (machado != null) return machado.CapturarSorteioJson(dadosExtrasJson);
+        var picareta = GetComponent<Picareta>();
+        if (picareta != null) return picareta.CapturarSorteioJson(dadosExtrasJson);
+        var escudo = GetComponent<Escudo>();
+        if (escudo != null) return escudo.CapturarSorteioJson(dadosExtrasJson);
+
+        var espada = GetComponent<Espada>();
+        if (espada != null && GetComponent<AtributosManoplas>() == null &&
+            GetComponent<AtributosPeitoral>() == null && GetComponent<EquiparElmo>() == null)
+        {
+            if (!espada.Gerado) return dadosExtrasJson;
+            var extras = LerExtrasEspada(dadosExtrasJson) ??
+                new ExtrasEspada { formato = "my-reincarnation.espada.v1", anteriores = dadosExtrasJson };
+            extras.espada = espada.ExportarEstadoJson();
+            return JsonUtility.ToJson(extras);
+        }
+        var elmo = GetComponent<EquiparElmo>();
         if (elmo != null)
         {
             if (!elmo.Gerado) return dadosExtrasJson;
@@ -382,12 +483,48 @@ public class ItemPersistente : MonoBehaviour
 
     public static void ValidarExtrasNoPrefab(GameObject prefab, string dadosExtrasJson)
     {
+        if (Flecha.LerUsosJson(dadosExtrasJson) != null)
+        {
+            if (prefab == null || prefab.GetComponentInChildren<Flecha>(true) == null)
+                throw new System.IO.InvalidDataException("Dados de usos sem componente de flecha.");
+            return;
+        }
+
+        if (Machado.LerSorteioJson(dadosExtrasJson) != null)
+        {
+            if (prefab == null || prefab.GetComponent<Machado>() == null)
+                throw new System.IO.InvalidDataException("Sorteio sem componente de machado.");
+            return;
+        }
+
+        if (Picareta.LerSorteioJson(dadosExtrasJson) != null)
+        {
+            if (prefab == null || prefab.GetComponent<Picareta>() == null)
+                throw new System.IO.InvalidDataException("Sorteio sem componente de picareta.");
+            return;
+        }
+
+        if (Escudo.LerSorteioJson(dadosExtrasJson) != null)
+        {
+            if (prefab == null || prefab.GetComponent<Escudo>() == null)
+                throw new System.IO.InvalidDataException("Sorteio sem componente de escudo.");
+            return;
+        }
+
+        var espada = LerExtrasEspada(dadosExtrasJson);
+        if (espada != null)
+        {
+            if (prefab == null || prefab.GetComponent<Espada>() == null || string.IsNullOrWhiteSpace(espada.espada))
+                throw new System.IO.InvalidDataException("Dados de espada sem componente ou estado correspondente.");
+            Espada.LerEValidarEstadoJson(espada.espada);
+            return;
+        }
         var elmo = LerExtrasElmo(dadosExtrasJson);
         if (elmo != null)
         {
-            if (prefab == null || prefab.GetComponent<AtributosElmo>() == null || string.IsNullOrWhiteSpace(elmo.elmo))
+            if (prefab == null || prefab.GetComponent<EquiparElmo>() == null || string.IsNullOrWhiteSpace(elmo.elmo))
                 throw new System.IO.InvalidDataException("Dados de elmo sem componente ou estado correspondente.");
-            AtributosElmo.LerEValidarEstadoJson(elmo.elmo);
+            EquiparElmo.LerEValidarEstadoJson(elmo.elmo);
             return;
         }
         var peitoral = LerExtrasPeitoral(dadosExtrasJson);
@@ -405,10 +542,51 @@ public class ItemPersistente : MonoBehaviour
         AtributosManoplas.LerEValidarEstadoJson(extras.manoplas);
     }
 
+    private float maximaEspadaLegadaParaCarga;
+
     private void RestaurarExtrasManoplas()
     {
+        var flecha = GetComponentInChildren<Flecha>(true);
+        if (flecha != null)
+        {
+            flecha.RestaurarUsos(Flecha.LerUsosJson(dadosExtrasJson), dadosExtrasJson);
+            return;
+        }
+
+        var machado = GetComponent<Machado>();
+        if (machado != null)
+        {
+            machado.RestaurarSorteio(dadosExtrasJson, durabilidadeAtual);
+            return;
+        }
+
+        var picareta = GetComponent<Picareta>();
+        if (picareta != null)
+        {
+            picareta.RestaurarSorteio(dadosExtrasJson, durabilidadeAtual);
+            return;
+        }
+
+        var escudo = GetComponent<Escudo>();
+        if (escudo != null)
+        {
+            escudo.RestaurarSorteio(dadosExtrasJson, durabilidadeAtual);
+            return;
+        }
+
+        var extrasEspada = LerExtrasEspada(dadosExtrasJson);
+        var espada = GetComponent<Espada>();
+        if (extrasEspada != null)
+        {
+            if (espada == null || string.IsNullOrWhiteSpace(extrasEspada.espada))
+                throw new System.IO.InvalidDataException("Dados de espada sem componente ou estado correspondente.");
+            espada.RestaurarEstadoJson(extrasEspada.espada);
+            return;
+        }
+        espada?.RestaurarEstadoLegado(durabilidadeAtual, maximaEspadaLegadaParaCarga > 0f ? maximaEspadaLegadaParaCarga : espada.VidaMaximaLegada);
+        maximaEspadaLegadaParaCarga = 0f;
         var extrasElmo = LerExtrasElmo(dadosExtrasJson);
-        var elmo = GetComponent<AtributosElmo>();
+        var elmo = GetComponent<EquiparElmo>();
         if (extrasElmo != null)
         {
             if (elmo == null || string.IsNullOrWhiteSpace(extrasElmo.elmo))
@@ -447,6 +625,9 @@ public class ItemPersistente : MonoBehaviour
 
     public EstadoCenaItem CriarEstadoCena()
     {
+        GetComponent<Machado>()?.PrepararSorteioParaSalvar();
+        GetComponent<Picareta>()?.PrepararSorteioParaSalvar();
+        GetComponent<Escudo>()?.PrepararSorteioParaSalvar();
         var estado = new EstadoCenaItem
         {
             itemId = ObterItemId(),
@@ -460,8 +641,10 @@ public class ItemPersistente : MonoBehaviour
             durabilidadeMaximaManopla = GetComponent<AtributosManoplas>() != null ? GetComponent<AtributosManoplas>().VidaMaxima : 0f,
             possuiDurabilidadePeitoral = GetComponent<AtributosPeitoral>() != null,
             durabilidadeMaximaPeitoral = GetComponent<AtributosPeitoral>() != null ? GetComponent<AtributosPeitoral>().VidaMaxima : 0f,
-            possuiDurabilidadeElmo = GetComponent<AtributosElmo>() != null,
-            durabilidadeMaximaElmo = GetComponent<AtributosElmo>() != null ? GetComponent<AtributosElmo>().VidaMaxima : 0f
+            possuiDurabilidadeElmo = GetComponent<EquiparElmo>() != null,
+            durabilidadeMaximaElmo = GetComponent<EquiparElmo>() != null ? GetComponent<EquiparElmo>().VidaMaxima : 0f,
+            possuiDurabilidadeEspada = GetComponent<Espada>() != null,
+            durabilidadeMaximaEspada = GetComponent<Espada>() != null ? GetComponent<Espada>().VidaMaxima : 0f
         };
         GetComponent<Cocumelo>()?.CapturarEstadoRespawn(estado);
         return estado;
@@ -479,7 +662,9 @@ public class ItemPersistente : MonoBehaviour
         if (estado.possuiDurabilidadePeitoral)
             TentarEscreverNumero(GetComponent<AtributosPeitoral>(), "vidaMaxima", estado.durabilidadeMaximaPeitoral);
         if (estado.possuiDurabilidadeElmo)
-            TentarEscreverNumero(GetComponent<AtributosElmo>(), "vidaMaxima", estado.durabilidadeMaximaElmo);
+            TentarEscreverNumero(GetComponent<EquiparElmo>(), "vidaMaxima", estado.durabilidadeMaximaElmo);
+        if (estado.possuiDurabilidadeEspada)
+            TentarEscreverNumero(GetComponent<Espada>(), "vidaMaxima", estado.durabilidadeMaximaEspada);
 
         AplicarItemIdLegadoSeNecessario(estado.itemId);
         if (!string.IsNullOrEmpty(estado.origemCenaId)) origemCenaId = estado.origemCenaId;
@@ -490,6 +675,7 @@ public class ItemPersistente : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(estado.instanciaId))
             DefinirInstanciaId(estado.instanciaId);
 
+        maximaEspadaLegadaParaCarga = estado.possuiDurabilidadeEspada ? estado.durabilidadeMaximaEspada : 0f;
         durabilidadeAtual = estado.durabilidade;
         dadosExtrasJson = estado.dadosExtrasJson;
         RestaurarExtrasManoplas();
@@ -627,13 +813,43 @@ public class ItemPersistente : MonoBehaviour
     public static bool EhMigracaoDurabilidadeManopla(GameObject prefab, InventorySaveData data)
     {
         return data.durabilidade == -1f && !data.possuiDurabilidadeMaxima &&
-            (ObterComponenteDuravel(prefab) is AtributosManoplas || ObterComponenteDuravel(prefab) is AtributosPeitoral || ObterComponenteDuravel(prefab) is AtributosElmo);
+            (ObterComponenteDuravel(prefab) is AtributosManoplas || ObterComponenteDuravel(prefab) is AtributosPeitoral || ObterComponenteDuravel(prefab) is EquiparElmo);
+    }
+
+    // Compatibilidade com arcos antigos: vida atual veio do Arco, maxima do popup legado.
+    public static bool MigrarDurabilidadeArcoLegado(GameObject prefab, EstadoCenaItem estado)
+    {
+        if (prefab == null || estado == null || !estado.possuiDurabilidadeEspada ||
+            prefab.GetComponent<Arcopopup>() == null || prefab.GetComponent<Arco>() == null ||
+            float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
+            estado.durabilidade <= estado.durabilidadeMaximaEspada) return false;
+        var extras = LerExtrasEspada(estado.dadosExtrasJson);
+        if (extras == null) return false;
+        var snapshot = JsonUtility.FromJson<Espada.EstadoEspada>(extras.espada);
+        if (snapshot == null || !snapshot.gerado || snapshot.vidaMaxima != estado.durabilidadeMaximaEspada ||
+            snapshot.vidaMaxima != 20f || snapshot.dano != 1 || snapshot.classe != ClasseManopla.Comum ||
+            (snapshot.atributos != null && snapshot.atributos.Count != 0)) return false;
+        var campo = typeof(Arco).GetField("durabilidadeMaxima", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (campo == null) return false;
+        float maximaLegada = (float)campo.GetValue(prefab.GetComponent<Arco>());
+        if (float.IsNaN(maximaLegada) || float.IsInfinity(maximaLegada) || maximaLegada < estado.durabilidade) return false;
+        snapshot.vidaMaxima = maximaLegada;
+        estado.durabilidadeMaximaEspada = maximaLegada;
+        extras.espada = JsonUtility.ToJson(snapshot);
+        estado.dadosExtrasJson = JsonUtility.ToJson(extras);
+        return true;
     }
 
     public static void ValidarDurabilidadeManoplaCena(GameObject prefab, EstadoCenaItem estado)
     {
+        if (estado.possuiDurabilidadeEspada &&
+            (prefab == null || prefab.GetComponent<Espada>() == null ||
+             float.IsNaN(estado.durabilidadeMaximaEspada) || float.IsInfinity(estado.durabilidadeMaximaEspada) ||
+             estado.durabilidadeMaximaEspada <= 0f || float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
+             estado.durabilidade < 0f || estado.durabilidade > estado.durabilidadeMaximaEspada))
+            throw new System.IO.InvalidDataException("Durabilidade de espada de cena invalida.");
         if (estado.possuiDurabilidadeElmo &&
-            (prefab == null || prefab.GetComponent<AtributosElmo>() == null ||
+            (prefab == null || prefab.GetComponent<EquiparElmo>() == null ||
              float.IsNaN(estado.durabilidadeMaximaElmo) || float.IsInfinity(estado.durabilidadeMaximaElmo) ||
              estado.durabilidadeMaximaElmo <= 0f || float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
              estado.durabilidade < 0f || estado.durabilidade > estado.durabilidadeMaximaElmo))
@@ -764,9 +980,9 @@ public class ItemPersistente : MonoBehaviour
 
     private static Component ObterComponenteDuravel(GameObject objeto)
     {
-        return objeto.GetComponent("Equipamento") ?? objeto.GetComponent("Espada") ??
+        return objeto.GetComponent("Equipamento") ?? (Component)objeto.GetComponent<Espada>() ??
                objeto.GetComponent("Machado") ?? objeto.GetComponent("Picareta") ??
-               objeto.GetComponent("Arco") ?? objeto.GetComponent("Escudo") ?? objeto.GetComponent<AtributosManoplas>() ?? (Component)objeto.GetComponent<AtributosPeitoral>() ?? objeto.GetComponent<AtributosElmo>();
+               objeto.GetComponent("Arco") ?? objeto.GetComponent("Escudo") ?? objeto.GetComponent<AtributosManoplas>() ?? (Component)objeto.GetComponent<AtributosPeitoral>() ?? objeto.GetComponent<EquiparElmo>();
     }
 
     private bool TentarLerNumero(Component componente, string nome, out float valor)

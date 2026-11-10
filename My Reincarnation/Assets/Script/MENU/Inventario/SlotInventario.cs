@@ -1101,7 +1101,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         itensRestauradosDoSave.Remove(item);
     }
 
-    private void RestaurarItemParaMundo(XRGrabInteractable item)
+    private void RestaurarItemParaMundo(XRGrabInteractable item, bool aguardarXR = true)
     {
         if (item == null)
             return;
@@ -1113,7 +1113,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             RestaurarEscalaEParentParaMundo(item);
             RestaurarFisicaDoItem(item);
             LiberarEstadoInventarioDoItem(item);
-            StartCoroutine(RestaurarFisicaQuandoXRTerminar(item));
+            if (aguardarXR) StartCoroutine(RestaurarFisicaQuandoXRTerminar(item));
             Physics.SyncTransforms();
             return;
         }
@@ -1134,8 +1134,8 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
 
         RestaurarFisicaDoItem(item);
         LiberarEstadoInventarioDoItem(item);
-        StartCoroutine(RestaurarEscalaOriginalNoProximoFrame(item));
-        StartCoroutine(RestaurarFisicaQuandoXRTerminar(item));
+        if (aguardarXR) StartCoroutine(RestaurarEscalaOriginalNoProximoFrame(item));
+        if (aguardarXR) StartCoroutine(RestaurarFisicaQuandoXRTerminar(item));
 
         Physics.SyncTransforms();
     }
@@ -1431,7 +1431,9 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
         return item != null && itemGuardado == item && TopoDaPilha() == item;
     }
 
-    public bool RetirarItemParaEquipamento(XRGrabInteractable item)
+    public bool RetirarItemParaEquipamento(XRGrabInteractable item) => RetirarTopoParaMundo(item, true);
+
+    internal bool RetirarTopoParaMundo(XRGrabInteractable item, bool aguardarXR)
     {
         if (!PodeRetirarItemParaEquipamento(item))
             return false;
@@ -1445,7 +1447,7 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
             TocarSom(somRetirarItem);
 
         itemGuardado = null;
-        RestaurarItemParaMundo(item);
+        RestaurarItemParaMundo(item, aguardarXR);
         AtualizarContadorTMP();
 
         if (pilhaItens.Count == 0)
@@ -2838,6 +2840,14 @@ public class SlotInventario : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
                 continue;
 
             bool ehTopo = item == topo;
+            if (!ehTopo || !slotVisivel)
+            {
+                item.GetComponent<Espada>()?.FecharPopup();
+                item.GetComponentInChildren<Flecha>(true)?.FecharPopup();
+                item.GetComponent<Picareta>()?.FecharPopup();
+                item.GetComponent<Escudo>()?.FecharPopup();
+                item.GetComponent<Machado>()?.FecharPopup();
+            }
             EstadoOriginalItem estado = estadosOriginais.TryGetValue(item, out EstadoOriginalItem estadoEncontrado)
                 ? estadoEncontrado
                 : null;

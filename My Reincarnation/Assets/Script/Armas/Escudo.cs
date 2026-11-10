@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using TMPro;
@@ -11,28 +12,98 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 [DisallowMultipleComponent]
 public class Escudo : MonoBehaviour
 {
+    [Serializable]
+    private class ClasseEscudo : AtributosManoplas.ConfiguracaoClasse
+    {
+        [Min(1)] public int defesaMinima;
+        [Min(1)] public int defesaMaxima;
+        public TMP_Text textoDefesa;
+        [Min(1)] public int durabilidadeMinima;
+        [Min(1)] public int durabilidadeMaxima;
+        public TMP_Text textoDurabilidadeAtual;
+        public TMP_Text textoDurabilidadeMaxima;
+    }
+
+    [Serializable]
+    internal class EstadoSorteio
+    {
+        internal const string Formato = "my-reincarnation.escudo.v1";
+        public string formato = Formato;
+        public string anteriores;
+        public ClasseManopla classe;
+        public int defesa;
+        public int durabilidadeMaxima;
+        public List<AtributosManoplas.ValorAtributo> atributos;
+    }
+
+    [SerializeField] private ClasseEscudo[] classes =
+    {
+        CriarClassePadrao(ClasseManopla.Comum, 85),
+        CriarClassePadrao(ClasseManopla.Incomum, 12),
+        CriarClassePadrao(ClasseManopla.Raro, 3),
+        CriarClassePadrao(ClasseManopla.Epico),
+        CriarClassePadrao(ClasseManopla.Unico),
+        CriarClassePadrao(ClasseManopla.Lendario),
+        CriarClassePadrao(ClasseManopla.Mitico),
+        CriarClassePadrao(ClasseManopla.Divino)
+    };
+
+    private static ClasseEscudo CriarClassePadrao(ClasseManopla classe, float chance = 0)
+    {
+        var configuracao = new ClasseEscudo
+        {
+            classe = classe,
+            chance = chance,
+            defesaMinima = 3 + (int)classe,
+            defesaMaxima = 5 + (int)classe,
+            quantidadeMinima = Mathf.Min((int)classe, 4),
+            quantidadeMaxima = Mathf.Min((int)classe + 1, 5)
+        };
+        foreach (TipoAtributoManopla atributo in Enum.GetValues(typeof(TipoAtributoManopla)))
+            if (AtributoValido(atributo))
+                configuracao.atributos.Add(new AtributosManoplas.FaixaAtributo { atributo = atributo });
+        return configuracao;
+    }
+
+    [SerializeField] private List<Espada.LinhaAtributoEspada> textosValores = new() { new(), new(), new(), new(), new() };
+    [SerializeField] private TipoAtributoManopla atributoRestricao = TipoAtributoManopla.Constituicao;
+    [SerializeField, Min(0)] private int valorMinimoParaUsar;
+    [SerializeField] private GameObject grupoRestricao;
+    [SerializeField] private TMP_Text textoAtributoRestricao, textoValorRestricao, textoMensagemRestricao;
+
+    private EstadoSorteio sorteio;
+    private bool durabilidadeRestaurada;
+    private static readonly HashSet<Escudo> escudosEmpunhados = new();
+    private StatusPlayer jogadorComBonus;
+    private TMP_Text resumoPopup;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void LimparEscudosEmpunhados() => escudosEmpunhados.Clear();
+
+    [Header("Popup do escudo: laser, sem botao equipar")]
+    [SerializeField] private GameObject popup;
+    [SerializeField] private GameObject prefabObjeto;
+    [SerializeField, TextArea(3, 8)] private string descricao;
+    [SerializeField] private TMP_Text textoNome;
+    [SerializeField] private TMP_Text textoClasse;
+    [SerializeField] private TMP_Text textoDescricao;
+    [SerializeField] private Camera cameraJogador;
+    [SerializeField] private Vector3 posicaoPopupNaCamera = new Vector3(0, 0, 1.5f);
+    [SerializeField] private Vector3 rotacaoPopupNaCamera;
+    [SerializeField, Min(0)] private float espacamentoHorizontalPopups = 0.45f;
+    [Min(0)] public float tempoParaFecharPopup = 5f;
+    private Coroutine fechamentoPopup;
+    private Transform paiOriginalPopup;
+    private Vector3 posicaoOriginalPopup, escalaOriginalPopup, escalaMundoPopup;
+    private Quaternion rotacaoOriginalPopup;
+    private bool posePopupCapturada, popupIsolado;
+    private GameObject raizPopup;
+
     [Header("Vida / Durabilidade")]
     [SerializeField] private int vidaMaxima = 30;
     [SerializeField] private int vidaAtual = 30;
-    [SerializeField] private int desgastePorBloqueio = 1;
     [SerializeField] private bool destruirQuandoVidaZerar = true;
-
-    [Header("Texto Durabilidade")]
-    public TMP_Text textoValorAtual;
-    public TMP_Text textoValorTotal;
-
-    [Header("Efeito LED Texto")]
-    public Color corTextoA = Color.white;
-    public Color corTextoB = Color.cyan;
-    public float velocidadePiscarTexto = 2f;
-    public bool usarEfeitoLedTexto = true;
-
-    [Header("Tags que desgastam o escudo")]
-    [SerializeField] private string[] tagsQueDesgastamEscudo;
-
-    [Header("Cooldown")]
-    [SerializeField] private float cooldownBloqueioMesmoObjeto = 0.25f;
-    [SerializeField] private float tempoIgnorarDonoAposSoltar = 1f;
+    [SerializeField, Min(1)] private int desgastePorDano = 1;
 
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
@@ -42,12 +113,10 @@ public class Escudo : MonoBehaviour
     [SerializeField] private float volumeQuebrar = 1f;
 
     private Transform donoAtualPlayer;
-    private Transform ultimoDonoPlayer;
-    private Transform raizTextoDurabilidade;
     private XRGrabInteractable grabInteractable;
     private bool quebrado;
-    private float ignorarUltimoDonoAte;
-    private readonly Dictionary<int, float> proximoBloqueioPermitidoPorObjeto = new();
+    private readonly Dictionary<Collider, (Component fonte, int quantidade)> contatosDeDano = new();
+    private readonly List<Collider> contatosInvalidos = new();
     private static readonly CultureInfo CulturaDurabilidade = CultureInfo.GetCultureInfo("pt-BR");
 
     public int VidaAtual => vidaAtual;
@@ -61,10 +130,9 @@ public class Escudo : MonoBehaviour
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
+        ResolverPopupEscudo();
         NormalizarVida();
-        EncontrarTextosDurabilidadeSeNecessario(true);
-        AtualizarTextoDurabilidade(true);
-        AplicarCorTexto(corTextoA);
+        FecharPopup();
     }
 
     private void OnEnable()
@@ -77,8 +145,11 @@ public class Escudo : MonoBehaviour
 
         if (grabInteractable != null)
         {
+            grabInteractable.hoverEntered.AddListener(OnHoverPopupEscudo);
             grabInteractable.selectEntered.AddListener(OnSelectEntered);
             grabInteractable.selectExited.AddListener(OnSelectExited);
+            AtualizarDonoPelaSelecaoAtual();
+            AtualizarBonusEmpunhado();
         }
     }
 
@@ -86,33 +157,40 @@ public class Escudo : MonoBehaviour
     {
         if (grabInteractable != null)
         {
+            grabInteractable.hoverEntered.RemoveListener(OnHoverPopupEscudo);
             grabInteractable.selectEntered.RemoveListener(OnSelectEntered);
             grabInteractable.selectExited.RemoveListener(OnSelectExited);
         }
 
+        FecharPopup();
+        DefinirJogadorComBonus(null);
         donoAtualPlayer = null;
-        ultimoDonoPlayer = null;
-        ignorarUltimoDonoAte = 0f;
-        proximoBloqueioPermitidoPorObjeto.Clear();
+        contatosDeDano.Clear();
     }
 
     private void OnValidate()
     {
         vidaMaxima = Mathf.Max(1, vidaMaxima);
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
-        desgastePorBloqueio = Mathf.Max(0, desgastePorBloqueio);
-        cooldownBloqueioMesmoObjeto = Mathf.Max(0f, cooldownBloqueioMesmoObjeto);
-        tempoIgnorarDonoAposSoltar = Mathf.Max(0f, tempoIgnorarDonoAposSoltar);
+        if (!Application.isPlaying && classes != null)
+            foreach (var classe in classes)
+            {
+                if (classe == null) continue;
+                ObterFaixaDurabilidade(classe, classe.classe, out int minimo, out int maximo);
+                classe.durabilidadeMinima = minimo;
+                classe.durabilidadeMaxima = maximo;
+            }
+        desgastePorDano = Mathf.Max(1, desgastePorDano);
         volumeBloqueio = Mathf.Max(0f, volumeBloqueio);
         volumeQuebrar = Mathf.Max(0f, volumeQuebrar);
-        velocidadePiscarTexto = Mathf.Max(0f, velocidadePiscarTexto);
-        AtualizarTextoDurabilidade(false);
     }
 
     private void LateUpdate()
     {
-        RotacionarTextoParaCamera();
-        AtualizarEfeitoLedTexto();
+        AtualizarBonusEmpunhado();
+        if (!popupIsolado || popup == null) return;
+        if (PopupBloqueadoPorSelecao() || Quebrado) FecharPopup();
+        else if (popup.activeInHierarchy) PosicionarPopup();
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -120,7 +198,7 @@ public class Escudo : MonoBehaviour
         if (collision == null || collision.collider == null)
             return;
 
-        ProcessarBloqueio(collision.collider.gameObject, AudioColisaoFiltro.PodeTocarSomDeColisao(collision));
+        ProcessarBloqueio(collision.collider, AudioColisaoFiltro.PodeTocarSomDeColisao(collision));
     }
 
     private void OnTriggerEnter(Collider other)
@@ -128,355 +206,131 @@ public class Escudo : MonoBehaviour
         if (other == null)
             return;
 
-        ProcessarBloqueio(other.gameObject, false);
+        ProcessarBloqueio(other, false);
     }
+
+    private void OnCollisionExit(Collision collision) => EncerrarContato(collision.collider);
+    private void OnTriggerExit(Collider other) => EncerrarContato(other);
 
     private void OnSelectEntered(SelectEnterEventArgs args)
     {
+        if (args == null || args.interactorObject == null) return;
+        if (args.interactorObject is XRSocketInteractor) return;
+        FecharPopup();
         Transform interactorTransform = ObterTransformInteractor(args.interactorObject);
         donoAtualPlayer = EncontrarPlayerDonoAPartirDoTransform(interactorTransform);
-        ultimoDonoPlayer = donoAtualPlayer;
-        ignorarUltimoDonoAte = 0f;
+        AtualizarBonusEmpunhado();
     }
 
     private void OnSelectExited(SelectExitEventArgs args)
     {
-        Transform donoAntesDeSoltar = donoAtualPlayer;
         AtualizarDonoPelaSelecaoAtual();
-
-        if (donoAtualPlayer != null)
-        {
-            ultimoDonoPlayer = donoAtualPlayer;
-            ignorarUltimoDonoAte = 0f;
-            return;
-        }
-
-        if (donoAntesDeSoltar != null && tempoIgnorarDonoAposSoltar > 0f)
-        {
-            ultimoDonoPlayer = donoAntesDeSoltar;
-            ignorarUltimoDonoAte = Time.time + tempoIgnorarDonoAposSoltar;
-        }
+        AtualizarBonusEmpunhado();
+        if (donoAtualPlayer == null) contatosDeDano.Clear();
     }
 
     public bool EstaProtegendoPlayer(Transform player)
     {
-        if (Quebrado || player == null || donoAtualPlayer == null)
+        if (!PodeConcederBonus() || player == null)
             return false;
 
         return player == donoAtualPlayer || player.IsChildOf(donoAtualPlayer);
     }
 
-    public bool BloqueiaDanoDe(GameObject origemDano, Transform playerAlvo)
+    private void RegistrarImpacto(bool tocarSom)
     {
-        if (!EstaProtegendoPlayer(playerAlvo) || origemDano == null)
-            return false;
-
-        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(origemDano))
-            return false;
-
-        if (EhParteDoProprioEscudo(origemDano))
-            return false;
-
-        if (!TagPodeDesgastarEscudo(origemDano, out GameObject origemResolvida))
-            return false;
-
-        if (PertenceAoDonoAtual(origemResolvida) || PertenceAoDonoRecente(origemResolvida) || EstaAcopladoAoMesmoDono(origemResolvida) || EstaAcopladoAoDonoRecente(origemResolvida))
-            return false;
-
-        // TODO futuro:
-        // if (escudo != null && escudo.BloqueiaDanoDe(origemDano, playerTransform))
-        //     return; // dano bloqueado
-        return true;
-    }
-
-    public bool RegistrarBloqueio(GameObject origemDano)
-    {
-        return RegistrarBloqueio(origemDano, true);
-    }
-
-    public bool RegistrarBloqueio(GameObject origemDano, bool tocarSom)
-    {
-        if (Quebrado || origemDano == null)
-            return false;
-
-        if (EstadoItemInventario.EstaNoInventario(this) || EstadoItemInventario.EstaNoInventario(origemDano))
-            return false;
-
-        if (EhParteDoProprioEscudo(origemDano))
-            return false;
-
-        if (!TagPodeDesgastarEscudo(origemDano, out GameObject origemResolvida))
-            return false;
-
-        if (origemResolvida == null || EhParteDoProprioEscudo(origemResolvida))
-            return false;
-
-        if (PertenceAoDonoAtual(origemResolvida) || PertenceAoDonoRecente(origemResolvida) || EstaAcopladoAoMesmoDono(origemResolvida) || EstaAcopladoAoDonoRecente(origemResolvida))
-            return false;
-
-        if (!PodeBloquearAgora(origemResolvida))
-            return false;
-
+        GarantirSorteio();
         if (tocarSom)
             TocarSomBloqueio();
         ReduzirVidaDoEscudo();
+    }
+
+    internal static bool IgnorarNoAtaque(Collider contato, Transform alvo)
+    {
+        var escudo = contato != null ? contato.GetComponentInParent<Escudo>() : null;
+        return escudo != null && !escudo.EstaProtegendoPlayer(alvo);
+    }
+
+    internal static bool TentarInterceptarGolpe(Collider contato, GameObject atacante, Transform alvo,
+        float ataque, out float restante)
+    {
+        restante = ataque;
+        var escudo = contato != null ? contato.GetComponentInParent<Escudo>() : null;
+        if (escudo == null || !escudo.EstaProtegendoPlayer(alvo)) return false;
+
+        var jogador = alvo.GetComponentInParent<StatusPlayer>() ?? alvo.GetComponentInChildren<StatusPlayer>(true);
+        if (!float.IsFinite(ataque) || ataque <= 0f || atacante == null ||
+            escudo.PertenceAoDonoAtual(atacante) || !escudo.PodeUsar(jogador))
+            return true;
+
+        escudo.GarantirSorteio();
+        restante = Mathf.Max(0f, ataque - escudo.sorteio.defesa);
+        if (restante < ataque)
+            escudo.RegistrarImpacto(true);
         return true;
     }
 
-    private void ProcessarBloqueio(GameObject objetoColidido, bool tocarSom)
+    private void ProcessarBloqueio(Collider contato, bool tocarSom)
     {
-        RegistrarBloqueio(objetoColidido, tocarSom);
+        // Slime e Goblin confirmam o ataque no proprio fluxo de combate.
+        if (!PodeConcederBonus() || !PodeUsar(jogadorComBonus) ||
+            contato.GetComponentInParent<IDano>() is not Component componente ||
+            componente is SlimeIA || componente is GoblinIA ||
+            EstadoItemInventario.EstaNoInventario(componente))
+            return;
+
+        var fonte = (IDano)componente;
+        var atacante = fonte.ObterDono();
+        if (atacante == null || PertenceAoDonoAtual(atacante))
+            return;
+
+        float dano = fonte.ObterDano();
+        if (float.IsFinite(dano) && dano > 0f && RegistrarContato(contato, componente))
+            RegistrarImpacto(tocarSom);
+    }
+
+    private bool RegistrarContato(Collider contato, Component fonte)
+    {
+        bool primeiroDaFonte = true;
+        foreach (var entrada in contatosDeDano)
+        {
+            Collider collider = entrada.Key;
+            if (collider == null || !collider.enabled || !collider.gameObject.activeInHierarchy || entrada.Value.fonte == null)
+                contatosInvalidos.Add(collider);
+            else if (entrada.Value.fonte == fonte)
+                primeiroDaFonte = false;
+        }
+
+        foreach (var invalido in contatosInvalidos)
+            contatosDeDano.Remove(invalido);
+        contatosInvalidos.Clear();
+
+        contatosDeDano.TryGetValue(contato, out var anterior);
+        contatosDeDano[contato] = (fonte, anterior.quantidade + 1);
+        return primeiroDaFonte;
+    }
+
+    private void EncerrarContato(Collider contato)
+    {
+        if (contato == null || !contatosDeDano.TryGetValue(contato, out var atual)) return;
+        if (atual.quantidade <= 1) contatosDeDano.Remove(contato);
+        else contatosDeDano[contato] = (atual.fonte, atual.quantidade - 1);
     }
 
     private void NormalizarVida()
     {
         vidaMaxima = Mathf.Max(1, vidaMaxima);
 
-        if (vidaAtual <= 0)
+        if (vidaAtual <= 0 && !durabilidadeRestaurada)
             vidaAtual = vidaMaxima;
 
         vidaAtual = Mathf.Clamp(vidaAtual, 0, vidaMaxima);
-        AtualizarTextoDurabilidade(false);
-    }
-
-    private void EncontrarTextosDurabilidadeSeNecessario(bool criarSeNecessario = false)
-    {
-        if (textoValorAtual != null && textoValorTotal != null)
-            return;
-
-        TMP_Text[] textos = GetComponentsInChildren<TMP_Text>(true);
-        for (int i = 0; i < textos.Length; i++)
-        {
-            TMP_Text texto = textos[i];
-            if (texto == null)
-                continue;
-
-            string nome = NormalizarNome(texto.gameObject.name);
-
-            if (textoValorAtual == null && (nome == "valoratual" || nome == "atual"))
-                textoValorAtual = texto;
-
-            if (textoValorTotal == null && (nome == "valortotal" || nome == "total"))
-                textoValorTotal = texto;
-        }
-
-        if (criarSeNecessario && Application.isPlaying && (textoValorAtual == null || textoValorTotal == null))
-            CriarTextosDurabilidadeSeNecessario();
     }
 
     public void AtualizarDurabilidadeVisual()
     {
-        AtualizarTextoDurabilidade(true);
-    }
-
-    private void AtualizarTextoDurabilidade(bool criarSeNecessario = false)
-    {
-        EncontrarTextosDurabilidadeSeNecessario(criarSeNecessario);
-
-        if (textoValorAtual != null)
-            textoValorAtual.text = FormatarValorDurabilidade(vidaAtual);
-
-        if (textoValorTotal != null)
-            textoValorTotal.text = FormatarValorDurabilidade(vidaMaxima);
-    }
-
-    private string FormatarValorDurabilidade(int valor)
-    {
-        return Mathf.Max(0, valor).ToString("N0", CulturaDurabilidade);
-    }
-
-    private void AtualizarEfeitoLedTexto()
-    {
-        EncontrarTextosDurabilidadeSeNecessario(true);
-
-        Color cor = corTextoA;
-        if (usarEfeitoLedTexto && velocidadePiscarTexto > 0f)
-        {
-            float t = Mathf.PingPong(Time.time * velocidadePiscarTexto, 1f);
-            cor = Color.Lerp(corTextoA, corTextoB, t);
-        }
-
-        AplicarCorTexto(cor);
-    }
-
-    private void CriarTextosDurabilidadeSeNecessario()
-    {
-        Canvas canvas = GetComponentInChildren<Canvas>(true);
-        if (canvas == null)
-            canvas = CriarCanvasDurabilidade();
-
-        Transform raiz = canvas.transform;
-
-        if (textoValorAtual == null)
-            textoValorAtual = CriarTextoDurabilidade(raiz, "Valor Atual", new Vector2(-45f, 0f), TextAlignmentOptions.Right);
-
-        if (!ExisteSeparadorDurabilidade(raiz))
-            CriarTextoDurabilidade(raiz, "Separador", Vector2.zero, TextAlignmentOptions.Center).text = "/";
-
-        if (textoValorTotal == null)
-            textoValorTotal = CriarTextoDurabilidade(raiz, "Valor Total", new Vector2(45f, 0f), TextAlignmentOptions.Left);
-
-        raizTextoDurabilidade = raiz;
-    }
-
-    private Canvas CriarCanvasDurabilidade()
-    {
-        GameObject canvasObj = new GameObject("Canvas Durabilidade", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
-        canvasObj.transform.SetParent(transform, false);
-
-        RectTransform rect = canvasObj.GetComponent<RectTransform>();
-        rect.localPosition = new Vector3(0f, 0.55f, -0.35f);
-        rect.localRotation = Quaternion.identity;
-        rect.localScale = Vector3.one * 0.01f;
-        rect.sizeDelta = new Vector2(160f, 40f);
-
-        Canvas canvas = canvasObj.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.WorldSpace;
-        canvas.worldCamera = ObterCameraTextoDurabilidade();
-        canvas.sortingOrder = 10;
-
-        CanvasScaler scaler = canvasObj.GetComponent<CanvasScaler>();
-        scaler.dynamicPixelsPerUnit = 10f;
-        scaler.referencePixelsPerUnit = 100f;
-
-        return canvas;
-    }
-
-    private TMP_Text CriarTextoDurabilidade(Transform parent, string nome, Vector2 posicao, TextAlignmentOptions alinhamento)
-    {
-        GameObject textoObj = new GameObject(nome, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        textoObj.transform.SetParent(parent, false);
-
-        RectTransform rect = textoObj.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = posicao;
-        rect.sizeDelta = new Vector2(80f, 30f);
-
-        TextMeshProUGUI texto = textoObj.GetComponent<TextMeshProUGUI>();
-        texto.text = "0";
-        texto.fontSize = 24f;
-        texto.enableAutoSizing = true;
-        texto.fontSizeMin = 10f;
-        texto.fontSizeMax = 26f;
-        texto.alignment = alinhamento;
-        texto.raycastTarget = false;
-        texto.color = corTextoA;
-
-        return texto;
-    }
-
-    private bool ExisteSeparadorDurabilidade(Transform raiz)
-    {
-        TMP_Text[] textos = raiz.GetComponentsInChildren<TMP_Text>(true);
-        for (int i = 0; i < textos.Length; i++)
-        {
-            TMP_Text texto = textos[i];
-            if (texto == null)
-                continue;
-
-            string nome = NormalizarNome(texto.gameObject.name);
-            if (nome == "separador" || texto.text.Trim() == "/")
-                return true;
-        }
-
-        return false;
-    }
-
-    private void AplicarCorTexto(Color cor)
-    {
-        if (textoValorAtual != null)
-            textoValorAtual.color = cor;
-
-        if (textoValorTotal != null)
-            textoValorTotal.color = cor;
-    }
-
-    private void RotacionarTextoParaCamera()
-    {
-        Transform raizTexto = ObterRaizTextoDurabilidade();
-        if (raizTexto == null)
-            return;
-
-        Camera cameraAlvo = ObterCameraTextoDurabilidade();
-        if (cameraAlvo == null)
-            return;
-
-        Transform cameraTransform = cameraAlvo.transform;
-        raizTexto.LookAt(
-            raizTexto.position + cameraTransform.rotation * Vector3.forward,
-            cameraTransform.rotation * Vector3.up);
-    }
-
-    private Transform ObterRaizTextoDurabilidade()
-    {
-        if (raizTextoDurabilidade != null)
-            return raizTextoDurabilidade;
-
-        EncontrarTextosDurabilidadeSeNecessario(true);
-
-        if (textoValorAtual != null && textoValorAtual.transform.parent != null)
-            raizTextoDurabilidade = textoValorAtual.transform.parent;
-        else if (textoValorTotal != null && textoValorTotal.transform.parent != null)
-            raizTextoDurabilidade = textoValorTotal.transform.parent;
-
-        return raizTextoDurabilidade;
-    }
-
-    private Camera ObterCameraTextoDurabilidade()
-    {
-        if (donoAtualPlayer == null)
-            AtualizarDonoPelaSelecaoAtual();
-
-        if (donoAtualPlayer != null)
-        {
-            Camera cameraDoDono = donoAtualPlayer.GetComponentInChildren<Camera>(true);
-            if (cameraDoDono != null)
-                return cameraDoDono;
-        }
-
-        if (Camera.main != null)
-            return Camera.main;
-
-        return FindFirstObjectByType<Camera>();
-    }
-
-    private string NormalizarNome(string texto)
-    {
-        if (string.IsNullOrWhiteSpace(texto))
-            return string.Empty;
-
-        return texto.Trim().ToLowerInvariant()
-            .Replace(" ", string.Empty)
-            .Replace("_", string.Empty)
-            .Replace("-", string.Empty);
-    }
-
-    private bool PodeBloquearAgora(GameObject origem)
-    {
-        if (cooldownBloqueioMesmoObjeto <= 0f)
-            return true;
-
-        int idOrigem = ObterIdCooldown(origem);
-        if (proximoBloqueioPermitidoPorObjeto.TryGetValue(idOrigem, out float proximoTempo) && Time.time < proximoTempo)
-            return false;
-
-        proximoBloqueioPermitidoPorObjeto[idOrigem] = Time.time + cooldownBloqueioMesmoObjeto;
-        return true;
-    }
-
-    private int ObterIdCooldown(GameObject origem)
-    {
-        if (origem == null)
-            return 0;
-
-        Rigidbody rb = origem.GetComponentInParent<Rigidbody>();
-        if (rb != null)
-            return rb.GetInstanceID();
-
-        return origem.transform.root != null
-            ? origem.transform.root.gameObject.GetInstanceID()
-            : origem.GetInstanceID();
+        if (popupIsolado && popup != null && popup.activeInHierarchy)
+            AtualizarPopup();
     }
 
     private Transform ObterTransformInteractor(IXRSelectInteractor interactor)
@@ -493,6 +347,7 @@ public class Escudo : MonoBehaviour
 
         for (int i = 0; i < grabInteractable.interactorsSelecting.Count; i++)
         {
+            if (grabInteractable.interactorsSelecting[i] is XRSocketInteractor) continue;
             Transform interactorTransform = ObterTransformInteractor(grabInteractable.interactorsSelecting[i]);
             Transform player = EncontrarPlayerDonoAPartirDoTransform(interactorTransform);
 
@@ -504,171 +359,8 @@ public class Escudo : MonoBehaviour
         }
     }
 
-    private bool TagPodeDesgastarEscudo(GameObject obj, out GameObject origemResolvida)
-    {
-        origemResolvida = null;
-
-        if (obj == null || tagsQueDesgastamEscudo == null || tagsQueDesgastamEscudo.Length == 0)
-            return false;
-
-        Transform origemComTag = EncontrarTransformComTagPermitida(obj.transform);
-        if (origemComTag != null)
-        {
-            origemResolvida = origemComTag.gameObject;
-            return true;
-        }
-
-        Rigidbody rb = obj.GetComponentInParent<Rigidbody>();
-        if (rb != null)
-        {
-            origemComTag = EncontrarTransformComTagPermitida(rb.transform);
-            if (origemComTag != null)
-            {
-                origemResolvida = origemComTag.gameObject;
-                return true;
-            }
-        }
-
-        if (obj.transform.root != null)
-        {
-            origemComTag = EncontrarTransformComTagPermitida(obj.transform.root);
-            if (origemComTag != null)
-            {
-                origemResolvida = origemComTag.gameObject;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private Transform EncontrarTransformComTagPermitida(Transform origem)
-    {
-        Transform atual = origem;
-        while (atual != null)
-        {
-            if (TagEstaConfigurada(atual.gameObject))
-                return atual;
-
-            atual = atual.parent;
-        }
-
-        return null;
-    }
-
-    private bool TagEstaConfigurada(GameObject obj)
-    {
-        if (obj == null || tagsQueDesgastamEscudo == null)
-            return false;
-
-        string tagObjeto = obj.tag;
-        for (int i = 0; i < tagsQueDesgastamEscudo.Length; i++)
-        {
-            string tagPermitida = tagsQueDesgastamEscudo[i];
-            if (string.IsNullOrWhiteSpace(tagPermitida))
-                continue;
-
-            if (string.Equals(tagObjeto, tagPermitida.Trim(), StringComparison.Ordinal))
-                return true;
-        }
-
-        return false;
-    }
-
-    private bool PertenceAoDonoAtual(GameObject obj)
-    {
-        if (donoAtualPlayer == null || obj == null)
-            return false;
-
-        Transform alvo = obj.transform;
-        if (alvo == donoAtualPlayer || alvo.IsChildOf(donoAtualPlayer))
-            return true;
-
-        Transform donoDoObjeto = ObterDonoAtualDoObjeto(obj);
-        return donoDoObjeto == donoAtualPlayer;
-    }
-
-    private bool EstaAcopladoAoMesmoDono(GameObject obj)
-    {
-        if (donoAtualPlayer == null || obj == null)
-            return false;
-
-        Transform donoDoObjeto = ObterDonoAtualDoObjeto(obj);
-        return donoDoObjeto == donoAtualPlayer;
-    }
-
-    private bool PertenceAoDonoRecente(GameObject obj)
-    {
-        if (!DeveIgnorarUltimoDono() || obj == null)
-            return false;
-
-        Transform alvo = obj.transform;
-        if (alvo == ultimoDonoPlayer || alvo.IsChildOf(ultimoDonoPlayer))
-            return true;
-
-        Transform donoDoObjeto = ObterDonoAtualDoObjeto(obj);
-        return donoDoObjeto == ultimoDonoPlayer;
-    }
-
-    private bool EstaAcopladoAoDonoRecente(GameObject obj)
-    {
-        if (!DeveIgnorarUltimoDono() || obj == null)
-            return false;
-
-        Transform donoDoObjeto = ObterDonoAtualDoObjeto(obj);
-        return donoDoObjeto == ultimoDonoPlayer;
-    }
-
-    private bool DeveIgnorarUltimoDono()
-    {
-        return ultimoDonoPlayer != null && Time.time <= ignorarUltimoDonoAte;
-    }
-
-    private Transform ObterDonoAtualDoObjeto(GameObject obj)
-    {
-        if (obj == null)
-            return null;
-
-        Transform playerNaHierarquia = EncontrarPlayerDonoAPartirDoTransform(obj.transform);
-        if (playerNaHierarquia != null)
-            return playerNaHierarquia;
-
-        XRGrabInteractable interactable = obj.GetComponentInParent<XRGrabInteractable>();
-        Transform dono = ObterDonoDeInteractable(interactable);
-        if (dono != null)
-            return dono;
-
-        XRGrabInteractable[] interactablesFilhos = obj.GetComponentsInChildren<XRGrabInteractable>(true);
-        for (int i = 0; i < interactablesFilhos.Length; i++)
-        {
-            dono = ObterDonoDeInteractable(interactablesFilhos[i]);
-            if (dono != null)
-                return dono;
-        }
-
-        Rigidbody rb = obj.GetComponentInParent<Rigidbody>();
-        if (rb != null && rb.gameObject != obj)
-            return ObterDonoAtualDoObjeto(rb.gameObject);
-
-        return null;
-    }
-
-    private Transform ObterDonoDeInteractable(XRGrabInteractable interactable)
-    {
-        if (interactable == null)
-            return null;
-
-        for (int i = 0; i < interactable.interactorsSelecting.Count; i++)
-        {
-            Transform interactorTransform = ObterTransformInteractor(interactable.interactorsSelecting[i]);
-            Transform player = EncontrarPlayerDonoAPartirDoTransform(interactorTransform);
-
-            if (player != null)
-                return player;
-        }
-
-        return null;
-    }
+    private bool PertenceAoDonoAtual(GameObject objeto) =>
+        donoAtualPlayer != null && objeto != null && objeto.transform.IsChildOf(donoAtualPlayer);
 
     private Transform EncontrarPlayerDonoAPartirDoTransform(Transform origem)
     {
@@ -684,22 +376,13 @@ public class Escudo : MonoBehaviour
         return null;
     }
 
-    private bool EhParteDoProprioEscudo(GameObject obj)
-    {
-        if (obj == null)
-            return false;
-
-        Transform t = obj.transform;
-        return t == transform || t.IsChildOf(transform);
-    }
-
     private void ReduzirVidaDoEscudo()
     {
-        if (desgastePorBloqueio <= 0 || quebrado)
+        if (Quebrado)
             return;
 
-        vidaAtual = Mathf.Max(0, vidaAtual - desgastePorBloqueio);
-        AtualizarTextoDurabilidade(true);
+        vidaAtual = Mathf.Max(0, vidaAtual - Mathf.Max(1, desgastePorDano));
+        AtualizarDurabilidadeVisual();
 
         if (vidaAtual <= 0)
             QuebrarEscudo();
@@ -711,12 +394,17 @@ public class Escudo : MonoBehaviour
             return;
 
         quebrado = true;
+        DefinirJogadorComBonus(null);
+        FecharPopup();
         vidaAtual = 0;
-        AtualizarTextoDurabilidade(true);
+        AtualizarDurabilidadeVisual();
         TocarSomQuebrar();
 
         if (destruirQuandoVidaZerar)
+        {
+            GetComponent<ItemPersistente>()?.RegistrarConsumoPermanente();
             Destroy(gameObject);
+        }
     }
 
     private void TocarSomBloqueio()
@@ -729,5 +417,317 @@ public class Escudo : MonoBehaviour
     {
         if (somQuebrar != null)
             AudioSource.PlayClipAtPoint(somQuebrar, transform.position, volumeQuebrar);
+    }
+    private void ResolverPopupEscudo()
+    {
+        if (popup != null) return;
+        var t = transform.Find("PopUp") ?? transform.Find("Popup");
+        if (t != null) popup = t.gameObject;
+    }
+
+    private bool PopupBloqueadoPorSelecao()
+    {
+        if (grabInteractable == null) return false;
+        foreach (var interactor in grabInteractable.interactorsSelecting)
+            if (interactor != null && !(interactor is XRSocketInteractor)) return true;
+        return false;
+    }
+
+    private void OnHoverPopupEscudo(HoverEnterEventArgs args)
+    {
+        if (args == null || !Espada.EhLaserDoPopup(args.interactorObject) || PopupBloqueadoPorSelecao() || Quebrado) return;
+        ResolverPopupEscudo();
+        if (!isActiveAndEnabled) return;
+        if (popup == null) popup = Flecha.CriarPopupSimples(transform, "Popup do Escudo", out resumoPopup);
+        GarantirSorteio();
+        CancelarFechamentoPopup(); PrepararPopup(); popup.SetActive(true);
+        foreach (var c in popup.GetComponentsInChildren<Canvas>(true)) c.enabled = true;
+        foreach (var g in popup.GetComponentsInChildren<Graphic>(true)) g.enabled = true;
+        AtualizarPopup(); PosicionarPopup();
+        fechamentoPopup = StartCoroutine(FecharPopupDepois());
+    }
+
+    private TMP_Text BuscarTextoPopup(string caminho) => popup.transform.Find(caminho)?.GetComponent<TMP_Text>();
+
+    public void AtualizarPopup()
+    {
+        if (popup == null || sorteio == null) return;
+
+        textoNome ??= BuscarTextoPopup("Fundo/nome");
+        textoClasse ??= BuscarTextoPopup("Fundo/Valor classe");
+        textoDescricao ??= BuscarTextoPopup("Fundo/Descricao");
+        string nome = prefabObjeto != null ? prefabObjeto.name : name.Replace("(Clone)", "").Trim();
+        var jogador = (cameraJogador != null ? cameraJogador : Camera.main)?.GetComponentInParent<StatusPlayer>();
+        bool restrito = !PodeUsar(jogador);
+        if (resumoPopup != null)
+        {
+            var atributos = sorteio.atributos.ConvertAll(valor => $"{NomeAtributo(valor.atributo)} +{valor.valor}");
+            string restricao = restrito ? $"Restrição: {NomeAtributo(atributoRestricao)} {valorMinimoParaUsar}\n" : "";
+            resumoPopup.text = $"{nome}\n{sorteio.classe} · Defesa {sorteio.defesa}\nDurabilidade {vidaAtual}/{vidaMaxima}\n" +
+                $"{string.Join(" · ", atributos)}\n{restricao}{descricao}";
+            return;
+        }
+
+        if (textoNome != null) textoNome.text = nome;
+        if (textoClasse != null) textoClasse.text = sorteio.classe.ToString();
+        if (textoDescricao != null) textoDescricao.text = descricao ?? "";
+        var classeSorteada = ObterConfiguracaoSorteada();
+        var valorDefesa = classeSorteada?.textoDefesa ?? BuscarTextoPopup("Fundo/Defesa/Defesa Valor")
+            ?? BuscarTextoPopup("Fundo/Ataque/Ataque Valor");
+        var rotuloLegado = BuscarTextoPopup("Fundo/Ataque/Ataque Texto");
+        if (rotuloLegado != null) rotuloLegado.text = "DEFESA:";
+        if (classes != null)
+            foreach (var classe in classes)
+                if (classe?.textoDefesa != null && classe.textoDefesa != valorDefesa) classe.textoDefesa.text = "";
+        if (valorDefesa != null) valorDefesa.text = sorteio.defesa.ToString();
+        var durabilidadeAtual = classeSorteada?.textoDurabilidadeAtual ??
+            BuscarTextoPopup("Fundo/Durabilidade/Durabilidade Atual");
+        var durabilidadeMaxima = classeSorteada?.textoDurabilidadeMaxima ??
+            BuscarTextoPopup("Fundo/Durabilidade/Durabilidade Limite");
+        if (durabilidadeAtual != null) durabilidadeAtual.text = vidaAtual.ToString("N0", CulturaDurabilidade);
+        if (durabilidadeMaxima != null) durabilidadeMaxima.text = vidaMaxima.ToString("N0", CulturaDurabilidade);
+
+        for (int i = 0; i < 5; i++)
+        {
+            var linha = textosValores != null && i < textosValores.Count ? textosValores[i] : null;
+            var raiz = popup.transform.Find("Fundo/" + i);
+            var nomeAtributo = linha?.textoNome ?? raiz?.Find("Texto")?.GetComponent<TMP_Text>();
+            var valorAtributo = linha?.textoValor ?? raiz?.Find("Numero")?.GetComponent<TMP_Text>();
+            var valor = i < sorteio.atributos.Count ? sorteio.atributos[i] : null;
+            if (raiz != null) raiz.gameObject.SetActive(valor != null);
+            if (nomeAtributo != null) nomeAtributo.text = valor != null ? NomeAtributo(valor.atributo) : "";
+            if (valorAtributo != null) valorAtributo.text = valor != null ? "+" + valor.valor : "";
+        }
+
+        if (grupoRestricao == null) grupoRestricao = popup.transform.Find("Fundo/Restricao")?.gameObject;
+        if (grupoRestricao != null)
+        {
+            grupoRestricao.SetActive(restrito);
+            textoAtributoRestricao ??= grupoRestricao.transform.Find("Atributo")?.GetComponent<TMP_Text>();
+            textoValorRestricao ??= grupoRestricao.transform.Find("Valor")?.GetComponent<TMP_Text>();
+            textoMensagemRestricao ??= grupoRestricao.transform.Find("Descricao")?.GetComponent<TMP_Text>();
+        }
+        if (textoAtributoRestricao != null) textoAtributoRestricao.text = restrito ? NomeAtributo(atributoRestricao) : "";
+        if (textoValorRestricao != null) textoValorRestricao.text = restrito ? valorMinimoParaUsar.ToString() : "";
+        if (textoMensagemRestricao != null) textoMensagemRestricao.text = restrito ? "Seu valor está abaixo do mínimo" : "";
+    }
+
+    private static string NomeAtributo(TipoAtributoManopla atributo) =>
+        atributo == TipoAtributoManopla.Mana ? "MP" : atributo.ToString();
+
+    private IEnumerator FecharPopupDepois()
+    {
+        float tempo = float.IsNaN(tempoParaFecharPopup) || float.IsInfinity(tempoParaFecharPopup) ? 0 : Mathf.Max(0, tempoParaFecharPopup);
+        yield return new WaitForSeconds(tempo);
+        fechamentoPopup = null; FecharPopup();
+    }
+    private void CancelarFechamentoPopup()
+    {
+        if (fechamentoPopup != null) StopCoroutine(fechamentoPopup);
+        fechamentoPopup = null;
+    }
+    private void PrepararPopup()
+    {
+        if (popup == null || popupIsolado) return;
+        var t = popup.transform;
+        if (!posePopupCapturada)
+        {
+            paiOriginalPopup = t.parent; posicaoOriginalPopup = t.localPosition; rotacaoOriginalPopup = t.localRotation;
+            escalaOriginalPopup = t.localScale; var e = t.lossyScale;
+            escalaMundoPopup = new Vector3(Mathf.Abs(e.x), Mathf.Abs(e.y), Mathf.Abs(e.z)); posePopupCapturada = true;
+        }
+        if (raizPopup == null)
+        {
+            raizPopup = new GameObject("[Popup Arma] " + name); raizPopup.hideFlags = HideFlags.DontSave;
+            if (gameObject.scene.IsValid() && gameObject.scene.isLoaded)
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(raizPopup, gameObject.scene);
+        }
+        t.SetParent(raizPopup.transform, false); t.localPosition = Vector3.zero; t.localRotation = Quaternion.identity;
+        t.localScale = escalaMundoPopup; popupIsolado = true;
+    }
+    private void PosicionarPopup()
+    {
+        if (cameraJogador == null) cameraJogador = Camera.main;
+        if (popup != null && cameraJogador != null)
+            LayoutPopupsEquipamentos.Atualizar(popup, cameraJogador, posicaoPopupNaCamera, rotacaoPopupNaCamera, espacamentoHorizontalPopups);
+    }
+    public void FecharPopup()
+    {
+        CancelarFechamentoPopup(); LayoutPopupsEquipamentos.Remover(popup);
+        if (popup == null) return;
+        popup.SetActive(false);
+        if (!popupIsolado) return;
+        popupIsolado = false;
+        var t = popup.transform; t.SetParent(paiOriginalPopup != null ? paiOriginalPopup : transform, false);
+        t.localPosition = posicaoOriginalPopup; t.localRotation = rotacaoOriginalPopup; t.localScale = escalaOriginalPopup;
+    }
+    internal void GarantirSorteio()
+    {
+        if (sorteio != null) return;
+
+        var configuracao = Flecha.SortearClassePonderada(classes);
+        var tipos = new HashSet<TipoAtributoManopla>();
+        var faixas = configuracao?.atributos?.FindAll(faixa => faixa != null &&
+            AtributoValido(faixa.atributo) && Espada.FaixaSorteioValida(faixa.minimo, faixa.maximo, 0) &&
+            tipos.Add(faixa.atributo)) ?? new List<AtributosManoplas.FaixaAtributo>();
+        int minimo = Mathf.Clamp(configuracao?.quantidadeMinima ?? 0, 0, faixas.Count);
+        int maximo = Mathf.Clamp(configuracao?.quantidadeMaxima ?? 0, minimo, faixas.Count);
+        var classe = configuracao?.classe ?? ClasseManopla.Comum;
+        if (!durabilidadeRestaurada)
+        {
+            ObterFaixaDurabilidade(configuracao, classe, out int limiteMinimo, out int limiteMaximo);
+            vidaMaxima = Flecha.SortearInteiro(limiteMinimo, limiteMaximo, 1);
+            vidaAtual = vidaMaxima;
+        }
+        sorteio = new EstadoSorteio
+        {
+            classe = classe,
+            durabilidadeMaxima = vidaMaxima,
+            defesa = configuracao != null
+                ? Flecha.SortearInteiro(configuracao.defesaMinima, configuracao.defesaMaxima, 1) : 3,
+            atributos = Espada.SortearValoresAtributos(faixas, minimo, maximo)
+        };
+    }
+
+    private void ObterFaixaDurabilidade(ClasseEscudo config, ClasseManopla classe, out int minimo, out int maximo)
+    {
+        maximo = config != null && config.durabilidadeMaxima > 0
+            ? config.durabilidadeMaxima
+            : (int)Math.Min(int.MaxValue - 1, (long)Mathf.Max(1, vidaMaxima) + 2L * (int)classe + 1);
+        maximo = Mathf.Clamp(maximo, 1, int.MaxValue - 1);
+        minimo = config != null && config.durabilidadeMinima > 0
+            ? Mathf.Clamp(config.durabilidadeMinima, 1, int.MaxValue - 1)
+            : Mathf.Max(1, maximo - 2);
+        maximo = Mathf.Max(minimo, maximo);
+    }
+
+    private ClasseEscudo ObterConfiguracaoSorteada() =>
+        sorteio != null && classes != null
+            ? Array.Find(classes, classe => classe != null && classe.classe == sorteio.classe)
+            : null;
+
+    private static bool AtributoValido(TipoAtributoManopla atributo) =>
+        Enum.IsDefined(typeof(TipoAtributoManopla), atributo) &&
+        atributo != TipoAtributoManopla.Critico && atributo != TipoAtributoManopla.Defesa;
+
+    internal void PrepararSorteioParaSalvar()
+    {
+        if (!durabilidadeRestaurada)
+            GarantirSorteio();
+
+        AjustarLimiteParaDurabilidadeAtual(vidaAtual);
+    }
+
+    private void AjustarLimiteParaDurabilidadeAtual(int atual)
+    {
+        // Saves antigos de cena podem ter apenas o valor atual ou um limite desatualizado.
+        vidaMaxima = Mathf.Max(vidaMaxima, atual);
+        if (sorteio != null)
+            sorteio.durabilidadeMaxima = vidaMaxima;
+    }
+
+    internal string CapturarSorteioJson(string anteriores)
+    {
+        if (sorteio == null) return anteriores;
+        if (sorteio.anteriores == null && anteriores?.Contains(EstadoSorteio.Formato) != true)
+            sorteio.anteriores = anteriores;
+        return JsonUtility.ToJson(sorteio);
+    }
+
+    internal static EstadoSorteio LerSorteioJson(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || !json.Contains(EstadoSorteio.Formato)) return null;
+
+        var estado = JsonUtility.FromJson<EstadoSorteio>(json);
+        var tipos = new HashSet<TipoAtributoManopla>();
+        if (estado == null || estado.formato != EstadoSorteio.Formato ||
+            !Enum.IsDefined(typeof(ClasseManopla), estado.classe) || estado.defesa < 1 || estado.durabilidadeMaxima < 1 ||
+            estado.atributos == null || estado.atributos.Exists(valor => valor == null || valor.valor < 0 ||
+                !AtributoValido(valor.atributo) || !tipos.Add(valor.atributo)))
+            throw new System.IO.InvalidDataException("Sorteio do escudo inválido no save.");
+        return estado;
+    }
+
+    internal void RestaurarSorteio(string json, float durabilidadeSalva)
+    {
+        sorteio = LerSorteioJson(json);
+        durabilidadeRestaurada = durabilidadeSalva >= 0f;
+        if (sorteio != null)
+            vidaMaxima = sorteio.durabilidadeMaxima;
+        if (durabilidadeRestaurada)
+        {
+            AjustarLimiteParaDurabilidadeAtual(Mathf.RoundToInt(durabilidadeSalva));
+            quebrado = durabilidadeSalva <= 0f;
+        }
+    }
+
+    internal Action CapturarSorteioParaCarga()
+    {
+        var estado = sorteio;
+        bool restaurada = durabilidadeRestaurada;
+        bool estavaQuebrado = quebrado;
+        return () =>
+        {
+            sorteio = estado;
+            durabilidadeRestaurada = restaurada;
+            quebrado = estavaQuebrado;
+        };
+    }
+
+    private bool PodeConcederBonus() => isActiveAndEnabled && !Quebrado &&
+        donoAtualPlayer != null && PopupBloqueadoPorSelecao() && !EstadoItemInventario.EstaNoInventario(this);
+
+    private void AtualizarBonusEmpunhado()
+    {
+        StatusPlayer jogador = PodeConcederBonus()
+            ? donoAtualPlayer.GetComponentInChildren<StatusPlayer>(true)
+            : null;
+        if (jogador != null && sorteio == null) GarantirSorteio();
+        DefinirJogadorComBonus(jogador);
+    }
+
+    private void DefinirJogadorComBonus(StatusPlayer jogador)
+    {
+        StatusPlayer anterior = jogadorComBonus;
+        jogadorComBonus = jogador;
+        if (jogador != null) escudosEmpunhados.Add(this);
+        else escudosEmpunhados.Remove(this);
+        if (anterior == jogador) return;
+        if (anterior != null) anterior.AtualizarAtributosEquipamentos();
+        if (jogador != null) jogador.AtualizarAtributosEquipamentos();
+    }
+
+    private int ObterValorAtributo(TipoAtributoManopla atributo)
+    {
+        if (sorteio == null) return 0;
+        foreach (var valor in sorteio.atributos)
+            if (valor.atributo == atributo) return valor.valor;
+        return 0;
+    }
+
+    internal static long ObterBonusEmpunhado(StatusPlayer jogador, TipoAtributoManopla atributo)
+    {
+        if (jogador == null) return 0;
+        long total = 0;
+        foreach (var escudo in escudosEmpunhados)
+            if (escudo != null && escudo.jogadorComBonus == jogador && escudo.PodeConcederBonus())
+                total += escudo.ObterValorAtributo(atributo);
+        return total;
+    }
+
+    private bool PodeUsar(StatusPlayer jogador)
+    {
+        if (valorMinimoParaUsar <= 0) return true;
+        int bonusProprio = jogador != null && jogadorComBonus == jogador && PodeConcederBonus()
+            ? ObterValorAtributo(atributoRestricao) : 0;
+        return jogador != null && Espada.AtendeRestricaoAtributo(Espada.ObterAtributoTotal(jogador, atributoRestricao),
+            bonusProprio, valorMinimoParaUsar);
+    }
+
+    private void OnDestroy()
+    {
+        DefinirJogadorComBonus(null);
+        FecharPopup();
+        if (raizPopup != null) Destroy(raizPopup);
     }
 }

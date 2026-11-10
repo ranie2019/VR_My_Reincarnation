@@ -210,6 +210,77 @@ public class InventarioFlechas : MonoBehaviour
         if (string.IsNullOrWhiteSpace(id) || slots == null)
             return false;
 
+        var slotEscolhido = EncontrarSlotParaDisparo(id);
+        int menorQuantidade = slotEscolhido != null ? slotEscolhido.ObterQuantidadeAtual() : 0;
+        if (slotEscolhido == null)
+            return false;
+
+        bool consumiu = slotEscolhido.ConsumirUmaUnidade(out ItemInventarioDados itemConsumido);
+        if (!consumiu)
+            return false;
+
+        ultimaFlechaConsumida = itemConsumido != null ? itemConsumido.NomeItem : id;
+        quantidadeUltimaFlechaConsumida = Mathf.Max(0, menorQuantidade - 1);
+        diagnosticoUltimoConsumoSucesso = true;
+        ObterFlechasDisponiveis();
+        return true;
+    }
+
+    internal Flecha ObterFlechaParaPreparar(string idTipo)
+    {
+        return ObterUnidadeParaDisparo(idTipo, out _)?.GetComponentInChildren<Flecha>(true);
+    }
+
+    private XRGrabInteractable ObterUnidadeParaDisparo(string idTipo, out SlotInventario origem)
+    {
+        AtualizarReferencias();
+        origem = slots != null ? EncontrarSlotParaDisparo(NormalizarId(idTipo)) : null;
+        return origem != null ? origem.ObterItemRepresentanteParaSave() : null;
+    }
+
+    internal bool RetirarFlechaParaDisparo(string idTipo, StatusPlayer jogador, Arco arco, Flecha preparada,
+        out XRGrabInteractable flecha, out SlotInventario origem)
+    {
+        if (preparada != null)
+        {
+            // A unidade encaixada continua sendo a escolhida mesmo se outra pilha mudar de quantidade.
+            AtualizarReferencias();
+            origem = preparada.GetComponentInParent<EstadoItemInventario>(true)?.slotAtual;
+            flecha = null;
+            if (slots == null || origem == null || Array.IndexOf(slots, origem) < 0 ||
+                !TentarObterFlechaDoSlot(origem, out flecha, out var item) ||
+                !string.Equals(NormalizarId(ObterIdTipoFlecha(flecha, item)), NormalizarId(idTipo), StringComparison.Ordinal))
+                return false;
+        }
+        else
+        {
+            flecha = ObterUnidadeParaDisparo(idTipo, out origem);
+        }
+        return flecha != null && flecha.GetComponentInChildren<Flecha>(true) is Flecha dados &&
+            (preparada == null || dados == preparada) && dados.PodeDispararCom(arco) && dados.PodeUsar(jogador) &&
+            origem.RetirarTopoParaMundo(flecha, false);
+    }
+
+    internal bool DevolverFlecha(XRGrabInteractable flecha, SlotInventario origem)
+    {
+        AtualizarReferencias();
+        if (TentarDevolverAoSlot(flecha, origem)) return true;
+        if (slots == null) return false;
+        foreach (var slot in slots)
+            if (slot != origem && TentarDevolverAoSlot(flecha, slot)) return true;
+        return false;
+    }
+
+    private static bool TentarDevolverAoSlot(XRGrabInteractable flecha, SlotInventario slot)
+    {
+        if (slot == null || !slot.RestaurarItemSalvoNoSlot(flecha, false)) return false;
+        slot.FinalizarRestauracaoDoSave();
+        return true;
+    }
+
+    private SlotInventario EncontrarSlotParaDisparo(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return null;
         SlotInventario slotEscolhido = null;
         int menorQuantidade = int.MaxValue;
 
@@ -233,18 +304,7 @@ public class InventarioFlechas : MonoBehaviour
             slotEscolhido = slot;
         }
 
-        if (slotEscolhido == null)
-            return false;
-
-        bool consumiu = slotEscolhido.ConsumirUmaUnidade(out ItemInventarioDados itemConsumido);
-        if (!consumiu)
-            return false;
-
-        ultimaFlechaConsumida = itemConsumido != null ? itemConsumido.NomeItem : id;
-        quantidadeUltimaFlechaConsumida = Mathf.Max(0, menorQuantidade - 1);
-        diagnosticoUltimoConsumoSucesso = true;
-        ObterFlechasDisponiveis();
-        return true;
+        return slotEscolhido;
     }
 
     private static bool TentarObterFlechaDoSlot(

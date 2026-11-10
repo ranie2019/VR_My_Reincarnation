@@ -270,13 +270,19 @@ public class CriarItem : MonoBehaviour
             {
                 criado = criar();
                 if (criado == null) throw new InvalidOperationException("A criacao nao retornou um item.");
+                criado.GetComponent<Machado>()?.GarantirSorteio();
+                criado.GetComponent<Picareta>()?.GarantirSorteio();
+                criado.GetComponent<Escudo>()?.GarantirSorteio();
+                var espada = criado.GetComponent<Espada>();
+                if (espada != null && !espada.GarantirGeracao())
+                    throw new InvalidOperationException("Configuracao de atributos da arma invalida.");
                 var atributos = criado.GetComponent<AtributosManoplas>();
                 if (atributos != null && !atributos.GarantirGeracao())
                     throw new InvalidOperationException("Configuracao de atributos invalida no item criado.");
                 var peitoral = criado.GetComponent<AtributosPeitoral>();
                 if (peitoral != null && !peitoral.GarantirGeracao())
                     throw new InvalidOperationException("Configuracao de atributos do peitoral invalida no item criado.");
-                var elmo = criado.GetComponent<AtributosElmo>();
+                var elmo = criado.GetComponent<EquiparElmo>();
                 if (elmo != null && !elmo.GarantirGeracao())
                     throw new InvalidOperationException("Configuracao de atributos do elmo invalida no item criado.");
             }

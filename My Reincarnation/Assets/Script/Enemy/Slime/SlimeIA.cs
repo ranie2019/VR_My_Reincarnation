@@ -287,7 +287,10 @@ public class SlimeIA : MonoBehaviour, IDano
             if (NavMesh.SamplePosition(posicaoDesejada, out NavMeshHit hit, raioPatrulhaAuto, NavMesh.AllAreas))
                 posicaoFinal = hit.position;
 
-            GameObject ponto = new GameObject($"PontoAuto_{gameObject.name}_{i}");
+            GameObject ponto = new GameObject($"PontoAuto_{gameObject.name}_{i}")
+            {
+                hideFlags = HideFlags.HideInHierarchy
+            };
             ponto.transform.position = posicaoFinal;
             pontosValidos.Add(ponto.transform);
             if (movimentoVerde != null) pontosAutoProprios.Add(ponto);
@@ -474,6 +477,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private void TentarReceberDanoPorContato(Collider outroCollider)
     {
+        if (Machado.ControlaImpacto(outroCollider) || Picareta.ControlaImpacto(outroCollider)) return;
         if (outroCollider != null &&
             (outroCollider.GetComponentInParent<Flecha>() != null ||
              (outroCollider.attachedRigidbody != null && outroCollider.attachedRigidbody.GetComponent<Flecha>() != null)))
@@ -1154,7 +1158,7 @@ public class SlimeIA : MonoBehaviour, IDano
                 direcao.normalized, hitsVerde, distancia + margemParedeInvestida, layersBloqueioInvestida, QueryTriggerInteraction.Ignore);
             if (n == hitsVerde.Length) return true; // Cancela o deslocamento; nao aplica impacto sem collider conhecido.
             float menor = float.PositiveInfinity;
-            for (int i = 0; i < n; i++) if (hitsVerde[i].collider != null && !PertenceAEsteInimigo(hitsVerde[i].collider) && hitsVerde[i].distance < menor)
+            for (int i = 0; i < n; i++) if (hitsVerde[i].collider != null && !PertenceAEsteInimigo(hitsVerde[i].collider) && !Escudo.IgnorarNoAtaque(hitsVerde[i].collider, alvoPlayer) && hitsVerde[i].distance < menor)
             { hitBloqueio = hitsVerde[i]; menor = hitBloqueio.distance; }
             return hitBloqueio.collider != null;
         }
@@ -1174,7 +1178,7 @@ public class SlimeIA : MonoBehaviour, IDano
         for (int i = 0; i < hits.Length; i++)
         {
             Collider col = hits[i].collider;
-            if (col == null || PertenceAEsteInimigo(col))
+            if (col == null || PertenceAEsteInimigo(col) || Escudo.IgnorarNoAtaque(col, alvoPlayer))
                 continue;
 
             hitBloqueio = hits[i];
@@ -1245,18 +1249,19 @@ public class SlimeIA : MonoBehaviour, IDano
     private void ResolverImpactoCollider(Collider col)
     {
         if (movimentoVerde != null && (morto || estadoAtual != EstadoSlime.Atacando)) return;
-        if (col == null || alvoPlayer == null || impactoAtaqueResolvido)
+        if (col == null || alvoPlayer == null || impactoAtaqueResolvido || Escudo.IgnorarNoAtaque(col, alvoPlayer))
             return;
 
-        if (ColliderBloqueiaMesmoSendoDoPlayer(col) || !PertenceAoPlayerAlvo(col, alvoPlayer))
+        impactoAtaqueResolvido = true;
+        float danoBruto = ObterDano();
+        if (Escudo.TentarInterceptarGolpe(col, gameObject, alvoPlayer, danoBruto, out float restante))
         {
-            impactoAtaqueResolvido = true;
-            RegistrarBloqueioSeForEscudo(col, alvoPlayer);
+            TentarAplicarDanoNoPlayer(alvoPlayer, restante);
             return;
         }
 
-        impactoAtaqueResolvido = true;
-        TentarAplicarDanoNoPlayer(alvoPlayer, danoAtaque);
+        if (!ColliderBloqueiaMesmoSendoDoPlayer(col) && PertenceAoPlayerAlvo(col, alvoPlayer))
+            TentarAplicarDanoNoPlayer(alvoPlayer, danoBruto);
     }
 
     private void ResolverImpactoAtaque()
@@ -1272,8 +1277,8 @@ public class SlimeIA : MonoBehaviour, IDano
             for (int i = 0; i < n; i++)
             {
                 var candidato = sobreposicoesVerde[i];
-                if (candidato == null || PertenceAEsteInimigo(candidato)) continue;
-                if (ColliderBloqueiaMesmoSendoDoPlayer(candidato)) { contato = candidato; break; }
+                if (candidato == null || PertenceAEsteInimigo(candidato) || Escudo.IgnorarNoAtaque(candidato, alvoPlayer)) continue;
+                if (candidato.GetComponentInParent<Espada>() != null) { contato = candidato; break; }
                 float d = (candidato.ClosestPoint(ObterOrigemAtaque()) - ObterOrigemAtaque()).sqrMagnitude;
                 if (d < menor) { menor = d; contato = candidato; }
             }
@@ -1300,7 +1305,7 @@ public class SlimeIA : MonoBehaviour, IDano
             int n = Physics.SphereCastNonAlloc(origem, raioAtaque, direcao, hitsVerde, AlcanceEfetivoAtaque(), layersAtaque, QueryTriggerInteraction.Ignore);
             if (n == hitsVerde.Length) return false;
             float menor = float.PositiveInfinity;
-            for (int i = 0; i < n; i++) if (hitsVerde[i].collider != null && !PertenceAEsteInimigo(hitsVerde[i].collider) && hitsVerde[i].distance < menor)
+            for (int i = 0; i < n; i++) if (hitsVerde[i].collider != null && !PertenceAEsteInimigo(hitsVerde[i].collider) && !Escudo.IgnorarNoAtaque(hitsVerde[i].collider, playerAlvo) && hitsVerde[i].distance < menor)
             { primeiroHit = hitsVerde[i]; menor = primeiroHit.distance; }
             return primeiroHit.collider != null;
         }
@@ -1325,7 +1330,7 @@ public class SlimeIA : MonoBehaviour, IDano
         for (int i = 0; i < hits.Length; i++)
         {
             Collider col = hits[i].collider;
-            if (col == null || PertenceAEsteInimigo(col))
+            if (col == null || PertenceAEsteInimigo(col) || Escudo.IgnorarNoAtaque(col, playerAlvo))
                 continue;
 
             primeiroHit = hits[i];
@@ -1335,13 +1340,9 @@ public class SlimeIA : MonoBehaviour, IDano
         return false;
     }
 
-    private bool TentarAplicarDanoNoPlayer(Transform playerAlvo, int dano)
+    private bool TentarAplicarDanoNoPlayer(Transform playerAlvo, float danoConfigurado)
     {
-        if (playerAlvo == null || dano <= 0)
-            return false;
-
-        float danoConfigurado = Mathf.Max(0f, ObterDano());
-        if (danoConfigurado <= 0f)
+        if (playerAlvo == null || !float.IsFinite(danoConfigurado) || danoConfigurado <= 0f)
             return false;
 
         if (movimentoVerde != null)
@@ -1392,9 +1393,8 @@ public class SlimeIA : MonoBehaviour, IDano
         if (col == null)
             return false;
 
-        Escudo escudo = col.GetComponentInParent<Escudo>();
-        if (escudo != null && !escudo.Quebrado)
-            return true;
+        var escudo = col.GetComponentInParent<Escudo>();
+        if (escudo != null) return escudo.EstaProtegendoPlayer(alvoPlayer);
 
         return col.GetComponentInParent<Espada>() != null;
     }
@@ -1436,16 +1436,6 @@ public class SlimeIA : MonoBehaviour, IDano
         }
 
         return false;
-    }
-
-    private void RegistrarBloqueioSeForEscudo(Collider col, Transform playerAlvo)
-    {
-        if (col == null)
-            return;
-
-        Escudo escudo = col.GetComponentInParent<Escudo>();
-        if (escudo != null && escudo.EstaProtegendoPlayer(playerAlvo))
-            escudo.RegistrarBloqueio(gameObject);
     }
 
     private Vector3 ObterOrigemAtaque()

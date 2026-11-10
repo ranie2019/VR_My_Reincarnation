@@ -50,6 +50,14 @@ public class EfeitoFogoArea : MonoBehaviour
     private float horarioFim;
     private bool inicializada;
 
+    private ContextoDanoMagico? danoConfiguradoPelaMagia;
+    public int DanoPorPulsoAtual => danoConfiguradoPelaMagia.HasValue ? danoConfiguradoPelaMagia.Value.DanoTotal : Mathf.Max(0, danoPorPulso);
+
+    public void ConfigurarDanoMagico(ContextoDanoMagico contexto)
+    {
+        if (!inicializada) danoConfiguradoPelaMagia = contexto;
+    }
+
     private void Awake()
     {
         GarantirBuffer();
@@ -168,7 +176,8 @@ public class EfeitoFogoArea : MonoBehaviour
         quantidadeAlvosDanificadosNoUltimoPulso = 0;
         totalDePulsosExecutados++;
 
-        if (danoPorPulso <= 0)
+        int danoEfetivo = DanoPorPulsoAtual;
+        if (danoEfetivo <= 0)
         {
             LimparBufferUsado();
             AtualizarDiagnosticoArea("Pulso sem dano configurado.");
@@ -196,7 +205,7 @@ public class EfeitoFogoArea : MonoBehaviour
             if (!alvosAtingidosNoPulso.Add(idAlvo))
                 continue;
 
-            ReceptorDanoInimigo.Aplicar(slime, danoPorPulso, origemDano);
+            ReceptorDanoInimigo.Aplicar(slime, danoEfetivo, origemDano);
             quantidadeAlvosDanificadosNoUltimoPulso++;
             ultimoAlvoDanificado = slime.gameObject;
         }

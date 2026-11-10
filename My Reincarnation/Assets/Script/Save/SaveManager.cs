@@ -363,6 +363,98 @@ public class SaveManager : MonoBehaviour
         finally { remocoesDuranteCarga = null; adapterEmConfirmacao = null; equipamentosParaRestaurar.Clear(); }
     }
 
+    // Ao substituir um objeto persistente na cena, mantenha seu GUID. Se o GUID
+    // ja mudou em uma versao distribuida, registre a equivalencia comprovada aqui.
+    private static string MigrarIdDeCena(string id)
+    {
+        // Espada Velha: a instancia original foi substituida na Cena Principal.
+        const string antigo = "f8ee83d9ac5d4bd69cb971888e30026a";
+        const string atual = "f09185d4714d45f2af607752e4e3c160";
+        if (id == antigo) return atual;
+        if (id == PrefixoObjetoItemPersistente + antigo) return PrefixoObjetoItemPersistente + atual;
+        // Picareta Velha: mesmo prefab, com novo GUID de instancia na Cena Principal.
+        const string picaretaAntiga = "49cb6bab3398496282f3f396234f2cd5";
+        const string picaretaAtual = "b9afb90146184630a64ce9f0b8fb9144";
+        if (id == picaretaAntiga) return picaretaAtual;
+        if (id == PrefixoObjetoItemPersistente + picaretaAntiga) return PrefixoObjetoItemPersistente + picaretaAtual;
+        return id;
+    }
+
+    private void MigrarIdentidadesDeCena(SaveData data)
+    {
+        foreach (var item in data.inventario)
+        {
+            if (item == null) continue;
+            item.instanciaId = MigrarIdDeCena(item.instanciaId);
+            item.origemCenaId = MigrarIdDeCena(item.origemCenaId);
+            if (item.instanciaIds != null)
+                for (int i = 0; i < item.instanciaIds.Count; i++)
+                    item.instanciaIds[i] = MigrarIdDeCena(item.instanciaIds[i]);
+            if (item.estadosIndividuais == null) continue;
+            foreach (var unidade in item.estadosIndividuais)
+            {
+                if (unidade == null) continue;
+                unidade.instanciaId = MigrarIdDeCena(unidade.instanciaId);
+                unidade.origemCenaId = MigrarIdDeCena(unidade.origemCenaId);
+            }
+        }
+
+        foreach (var objeto in data.objetosCena)
+        {
+            if (!EhDadoItemPersistente(objeto)) continue;
+            objeto.objectId = MigrarIdDeCena(objeto.objectId);
+            objeto.instanciaId = MigrarIdDeCena(objeto.instanciaId);
+            var estado = ItemPersistente.LerEstadoCenaJson(objeto.estadoJson);
+            if (estado == null) continue;
+            string instancia = MigrarIdDeCena(estado.instanciaId);
+            string origem = MigrarIdDeCena(estado.origemCenaId);
+            if (instancia == estado.instanciaId && origem == estado.origemCenaId) continue;
+            estado.instanciaId = instancia;
+            estado.origemCenaId = origem;
+            objeto.estadoJson = JsonUtility.ToJson(estado);
+        }
+
+        if (data.itensRemovidosPermanentemente != null)
+            for (int i = 0; i < data.itensRemovidosPermanentemente.Count; i++)
+                data.itensRemovidosPermanentemente[i] = MigrarIdDeCena(data.itensRemovidosPermanentemente[i]);
+
+        MigrarReposicaoLegadaDeMadeira(data);
+    }
+
+    private void MigrarReposicaoLegadaDeMadeira(SaveData data)
+    {
+        const string idReposicao = "2ddbb81fb9d845feaba4d786cef56b38";
+        const string idOriginal = "5cad61707bcf4fccaa2017500fd7b14e";
+        const string tipoMadeira = "640e2e58c89e3714881006bd0c5eeabf";
+
+        foreach (var objeto in data.objetosCena)
+        {
+            if (!EhDadoItemPersistente(objeto) || objeto.instanciaId != idReposicao || objeto.prefabItemId != tipoMadeira)
+                continue;
+
+            var estado = LerEstadoItemCena(objeto);
+            if (estado == null || estado.instanciaId != idReposicao || estado.itemId != tipoMadeira ||
+                !string.IsNullOrEmpty(estado.origemCenaId)) continue;
+
+            // Nos backups, o original esta no inventario e a reposicao e independente.
+            var idsInventario = ExtrairInstanciaIdsInventario(data.inventario);
+            foreach (var pilha in data.inventario)
+            {
+                if (pilha == null) continue;
+                AdicionarInstanciaIdSeValido(idsInventario, pilha.origemCenaId);
+                if (pilha.estadosIndividuais == null) continue;
+                foreach (var unidade in pilha.estadosIndividuais)
+                    if (unidade != null) AdicionarInstanciaIdSeValido(idsInventario, unidade.origemCenaId);
+            }
+            var idsReservados = ObterIdsReservadosParaCargaCena(data.objetosCena, idsInventario);
+            if (idsReservados.Contains(idOriginal) || data.itensRemovidosPermanentemente?.Contains(idOriginal) == true)
+                return;
+
+            estado.origemCenaId = idOriginal;
+            objeto.estadoJson = JsonUtility.ToJson(estado);
+        }
+    }
+
     private SaveData InterpretarEValidarSave(string conteudo)
     {
         if (string.IsNullOrWhiteSpace(conteudo)) throw new InvalidDataException("Arquivo vazio.");
@@ -382,6 +474,7 @@ public class SaveManager : MonoBehaviour
         if (versao.Minor >= 5 && envelope.itensRemovidosPermanentemente == null)
             throw new InvalidDataException("Save novo sem registro de remocoes permanentes.");
         SaveData data = JsonUtility.FromJson<SaveData>(json);
+        MigrarIdentidadesDeCena(data);
         RemoverCogumelosDoMundoSalvo(data);
         var removidos = new HashSet<string>();
         if (data.itensRemovidosPermanentemente != null)
@@ -522,7 +615,7 @@ public class SaveManager : MonoBehaviour
                 EncontrarItemSoltoPorInstancia(existentes, estado.instanciaId, usados);
             if (item == null)
             {
-                item = EncontrarItemSoltoComIdRuntimeParaMigrar(existentes, estado.itemId, usados, out int candidatos, idsReservados, string.IsNullOrEmpty(estado.origemCenaId));
+                item = EncontrarItemSoltoComIdRuntimeParaMigrar(existentes, estado.itemId, usados, out int candidatos, idsReservados, string.IsNullOrEmpty(estado.origemCenaId), ItemPersistente.InstanciaIdEhGuidValido(estado.origemCenaId) && TipoUnicoNoSaveCena(data.objetosCena, estado.itemId));
                 if (item == null && (candidatos > 1 || EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(existentes, estado.itemId, usados, idsReservados, string.IsNullOrEmpty(estado.origemCenaId)) != null))
                     throw new InvalidDataException("Restauracao de cena ambigua: " + objeto.objectId);
             }
@@ -530,6 +623,8 @@ public class SaveManager : MonoBehaviour
             else if (database == null || database.ObterPrefab(estado.itemId) == null)
                 throw new InvalidDataException("Prefab de cena indisponivel: " + estado.itemId);
             GameObject prefabValidacao = item != null ? item.gameObject : database.ObterPrefab(estado.itemId);
+            if (ItemPersistente.MigrarDurabilidadeArcoLegado(prefabValidacao, estado))
+                objeto.estadoJson = JsonUtility.ToJson(estado);
             ItemPersistente.ValidarExtrasNoPrefab(prefabValidacao, estado.dadosExtrasJson);
             ItemPersistente.ValidarDurabilidadeManoplaCena(prefabValidacao, estado);
             ItemPersistente.ValidarPontoCogumelo(estado);
@@ -939,7 +1034,7 @@ public class SaveManager : MonoBehaviour
                     existentesAntes,
                     estadoItem.itemId,
                     itensUsados,
-                    out int candidatosMigracao, idsReservados, string.IsNullOrEmpty(estadoItem.origemCenaId));
+                    out int candidatosMigracao, idsReservados, string.IsNullOrEmpty(estadoItem.origemCenaId), ItemPersistente.InstanciaIdEhGuidValido(estadoItem.origemCenaId) && TipoUnicoNoSaveCena(objetosCena, estadoItem.itemId));
 
                 if (itemMigravel != null)
                 {
@@ -1163,6 +1258,9 @@ public class SaveManager : MonoBehaviour
         Rigidbody rb = item.GetComponent<Rigidbody>();
         if (rb != null)
         {
+            // Sincroniza tambem a pose fisica, inclusive com interpolacao habilitada.
+            rb.position = itemTransform.position;
+            rb.rotation = itemTransform.rotation;
             rb.isKinematic = false;
             rb.useGravity = true;
             rb.detectCollisions = true;
@@ -1211,6 +1309,19 @@ public class SaveManager : MonoBehaviour
         return null;
     }
 
+    private bool TipoUnicoNoSaveCena(List<SceneObjectSaveData> objetos, string tipo)
+    {
+        int quantidade = 0;
+        foreach (var objeto in objetos)
+        {
+            if (objeto == null || !EhDadoItemPersistente(objeto)) continue;
+            var estado = LerEstadoItemCena(objeto);
+            if (estado != null && string.Equals(estado.itemId, tipo, StringComparison.Ordinal) && ++quantidade > 1)
+                return false;
+        }
+        return quantidade == 1;
+    }
+
     private ItemPersistente EncontrarItemSoltoMesmoTipoParaBloquearDuplicacao(
         List<ItemPersistente> itens,
         string itemId,
@@ -1254,7 +1365,7 @@ public class SaveManager : MonoBehaviour
         string itemId,
         HashSet<ItemPersistente> itensUsados,
         out int candidatos,
-        HashSet<string> idsReservados = null, bool ignorarOriginaisComOrigem = false)
+        HashSet<string> idsReservados = null, bool ignorarOriginaisComOrigem = false, bool permitirOriginalPersistente = false)
     {
         candidatos = 0;
 
@@ -1276,7 +1387,7 @@ public class SaveManager : MonoBehaviour
             // Uma instancia sem origem pode ser um clone legitimo ao lado de
             // originais da cena. Nao adotar nem bloquear esses originais por tipo.
             // Objetos sem origem continuam sujeitos a ambiguidade e bloqueio.
-            if (ignorarOriginaisComOrigem && idsReservados != null &&
+            if ((ignorarOriginaisComOrigem || permitirOriginalPersistente) && idsReservados != null &&
                 ItemPersistente.InstanciaIdEhGuidValido(item.OrigemCenaId) && idsReservados.Contains(item.OrigemCenaId))
                 continue;
 
@@ -1284,7 +1395,11 @@ public class SaveManager : MonoBehaviour
             if (idsReservados != null && idsReservados.Contains(item.ObterInstanciaIdSemGerar()))
                 continue;
 
-            if (!item.InstanciaIdFoiGeradoEmRuntime())
+            // IDs de cena podem ter sido regenerados no Editor. Somente saves com
+            // origem explicita podem migrar um original persistente unico do mesmo tipo.
+            // Nunca roubar originais reservados para outros registros ou itens do inventario.
+            if (!item.InstanciaIdFoiGeradoEmRuntime() &&
+                !(permitirOriginalPersistente && ItemPersistente.InstanciaIdEhGuidValido(item.OrigemCenaId)))
                 continue;
 
             if (!item.CorrespondeAoItemId(itemIdNormalizado))

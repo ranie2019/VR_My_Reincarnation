@@ -7,6 +7,9 @@ public class VidaRecursoMineral : MonoBehaviour
 {
     [Header("Vida")]
     [SerializeField] private int vidaMax = 5;
+    [SerializeField] private bool recursoMetalico;
+
+    public bool RecursoMetalico => recursoMetalico;
     [SerializeField] private int vidaAtual = 5;
 
     [Header("Dano")]
@@ -109,7 +112,7 @@ public class VidaRecursoMineral : MonoBehaviour
 
     private void ReceberHitPorCollision(Collision collision, string origemEvento)
     {
-        if (collision == null)
+        if (collision == null || Picareta.ControlaImpacto(collision.collider))
         {
             return;
         }
@@ -138,7 +141,7 @@ public class VidaRecursoMineral : MonoBehaviour
 
     private void ReceberHitPorTrigger(Collider other, string origemEvento)
     {
-        if (other == null)
+        if (other == null || Picareta.ControlaImpacto(other))
         {
             return;
         }

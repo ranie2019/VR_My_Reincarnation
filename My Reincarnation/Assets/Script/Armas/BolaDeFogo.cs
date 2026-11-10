@@ -29,6 +29,12 @@ public class BolaDeFogo : MonoBehaviour, IDano
     [SerializeField, Min(1)] private int capacidadeMaximaAlvos = 64;
     [SerializeField, Min(0f)] private float tempoParaDestruirAposExplosao = 1.5f;
 
+    [Header("Bonus secundario da magia (base inicial para expansao)")]
+    [Tooltip("Somado ao ataque do cajado. Zero preserva somente o poder principal. Nao sorteia critico nem aplica vantagem elemental.")]
+    [SerializeField, Min(0)] private int bonusAtaqueMagia = 0;
+    [SerializeField] private ElementoAtaqueMagico elementoMagia = ElementoAtaqueMagico.Fogo;
+    private ContextoDanoMagico? danoConfiguradoPeloCajado;
+
     [Header("Area de Fogo")]
     [SerializeField] private EfeitoFogoArea prefabEfeitoFogoArea;
     [SerializeField] private bool criarAreaDeFogoAoExplodir = true;
@@ -106,7 +112,20 @@ public class BolaDeFogo : MonoBehaviour, IDano
 
     public float ObterDano()
     {
-        return Mathf.Max(0f, dano);
+        return danoConfiguradoPeloCajado.HasValue ? danoConfiguradoPeloCajado.Value.DanoTotal : Mathf.Max(0f, dano);
+    }
+
+    public int ObterDanoInteiro()
+    {
+        if (danoConfiguradoPeloCajado.HasValue) return danoConfiguradoPeloCajado.Value.DanoTotal;
+        if (float.IsNaN(dano) || float.IsInfinity(dano) || dano <= 0) return 0;
+        return dano >= int.MaxValue ? int.MaxValue : Mathf.RoundToInt(dano);
+    }
+
+    public void ConfigurarAtaqueDoCajado(int ataque)
+    {
+        if (estadoAtual != EstadoBolaDeFogo.Preparada || jaExplodiu) return;
+        danoConfiguradoPeloCajado = new ContextoDanoMagico(ataque, bonusAtaqueMagia, elementoMagia);
     }
 
     public GameObject ObterDono()
@@ -420,7 +439,10 @@ public class BolaDeFogo : MonoBehaviour, IDano
 
         EfeitoFogoArea area = Instantiate(prefabEfeitoFogoArea, posicao, rotacao);
         if (area != null)
+        {
+            if (danoConfiguradoPeloCajado.HasValue) area.ConfigurarDanoMagico(danoConfiguradoPeloCajado.Value);
             area.Inicializar(donoDaMagia, gameObject);
+        }
     }
 
     private bool TentarProjetarAreaNoChao(Vector3 pontoOrigem, out Vector3 pontoChao, out Vector3 normalChao)
@@ -508,7 +530,7 @@ public class BolaDeFogo : MonoBehaviour, IDano
             QueryTriggerInteraction.Collide);
 
         quantidadeAlvosDanificados = 0;
-        int danoFinal = Mathf.RoundToInt(ObterDano());
+        int danoFinal = ObterDanoInteiro();
 
         if (danoFinal <= 0)
             return;
@@ -1328,5 +1350,23 @@ public class BolaDeFogo : MonoBehaviour, IDano
             Destroy(material);
         else
             DestroyImmediate(material);
+    }
+}
+
+// Contexto por lancamento: nao depende de o cajado continuar existindo depois do disparo.
+public enum ElementoAtaqueMagico { Neutro, Fogo, Planta }
+
+public readonly struct ContextoDanoMagico
+{
+    public int AtaquePrincipal { get; }
+    public int BonusSecundario { get; }
+    public ElementoAtaqueMagico Elemento { get; }
+    public int DanoTotal => (int)System.Math.Min(int.MaxValue, (long)AtaquePrincipal + BonusSecundario);
+
+    public ContextoDanoMagico(int ataquePrincipal, int bonusSecundario, ElementoAtaqueMagico elemento)
+    {
+        AtaquePrincipal = System.Math.Max(0, ataquePrincipal);
+        BonusSecundario = System.Math.Max(0, bonusSecundario);
+        Elemento = elemento;
     }
 }

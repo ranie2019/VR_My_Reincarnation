@@ -14,7 +14,11 @@ public class GameObject {
  public void SetActive(bool a){active=a;}public T GetComponent<T>() where T:class=>components.OfType<T>().FirstOrDefault();
 }
 public class XRGrabInteractable {public int id;public GameObject gameObject=new GameObject();public T GetComponent<T>() where T:class=>gameObject.GetComponent<T>();}
-public class AtributosElmo {public bool valido=true;public bool GarantirGeracao()=>valido;}
+public class Espada {public bool valido=true;public bool GarantirGeracao()=>valido;}
+public class Machado {public void GarantirSorteio(){}}
+public class Picareta {public void GarantirSorteio(){}}
+public class Escudo {public void GarantirSorteio(){}}
+public class EquiparElmo {public bool valido=true;public bool GarantirGeracao()=>valido;}
 public class AtributosPeitoral {public bool valido=true;public bool GarantirGeracao()=>valido;}
 public class AtributosManoplas {public bool valido=true;public bool GarantirGeracao()=>valido;}
 public class ItemPersistente {public int consumed;public void RegistrarConsumoPermanente(){consumed++;}}
@@ -53,6 +57,7 @@ public static class CraftTests {
   h=New(4);originals=h.slots[0].items.ToArray();Check(!h.TentarCriarComRecursos(new Button(),()=>{throw new Exception("spawn");}),"Falha de spawn deve cancelar");Check(h.slots[0].items.SequenceEqual(originals)&&originals.All(x=>!x.gameObject.destroyed),"Falha de spawn deve devolver materiais");
   Check(!h.TentarCriarComRecursos(new Button(),()=>null),"Spawn nulo nao confirma");Check(h.slots[0].items.SequenceEqual(originals),"Nulo deve devolver unidades");
   var bad=new GameObject();bad.components.Add(new AtributosManoplas{valido=false});Check(!h.TentarCriarComRecursos(new Button(),()=>bad),"Item sem atributos validos nao confirma");Check(bad.destroyed&&h.slots[0].items.SequenceEqual(originals),"Item invalido descartado e materiais preservados");
+  var badSword=new GameObject();badSword.components.Add(new Espada{valido=false});Check(!h.TentarCriarComRecursos(new Button(),()=>badSword),"Arma com sorteio invalido nao confirma");Check(badSword.destroyed&&h.slots[0].items.SequenceEqual(originals),"Falha de sorteio da espada deve preservar materiais e LIFO");
   var host=h;Check(h.TentarCriarComRecursos(new Button(),()=>{Check(SaveManager.Instancia.locks==1,"Save deve estar bloqueado durante criacao");Check(!host.TentarCriarComRecursos(new Button(),()=>new GameObject()),"Reentrada deve ser rejeitada");return new GameObject();}),"Sucesso deve confirmar");
   Check(h.slots[0].items.Count==2&&originals.Count(x=>x.gameObject.destroyed)==2,"Destruir exatamente duas unidades");Check(originals[2].GetComponent<ItemPersistente>().consumed==1&&originals[3].GetComponent<ItemPersistente>().consumed==1,"Registrar consumo permanente");Check(SaveManager.Instancia.locks==0&&!SaveManager.Instancia.blocked,"Liberar bloqueio depois de sucesso");
   h=New(2);h.config.custos[0].quantidade=0;Check(!h.ConsumirRecursos(new Button()),"Custo invalido nao pode criar item gratis");

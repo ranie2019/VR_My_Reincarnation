@@ -79,7 +79,7 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
         {
             case "mao-direita":
             case "mao-esquerda": sucesso = TentarEquipar(item.GetComponent<EquiparManoplas>()); break;
-            case "cabeca": sucesso = TentarEquipar(item.GetComponent<EquiparElmo>()); break;
+            case "cabeca": sucesso = TentarEquiparElmo(item.GetComponent<EquiparElmo>(), restaurandoSave: true); break;
             default: sucesso = TentarEquipar(item.GetComponent<EquiparPeitoral>()); break;
         }
         if (!sucesso || IdentificarPosicaoVestida(item.gameObject) != posicao)
@@ -240,7 +240,9 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
         return true;
     }
 
-    public bool TentarEquipar(EquiparElmo novoElmo)
+    public bool TentarEquipar(EquiparElmo novoElmo) => TentarEquiparElmo(novoElmo, restaurandoSave: false);
+
+    private bool TentarEquiparElmo(EquiparElmo novoElmo, bool restaurandoSave)
     {
         if (novoElmo == null)
             return false;
@@ -252,6 +254,9 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
 
         if (elmoAtual == novoElmo)
             return true;
+
+        if (!restaurandoSave && !novoElmo.AtendeRestricao(GetComponent<StatusPlayer>()))
+            return false;
 
         XRGrabInteractable grabNovo = novoElmo.GetComponent<XRGrabInteractable>();
         EstadoItemInventario estadoNovo = grabNovo != null

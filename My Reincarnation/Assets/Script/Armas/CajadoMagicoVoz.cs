@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Text;
 using Meta.WitAi.Configuration;
@@ -96,6 +96,7 @@ public class CajadoMagicoVoz : MonoBehaviour
 #endif
 
     public EstadoVozCajado EstadoVoz => estadoVoz;
+    public int IdSessaoVozAtual => idSessaoVoz;
     public bool CajadoSegurado => cajadoSegurado;
     public bool PermissaoMicrofoneConcedida => permissaoMicrofoneConcedida;
     public bool EstaEscutando => estaEscutando;
@@ -226,7 +227,14 @@ public class CajadoMagicoVoz : MonoBehaviour
 
         int sessaoAtual = ++idSessaoVoz;
         instanciaComEscutaAtiva = this;
-        VoiceServiceRequest request = appVoiceExperience.Activate(new WitRequestOptions(), CriarEventosSessao(sessaoAtual));
+        VoiceServiceRequest request;
+        try { request = appVoiceExperience.Activate(new WitRequestOptions(), CriarEventosSessao(sessaoAtual)); }
+        catch (Exception erro)
+        {
+            PararEscutaVoz();
+            DefinirStatus(EstadoVozCajado.Erro, "Falha ao iniciar Voice SDK: " + erro.Message);
+            return;
+        }
 
         if (request == null)
         {
@@ -379,6 +387,7 @@ public class CajadoMagicoVoz : MonoBehaviour
 
     private void AoReceberTranscricaoCompleta(string texto, int sessao)
     {
+        if (!SessaoAtualValida(sessao)) return;
         transcricaoFinalRecebida = true;
         ProcessarTranscricaoFinal(texto, sessao, true, "request");
     }
@@ -463,25 +472,8 @@ public class CajadoMagicoVoz : MonoBehaviour
         DefinirStatus(EstadoVozCajado.Processando, "VoiceEvents: audio enviado.");
     }
 
-    private void AoReceberTranscricaoParcialGlobal(string texto)
-    {
-        if (!EhDonoGlobalEscuta())
-            return;
-
-        transcricaoParcialRecebida = true;
-        DefinirStatus(EstadoVozCajado.Processando, "VoiceEvents: texto parcial recebido.");
-        ProcessarTranscricaoParcialRapida(texto, idSessaoVoz, false);
-    }
-
-    private void AoReceberTranscricaoCompletaGlobal(string texto)
-    {
-        if (!EhDonoGlobalEscuta())
-            return;
-
-        transcricaoFinalRecebida = true;
-        ProcessarTranscricaoFinal(texto, idSessaoVoz, false, "VoiceEvents");
-    }
-
+    // Texto chega somente por CriarEventosSessao: inclui o ID da requisicao.
+    // Eventos globais permanecem apenas para diagnostico de audio/erros.
     private void ProcessarTranscricaoFinal(string texto, int sessao, bool exigirSessaoAtual, string origem)
     {
         if (exigirSessaoAtual && !SessaoAtualValida(sessao))
@@ -708,8 +700,6 @@ public class CajadoMagicoVoz : MonoBehaviour
         appVoiceExperience.VoiceEvents.OnStoppedListening.AddListener(AoPararEscutaGlobal);
         appVoiceExperience.VoiceEvents.OnMicDataSent.AddListener(AoEnviarAudioGlobal);
         appVoiceExperience.VoiceEvents.OnMicLevelChanged.AddListener(AoNivelMicrofoneAlterado);
-        appVoiceExperience.VoiceEvents.OnPartialTranscription.AddListener(AoReceberTranscricaoParcialGlobal);
-        appVoiceExperience.VoiceEvents.OnFullTranscription.AddListener(AoReceberTranscricaoCompletaGlobal);
         listenersVoiceRegistrados = true;
     }
 
@@ -723,8 +713,6 @@ public class CajadoMagicoVoz : MonoBehaviour
         appVoiceExperience.VoiceEvents.OnStoppedListening.RemoveListener(AoPararEscutaGlobal);
         appVoiceExperience.VoiceEvents.OnMicDataSent.RemoveListener(AoEnviarAudioGlobal);
         appVoiceExperience.VoiceEvents.OnMicLevelChanged.RemoveListener(AoNivelMicrofoneAlterado);
-        appVoiceExperience.VoiceEvents.OnPartialTranscription.RemoveListener(AoReceberTranscricaoParcialGlobal);
-        appVoiceExperience.VoiceEvents.OnFullTranscription.RemoveListener(AoReceberTranscricaoCompletaGlobal);
         listenersVoiceRegistrados = false;
     }
 

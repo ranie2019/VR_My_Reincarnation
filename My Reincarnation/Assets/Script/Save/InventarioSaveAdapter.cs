@@ -373,7 +373,9 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
                         var persistente = restaurados[inicio + i].GetComponent<ItemPersistente>();
                         var esperado = data.CriarDataParaInstancia(data.instanciaIds[i]);
                         var atual = persistente.CriarSaveData(data.slot, 1, false);
-                        if (atual.instanciaId != esperado.instanciaId || atual.itemId != esperado.itemId ||
+                        bool mesmoTipo = atual.itemId == esperado.itemId ||
+                            persistente.CorrespondeAIdDeTipoAnterior(esperado.itemId);
+                        if (atual.instanciaId != esperado.instanciaId || !mesmoTipo ||
                             (!ItemPersistente.EhMigracaoDurabilidadeManopla(persistente.gameObject, esperado) && atual.durabilidade != esperado.durabilidade) || atual.dadosExtrasJson != esperado.dadosExtrasJson ||
                             (esperado.possuiDurabilidadeMaxima &&
                              (!atual.possuiDurabilidadeMaxima || atual.durabilidadeMaxima != esperado.durabilidadeMaxima)))
@@ -531,18 +533,7 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         if (!destruirOriginaisSalvosNoInventario || originaisCena == null || data == null)
             return;
 
-        ItemPersistente original = EncontrarOriginalSoltoPorInstanciaId(
-            originaisCena,
-            data.instanciaId,
-            originaisUsados);
-
-        if (original == null)
-        {
-            original = EncontrarOriginalSoltoPorItemIdParaRestauracaoDireta(
-                originaisCena,
-                data.itemId,
-                originaisUsados);
-        }
+        ItemPersistente original = EncontrarOriginalParaLimpezaDireta(originaisCena, data, originaisUsados);
 
         if (original == null)
             return;
@@ -576,79 +567,37 @@ public class InventarioSaveAdapter : MonoBehaviour, IInventarioSalvavel
         }
     }
 
-    private ItemPersistente EncontrarOriginalSoltoPorInstanciaId(
-        List<ItemPersistente> originaisCena,
-        string instanciaId,
-        HashSet<ItemPersistente> originaisUsados)
+    private ItemPersistente EncontrarOriginalParaLimpezaDireta(
+        List<ItemPersistente> originaisCena, InventorySaveData data, HashSet<ItemPersistente> usados)
     {
-        if (originaisCena == null || string.IsNullOrWhiteSpace(instanciaId))
-            return null;
-
-        string instanciaIdNormalizado = instanciaId.Trim();
-        for (int i = 0; i < originaisCena.Count; i++)
+        if (originaisCena == null || data == null) return null;
+        ItemPersistente encontrado = null;
+        foreach (var item in originaisCena)
         {
-            ItemPersistente item = originaisCena[i];
-            if (item == null || (originaisUsados != null && originaisUsados.Contains(item)))
-                continue;
-
-            if (item.EstaNoInventario() || item.GetComponentInParent<SlotInventario>(true) != null)
-                continue;
-
-            if (string.Equals(item.ObterInstanciaIdSemGerar(), instanciaIdNormalizado, System.StringComparison.Ordinal))
-                return item;
+            if (item == null || (usados != null && usados.Contains(item)) || item.EstaNoInventario() ||
+                item.GetComponentInParent<SlotInventario>(true) != null || !item.CorrespondeAoItemId(data.itemId)) continue;
+            bool mesmaInstancia = !string.IsNullOrWhiteSpace(data.instanciaId) &&
+                item.ObterInstanciaIdSemGerar() == data.instanciaId.Trim();
+            bool mesmaOrigem = ItemPersistente.InstanciaIdEhGuidValido(data.origemCenaId) &&
+                item.OrigemCenaId == data.origemCenaId;
+            if (!mesmaInstancia && !mesmaOrigem) continue;
+            if (encontrado != null)
+                throw new System.InvalidOperationException("Originais duplicados para limpeza do inventario: " + data.instanciaId);
+            encontrado = item;
         }
-
-        return null;
-    }
-
-    private ItemPersistente EncontrarOriginalSoltoPorItemIdParaRestauracaoDireta(
-        List<ItemPersistente> originaisCena,
-        string itemId,
-        HashSet<ItemPersistente> originaisUsados)
-    {
-        ItemPersistente originalComIdPersistente = EncontrarOriginalSoltoPorItemId(
-            originaisCena,
-            itemId,
-            originaisUsados,
-            true);
-
-        if (originalComIdPersistente != null)
-            return originalComIdPersistente;
-
-        return EncontrarOriginalSoltoPorItemId(
-            originaisCena,
-            itemId,
-            originaisUsados,
-            false);
-    }
-
-    private ItemPersistente EncontrarOriginalSoltoPorItemId(
-        List<ItemPersistente> originaisCena,
-        string itemId,
-        HashSet<ItemPersistente> originaisUsados,
-        bool apenasIdRuntime)
-    {
-        if (originaisCena == null || string.IsNullOrWhiteSpace(itemId))
-            return null;
-
-        string itemIdNormalizado = itemId.Trim();
-        for (int i = 0; i < originaisCena.Count; i++)
+        if (encontrado != null) return encontrado;
+        // Saves individuais atuais identificam clones sem origem. Um item do mesmo tipo
+        // no mundo nao e necessariamente o original: nunca o destruir por mera semelhanca.
+        if (data.versaoEstadosIndividuais == 1 || !string.IsNullOrEmpty(data.origemCenaId)) return null;
+        // Compatibilidade anterior aos IDs individuais: somente candidato unico.
+        foreach (var item in originaisCena)
         {
-            ItemPersistente item = originaisCena[i];
-            if (item == null || (originaisUsados != null && originaisUsados.Contains(item)))
-                continue;
-
-            if (item.EstaNoInventario() || item.GetComponentInParent<SlotInventario>(true) != null)
-                continue;
-
-            if (apenasIdRuntime && !item.InstanciaIdFoiGeradoEmRuntime())
-                continue;
-
-            if (item.CorrespondeAoItemId(itemIdNormalizado))
-                return item;
+            if (item == null || (usados != null && usados.Contains(item)) || item.EstaNoInventario() ||
+                item.GetComponentInParent<SlotInventario>(true) != null || !item.CorrespondeAoItemId(data.itemId)) continue;
+            if (encontrado != null) return null;
+            encontrado = item;
         }
-
-        return null;
+        return encontrado;
     }
 
     private List<ItemPersistente> ObterItensPersistentesSoltosCena()

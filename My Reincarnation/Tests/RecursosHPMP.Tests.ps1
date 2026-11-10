@@ -16,6 +16,11 @@ public static class Mathf {
  public static int Clamp(int v,int a,int b)=>Math.Min(b,Math.Max(a,v));
  public static float Clamp(float v,float a,float b)=>Math.Min(b,Math.Max(a,v));
 }
+public static class Machado {public static long value; public static long ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>value;}
+public static class Picareta {public static long ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>0;}
+public static class Escudo {public static long ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>0;}
+public static class Flecha {public static long ObterBonusEmUso(object player,TipoAtributoManopla tipo)=>0;}
+public static class Espada {public static int ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>0;}
 public class ResourceHost {
  private int vidaAtual=100,vidaMaxima=100,manaAtual=50,manaMaxima=50;
  private float vidaAtualReal=100;private bool vidaAtualRealInicializada=true;

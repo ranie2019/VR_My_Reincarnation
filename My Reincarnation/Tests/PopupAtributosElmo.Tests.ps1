@@ -1,11 +1,11 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$source = Get-Content -Raw (Join-Path $project 'Assets/Script/Equipamento/AtributosElmo.cs')
+$source = Get-Content -Raw (Join-Path $project 'Assets/Script/Equipamento/EquiparElmo.cs')
 $a = $source.IndexOf('    private const int LimiteLinhasPopup')
 $b = $source.IndexOf('    [SerializeField, HideInInspector] private EstadoGerado', $a)
 $setup = $source.Substring($a, $b - $a)
 $a = $source.IndexOf('    private void AtualizarLinhasAtributos(')
-$b = $source.IndexOf('    private AtributosElmo ObterElmoComparacao(', $a)
+$b = $source.IndexOf('    private EquiparElmo ObterElmoComparacao(', $a)
 $render = $source.Substring($a, $b - $a)
 $a = $source.IndexOf('    private static void AtualizarComparacaoLinha(')
 $b = $source.IndexOf('    public string ExportarEstadoJson()', $a)
@@ -18,7 +18,7 @@ public enum TipoAtributoManopla { Forca, Constituicao, Agilidade, Resistencia, S
 public class TMP_Text { public string text="antigo"; }
 public static class Mathf { public static float Max(float a,float b)=>Math.Max(a,b); public static float Clamp(float v,float a,float b)=>Math.Min(b,Math.Max(a,v)); }
 public class GameObject { public bool activeSelf=true; public void SetActive(bool value){activeSelf=value;} }
-public class AtributosElmo {
+public class EquiparElmo {
  public class Estado { public List<PopupElmoTests.ValorAtributo> atributos=new List<PopupElmoTests.ValorAtributo>(); }
  public Estado resultado;
  public Dictionary<TipoAtributoManopla,int> valores=new Dictionary<TipoAtributoManopla,int>();
@@ -32,9 +32,9 @@ public class PopupElmoTests {
  public class ValorAtributo { public TipoAtributoManopla atributo; public int valor; }
  private float vidaMaxima=100,vidaAtual=100,desgasteNaturalPorMinuto=.5f;
  private List<TextoAtributo> textosValores;
- private AtributosElmo equipada;
+ private EquiparElmo equipada;
  private bool disponivel=true;
- private AtributosElmo ObterElmoComparacao(out bool ok){ok=disponivel;return equipada;}
+ private EquiparElmo ObterElmoComparacao(out bool ok){ok=disponivel;return equipada;}
 '@ + $setup + $render + @'
  public static int Run() {
   int n=0;Action<bool,string> check=(ok,msg)=>{if(!ok)throw new Exception(msg);n++;};
@@ -52,7 +52,7 @@ public class PopupElmoTests {
   check(values.Count==6,"Limite visual nao deve alterar valores salvos ou bonus");
   host.AtualizarLinhasAtributos(new List<ValorAtributo>());
   foreach(var row in host.textosValores)check(row.textoNome.text==""&&row.textoValor.text=="","Nenhum atributo deve limpar textos anteriores");
-  host.textosValores.Add(new TextoAtributo());host.OnValidate();
+  host.textosValores.Add(new TextoAtributo());host.ValidarAtributosEDurabilidade();
   check(host.textosValores.Count==5&&host.textosValores[0]==first,"Normalizar deve preservar as primeiras referencias");
   host.textosValores[0]=null;host.AtualizarLinhasAtributos(values);
   check(host.textosValores[0]!=null,"Campos ausentes nao devem causar excecao");
@@ -62,7 +62,7 @@ public class PopupElmoTests {
    row.sinalPositivo=new GameObject();row.sinalNegativo=new GameObject();
   }
   first=host.textosValores[0];
-  host.equipada=new AtributosElmo();host.equipada.valores[TipoAtributoManopla.Forca]=5;
+  host.equipada=new EquiparElmo();host.equipada.valores[TipoAtributoManopla.Forca]=5;
   values=new List<ValorAtributo>{new ValorAtributo{atributo=TipoAtributoManopla.Forca,valor=7}};
   host.AtualizarLinhasAtributos(values);
   check(first.textoDiferenca.text=="2"&&first.setaUp.activeSelf&&first.sinalPositivo.activeSelf&&!first.setaDown.activeSelf&&!first.sinalNegativo.activeSelf,"7 contra 5 deve mostrar +2 e somente up");
@@ -78,10 +78,10 @@ public class PopupElmoTests {
   check(first.textoDiferenca.text==""&&!first.setaUp.activeSelf&&!first.setaDown.activeSelf,"Comparacao indisponivel nao inventa diferenca");
   host.disponivel=true;host.AtualizarLinhasAtributos(new List<ValorAtributo>());
   foreach(var row in host.textosValores)check(row.textoDiferenca.text==""&&!row.setaUp.activeSelf&&!row.setaDown.activeSelf&&!row.sinalPositivo.activeSelf&&!row.sinalNegativo.activeSelf,"Linha vazia deve limpar todos os indicadores");
-  host.equipada=new AtributosElmo();host.equipada.valores[TipoAtributoManopla.Forca]=int.MaxValue;
+  host.equipada=new EquiparElmo();host.equipada.valores[TipoAtributoManopla.Forca]=int.MaxValue;
   values[0].atributo=TipoAtributoManopla.Forca;values[0].valor=0;host.AtualizarLinhasAtributos(values);
   check(first.textoDiferenca.text==int.MaxValue.ToString()&&first.setaDown.activeSelf,"Limite inteiro deve preservar diferenca negativa");
-  host.equipada.resultado=new AtributosElmo.Estado();
+  host.equipada.resultado=new EquiparElmo.Estado();
   host.equipada.resultado.atributos.Add(new ValorAtributo{atributo=TipoAtributoManopla.Resistencia,valor=4});
   host.equipada.valores[TipoAtributoManopla.Resistencia]=4;
   values[0].valor=7;host.AtualizarLinhasAtributos(values);

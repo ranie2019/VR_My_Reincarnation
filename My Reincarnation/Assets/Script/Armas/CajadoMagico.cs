@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -1065,6 +1065,17 @@ public class CajadoMagico : MonoBehaviour
             ultimoConsumoManaSucesso = false;
             manaConsumidaNaUltimaPreparacao = 0;
 
+            var dadosCajado = GetComponent<CajadoPopup>();
+            if (dadosCajado != null && !dadosCajado.PodeLancarMagia(statusDono))
+            {
+                statusPreparacaoMagia = "Cajado indisponivel ou requisito de uso nao atendido.";
+                statusManaDaMagia = "Mana nao consumida.";
+                manterRunaAposFalhaPreparacao = true;
+                AtualizarDiagnosticoManaMagia();
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+
             if (statusDono != null && !statusDono.TentarConsumirMana(custo))
             {
                 manaAtualDoDono = statusDono.GetManaAtual();
@@ -1192,7 +1203,8 @@ public class CajadoMagico : MonoBehaviour
 
         Vector3 direcao = ObterDirecaoLancamento();
 
-        if (direcao.sqrMagnitude < 0.0001f)
+        float magnitudeQuadrada = direcao.sqrMagnitude;
+        if (magnitudeQuadrada < 0.0001f || float.IsNaN(magnitudeQuadrada) || float.IsInfinity(magnitudeQuadrada))
         {
             statusLancamentoMagia = "Direcao de lancamento invalida.";
             statusDirecaoLancamento = pontoDirecaoMagia == null
@@ -1202,17 +1214,35 @@ public class CajadoMagico : MonoBehaviour
             return false;
         }
 
+        var dadosCajado = GetComponent<CajadoPopup>();
+        if (dadosCajado != null)
+        {
+            if (!dadosCajado.PodeLancarMagia(ObterStatusPlayerDonoAtual(true)))
+            {
+                statusLancamentoMagia = "Cajado indisponivel ou requisito de uso nao atendido.";
+                AtualizarDiagnosticoMagiaPreparada();
+                return false;
+            }
+            bolaParaLancar.ConfigurarAtaqueDoCajado(dadosCajado.DanoBase);
+        }
         ultimaDirecaoLancamento = direcao.normalized;
+        bolaParaLancar.Lancar(ultimaDirecaoLancamento, ObterDonoDaMagia(), gameObject);
+        if (bolaParaLancar.EstadoAtual != BolaDeFogo.EstadoBolaDeFogo.Lancada)
+        {
+            statusLancamentoMagia = "Bola de Fogo nao saiu do estado de preparacao.";
+            AtualizarDiagnosticoMagiaPreparada();
+            return false;
+        }
+
         EsconderMiraLaser();
         bolaDeFogoPreparadaAtual = null;
-        bolaParaLancar.Lancar(ultimaDirecaoLancamento, ObterDonoDaMagia(), gameObject);
-
         ultimaMagiaLancada = "BolaDeFogo";
         statusLancamentoMagia = "Bola de Fogo lancada.";
         statusDirecaoLancamento = "Direcao obtida pelo PontoDirecaoMagia.";
         statusPreparacaoMagia = "Nenhuma Bola de Fogo preparada.";
         AtualizarDiagnosticoMagiaPreparada();
         AtualizarDiagnostico();
+        if (dadosCajado != null) dadosCajado.RegistrarMagiaLancada();
         return true;
     }
 

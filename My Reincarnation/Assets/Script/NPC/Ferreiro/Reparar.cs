@@ -37,13 +37,15 @@ public class Reparar : MonoBehaviour
     {
         "Equipamento",
         "Espada",
+        "CajadoPopup",
+        "Arcopopup",
         "Machado",
         "Picareta",
         "Arco",
         "Escudo",
         "AtributosManoplas",
         "AtributosPeitoral",
-        "AtributosElmo"
+        "EquiparElmo"
     };
 
     private void Start()

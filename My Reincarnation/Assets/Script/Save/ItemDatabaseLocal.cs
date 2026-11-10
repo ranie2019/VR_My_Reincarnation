@@ -50,6 +50,9 @@ public class ItemDatabaseLocal : MonoBehaviour
                 RegistrarNoCache(persistente.ObterTipoItemId(), entrada.prefab);
                 RegistrarNoCache(persistente.ObterItemIdLegado(), entrada.prefab);
                 RegistrarNoCache(persistente.ObterNomeItem(), entrada.prefab);
+                if (persistente.IdsDeTipoAnteriores != null)
+                    foreach (string id in persistente.IdsDeTipoAnteriores)
+                        RegistrarNoCache(id, entrada.prefab);
             }
         }
     }

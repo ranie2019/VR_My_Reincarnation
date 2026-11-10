@@ -690,21 +690,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Escudo
   vidaMaxima: 100
   vidaAtual: 100
-  desgastePorBloqueio: 1
   destruirQuandoVidaZerar: 1
-  textoValorAtual: {fileID: 5690090275430421335}
-  textoValorTotal: {fileID: 5580569003603038584}
-  corTextoA: {r: 1, g: 1, b: 1, a: 1}
-  corTextoB: {r: 0, g: 1, b: 1, a: 1}
-  velocidadePiscarTexto: 2
-  usarEfeitoLedTexto: 1
-  tagsQueDesgastamEscudo:
-  - Player
-  - Enemy
-  - Shield
-  - Sword
-  cooldownBloqueioMesmoObjeto: 0.25
-  tempoIgnorarDonoAposSoltar: 1
+  desgastePorDano: 1
   audioSource: {fileID: 8630448567265020317}
   somBloqueio: {fileID: 8300000, guid: c01c7924b3cc3324aa79f6362974198f, type: 3}
   somQuebrar: {fileID: 8300000, guid: e32e7100b0e8a594c8621a124e54048e, type: 3}
@@ -849,7 +836,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &2731686406031041291
 RectTransform:
   m_ObjectHideFlags: 0

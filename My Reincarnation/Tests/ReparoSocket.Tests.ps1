@@ -36,7 +36,7 @@ public class XRSocketInteractor {public Selected firstInteractableSelected;publi
 public class Manager {public int exits;public Action onExit;public void SelectExit(XRSocketInteractor s,Selected selected){exits++;s.firstInteractableSelected=null;onExit?.Invoke();}}
 public class AtributosManoplas:Component {public float VidaMaxima=>100;public float VidaAtual=70;public void RepararCompleto(){VidaAtual=100;}public void AtualizarDurabilidadeVisual(){}}
 public class AtributosPeitoral:AtributosManoplas {}
-public class AtributosElmo:AtributosManoplas {}
+public class EquiparElmo:AtributosManoplas {}
 public class Espada:AtributosManoplas {}
 public class RepairSocketChecks {
  private Transform slot,pontoSpawn;private GameObject itemNoSlot;private Component equipamentoNoSlot;private float valorAtualDoReparo;private float precoPorPontoDeVida=.1f;private XRSocketInteractor socketSlot;
@@ -50,7 +50,7 @@ public class RepairSocketChecks {
   c(Math.Abs(h.valorAtualDoReparo-3)<.0001,"Existing repair price formula preserved");
   c(TentarRepararComponente(stats)&&stats.VidaAtual==100,"Glove repaired through actual durable adapter");
   c(stats.persistence.reads==1,"Durability persistence refreshed");
-  foreach(Component armor in new Component[]{new AtributosPeitoral(),new AtributosElmo(),new Espada()}){
+  foreach(Component armor in new Component[]{new AtributosPeitoral(),new EquiparElmo(),new Espada()}){
    var item=new GameObject{components=new[]{armor}};c(ObterComponenteReparavel(item)==armor,"Other armor and weapon remain repairable");
   }
   h.pontoSpawn=new Transform{position=new Vector3(1,2,3),rotation=new Quaternion{value=42}};

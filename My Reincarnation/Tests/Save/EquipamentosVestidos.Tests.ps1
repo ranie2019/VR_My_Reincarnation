@@ -26,7 +26,7 @@ public struct Vector3 {public float x,y,z;public Vector3(float a,float b,float c
 public struct Quaternion {public static Quaternion Euler(Vector3 v)=>new Quaternion();}
 public class Transform {public Vector3 position,localScale;public Quaternion rotation;public void SetParent(Transform p,bool world){}}
 public class Renderer {public bool enabled=true;}
-public class Rigidbody {public bool isKinematic,useGravity,detectCollisions;public void WakeUp(){}}
+public class Rigidbody {public Vector3 position;public Quaternion rotation;public bool isKinematic,useGravity,detectCollisions;public void WakeUp(){}}
 public class GameObject {
  public Transform transform=new Transform();public bool activeSelf=true;public List<object> components=new List<object>();
  public T GetComponent<T>() where T:class=>components.OfType<T>().FirstOrDefault();public void SetActive(bool a){activeSelf=a;}
@@ -49,7 +49,7 @@ public class GerenciadorEquipamentosPlayer {
  void ResolverReferencias(){}
  T[] GetComponentsInChildren<T>(bool inactive)=>renderers.OfType<T>().ToArray();
  bool TentarEquipar(EquiparManoplas v){if(forceFailure)return false;v.JaEquipado=true;if(v.LadoMao==LadoMaoEquipamento.Direita)luvaDireita=v;else luvaEsquerda=v;return true;}
- bool TentarEquipar(EquiparElmo v){if(forceFailure)return false;v.JaEquipado=true;elmoAtual=v;return true;}
+ bool TentarEquiparElmo(EquiparElmo v,bool restaurandoSave){if(!restaurandoSave||forceFailure)return false;v.JaEquipado=true;elmoAtual=v;return true;}
  bool TentarEquipar(EquiparPeitoral v){if(forceFailure)return false;v.JaEquipado=true;peitoralAtual=v;return true;}
 '@+$methods+@'
 }

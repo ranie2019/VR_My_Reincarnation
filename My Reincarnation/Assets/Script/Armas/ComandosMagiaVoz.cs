@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 using UnityEngine;
 
@@ -61,6 +61,8 @@ public class ComandosMagiaVoz : MonoBehaviour
     private float horarioUltimoComandoAceito = -999f;
     private string ultimoComandoAceito;
     private bool listenerRegistrado;
+    private CajadoMagicoVoz fonteVozRegistrada;
+    private int ultimaSessaoComComandoAceito = -1;
 
     private void Awake()
     {
@@ -116,6 +118,7 @@ public class ComandosMagiaVoz : MonoBehaviour
 
     private void ProcessarComandoVozInterno(string textoNormalizado, bool veioDeParcial)
     {
+        if (!isActiveAndEnabled) return;
         string fraseNormalizada = NormalizarFrase(textoNormalizado);
         transcricaoRecebida = true;
         quantidadeTranscricoesRecebidas++;
@@ -144,6 +147,12 @@ public class ComandosMagiaVoz : MonoBehaviour
             return;
         }
 
+        if (!cajadoMagico.isActiveAndEnabled || !cajadoMagicoVoz.isActiveAndEnabled)
+        {
+            IgnorarComando("Componente de magia ou voz desativado.", veioDeParcial);
+            return;
+        }
+
         if (!cajadoMagico.CajadoSegurado)
         {
             IgnorarComando("Cajado nao esta segurado.", veioDeParcial);
@@ -168,7 +177,7 @@ public class ComandosMagiaVoz : MonoBehaviour
         DefinirDiagnostico(
             $"Comando identificado: '{fraseNormalizada}' -> {comando.idMagia} ({(veioDeParcial ? "parcial" : "final")}).");
 
-        if (EhMesmoComandoRepetido(fraseNormalizada))
+        if (EhMesmoComandoRepetido(comando.idMagia))
         {
             IgnorarComando("Comando repetido ignorado pelo intervalo minimo.", veioDeParcial);
             return;
@@ -180,12 +189,12 @@ public class ComandosMagiaVoz : MonoBehaviour
             return;
         }
 
-        ultimoComandoAceito = fraseNormalizada;
-        horarioUltimoComandoAceito = Time.time;
-
         bool preparouMagia = cajadoMagico.TentarPrepararBolaDeFogoPorVoz();
         if (preparouMagia)
         {
+            ultimoComandoAceito = comando.idMagia;
+            horarioUltimoComandoAceito = Time.time;
+            ultimaSessaoComComandoAceito = cajadoMagicoVoz.IdSessaoVozAtual;
             magiaAtivada = true;
             quantidadeMagiasAtivadas++;
             DefinirDiagnostico($"Magia ativada por voz: {comando.idMagia}.");
@@ -197,23 +206,25 @@ public class ComandosMagiaVoz : MonoBehaviour
 
     private void RegistrarListenerVoz()
     {
-        if (listenerRegistrado || cajadoMagicoVoz == null || cajadoMagicoVoz.AoComandoVozRecebido == null)
-            return;
-
-        cajadoMagicoVoz.AoComandoVozRecebido.RemoveListener(ProcessarComandoVoz);
-        cajadoMagicoVoz.AoComandoVozRecebido.AddListener(ProcessarComandoVoz);
-        cajadoMagicoVoz.AoTextoParcialVozRecebido.RemoveListener(ProcessarComandoVozParcial);
-        cajadoMagicoVoz.AoTextoParcialVozRecebido.AddListener(ProcessarComandoVozParcial);
+        if (listenerRegistrado && fonteVozRegistrada == cajadoMagicoVoz) return;
+        RemoverListenerVoz();
+        if (cajadoMagicoVoz == null) return;
+        fonteVozRegistrada = cajadoMagicoVoz;
+        fonteVozRegistrada.AoComandoVozRecebido.RemoveListener(ProcessarComandoVoz);
+        fonteVozRegistrada.AoComandoVozRecebido.AddListener(ProcessarComandoVoz);
+        fonteVozRegistrada.AoTextoParcialVozRecebido.RemoveListener(ProcessarComandoVozParcial);
+        fonteVozRegistrada.AoTextoParcialVozRecebido.AddListener(ProcessarComandoVozParcial);
         listenerRegistrado = true;
     }
 
     private void RemoverListenerVoz()
     {
-        if (!listenerRegistrado || cajadoMagicoVoz == null || cajadoMagicoVoz.AoComandoVozRecebido == null)
-            return;
-
-        cajadoMagicoVoz.AoComandoVozRecebido.RemoveListener(ProcessarComandoVoz);
-        cajadoMagicoVoz.AoTextoParcialVozRecebido.RemoveListener(ProcessarComandoVozParcial);
+        if (fonteVozRegistrada != null)
+        {
+            fonteVozRegistrada.AoComandoVozRecebido.RemoveListener(ProcessarComandoVoz);
+            fonteVozRegistrada.AoTextoParcialVozRecebido.RemoveListener(ProcessarComandoVozParcial);
+        }
+        fonteVozRegistrada = null;
         listenerRegistrado = false;
     }
 
@@ -336,36 +347,21 @@ public class ComandosMagiaVoz : MonoBehaviour
 
     private bool FraseContemComTolerancia(string fraseNormalizada, string fraseVariante)
     {
-        if (fraseNormalizada.IndexOf(fraseVariante, StringComparison.Ordinal) >= 0)
-            return true;
-
-        string[] palavrasFrase = fraseNormalizada.Split(' ');
-        string[] palavrasVariante = fraseVariante.Split(' ');
-
-        if (palavrasVariante.Length == 0)
-            return false;
-
-        int indiceBusca = 0;
-
-        for (int i = 0; i < palavrasVariante.Length; i++)
+        if (string.IsNullOrWhiteSpace(fraseNormalizada) || string.IsNullOrWhiteSpace(fraseVariante)) return false;
+        string[] palavrasFrase = fraseNormalizada.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        string[] palavrasVariante = fraseVariante.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (palavrasVariante.Length == 0 || palavrasVariante.Length > palavrasFrase.Length) return false;
+        // A frase do comando deve ser contigua. Nao reunir palavras espalhadas
+        // pela transcricao (ex.: "bola longe sem nenhum fogo").
+        for (int inicio = 0; inicio <= palavrasFrase.Length - palavrasVariante.Length; inicio++)
         {
-            bool encontrou = false;
-
-            for (int j = indiceBusca; j < palavrasFrase.Length; j++)
-            {
-                if (!PalavrasParecidas(palavrasFrase[j], palavrasVariante[i]))
-                    continue;
-
-                indiceBusca = j + 1;
-                encontrou = true;
-                break;
-            }
-
-            if (!encontrou)
-                return false;
+            bool corresponde = true;
+            for (int i = 0; i < palavrasVariante.Length; i++)
+                if (!PalavrasParecidas(palavrasFrase[inicio + i], palavrasVariante[i]))
+                { corresponde = false; break; }
+            if (corresponde) return true;
         }
-
-        return true;
+        return false;
     }
 
     private bool PalavrasParecidas(string palavraOuvida, string palavraEsperada)
@@ -423,13 +419,15 @@ public class ComandosMagiaVoz : MonoBehaviour
         }
     }
 
-    private bool EhMesmoComandoRepetido(string fraseNormalizada)
+    private bool EhMesmoComandoRepetido(string idMagia)
     {
-        if (string.IsNullOrEmpty(ultimoComandoAceito) || intervaloMinimoMesmoComando <= 0f)
-            return false;
-
-        return string.Equals(ultimoComandoAceito, fraseNormalizada, StringComparison.Ordinal)
-            && Time.time - horarioUltimoComandoAceito < intervaloMinimoMesmoComando;
+        if (string.IsNullOrEmpty(ultimoComandoAceito) ||
+            !string.Equals(ultimoComandoAceito, idMagia, StringComparison.OrdinalIgnoreCase)) return false;
+        // Parcial e final pertencentes a mesma fala nao podem conjurar duas vezes,
+        // mesmo que mudem de idioma ou cheguem depois do cooldown.
+        if (cajadoMagicoVoz != null && cajadoMagicoVoz.IdSessaoVozAtual > 0 &&
+            ultimaSessaoComComandoAceito == cajadoMagicoVoz.IdSessaoVozAtual) return true;
+        return intervaloMinimoMesmoComando > 0f && Time.time - horarioUltimoComandoAceito < intervaloMinimoMesmoComando;
     }
 
     private string ObterMotivoFalhaPreparacao()

@@ -51,6 +51,12 @@ internal sealed class RecuperacaoItemCarga
         if (elmo != null) restauracoes.Add(elmo.CapturarEstadoEquipadoParaCarga());
         var peitoral = item.GetComponent<EquiparPeitoral>();
         if (peitoral != null) restauracoes.Add(peitoral.CapturarEstadoEquipadoParaCarga());
+        var machado = item.GetComponent<Machado>();
+        if (machado != null) restauracoes.Add(machado.CapturarSorteioParaCarga());
+        var picareta = item.GetComponent<Picareta>();
+        if (picareta != null) restauracoes.Add(picareta.CapturarSorteioParaCarga());
+        var escudo = item.GetComponent<Escudo>();
+        if (escudo != null) restauracoes.Add(escudo.CapturarSorteioParaCarga());
         var cogumelo = item.GetComponent<Cocumelo>();
         if (cogumelo != null) restauracoes.Add(cogumelo.CapturarRecuperacaoRespawn());
         var persistente = item.GetComponent<ItemPersistente>();
