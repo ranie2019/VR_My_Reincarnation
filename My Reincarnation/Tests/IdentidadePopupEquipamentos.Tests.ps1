@@ -17,7 +17,7 @@ public class EstadoGerado {
 public static class JsonUtility {public static string ToJson(object estado)=>((EstadoGerado)estado).Dump();}
 '@
 $index=0
-foreach($script in @('AtributosManoplas','AtributosPeitoral','EquiparElmo')) {
+foreach($script in @('AtributosManoplas','EquiparPeitoral','EquiparElmo')) {
  $source=Get-Content -Raw (Join-Path $project "Assets/Script/Equipamento/$script.cs")
  $a=$source.IndexOf('    private string ObterNomePrefab()')
  $b=$source.IndexOf('    public int ObterValor(', $a)

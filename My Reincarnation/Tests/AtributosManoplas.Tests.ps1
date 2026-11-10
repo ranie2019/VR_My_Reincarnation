@@ -66,8 +66,8 @@ public class EquiparManoplas {
  public bool JaEquipado=true; public FakeObject gameObject=new FakeObject(); public AtributosManoplas data;
  public T GetComponent<T>() where T:class=>data as T;
 }
-public class AtributosPeitoral {public int value;public int ObterValor(TipoAtributoManopla a)=>value;}
-public class EquiparPeitoral {public bool JaEquipado=true;public FakeObject gameObject=new FakeObject();public AtributosPeitoral data;public T GetComponent<T>() where T:class=>data as T;}
+
+public class EquiparPeitoral {public bool JaEquipado=true;public FakeObject gameObject=new FakeObject();public int value;public int ObterValor(TipoAtributoManopla a)=>value;}
 public class EquiparElmo {public bool JaEquipado=true;public FakeObject gameObject=new FakeObject();public int value;public int ObterValor(TipoAtributoManopla a)=>value;}
 public class GerenciadorEquipamentosPlayer { public EquiparManoplas LuvaDireita, LuvaEsquerda; public EquiparPeitoral PeitoralAtual; public EquiparElmo ElmoAtual; }
 public static class Machado {public static long value; public static long ObterBonusEmpunhado(object player,TipoAtributoManopla tipo)=>value;}
@@ -90,7 +90,7 @@ public class BonusManoplasTests {
   player.manager.LuvaDireita=player.manager.LuvaEsquerda;check(player.GetBonusForca(),3);
   player.manager.LuvaDireita=null;player.manager.LuvaEsquerda=null;check(player.GetForcaTotal(),21);
   player.bonusForca=2;check(player.GetForcaTotal(),23);
-  player.manager.PeitoralAtual=new EquiparPeitoral{data=new AtributosPeitoral{value=4}};
+  player.manager.PeitoralAtual=new EquiparPeitoral{value=4};
   check(player.GetForcaTotal(),27);player.manager.PeitoralAtual.JaEquipado=false;check(player.GetForcaTotal(),23);
   player.manager.PeitoralAtual.JaEquipado=true;
   player.manager.LuvaDireita=new EquiparManoplas{data=new AtributosManoplas{value=5}};

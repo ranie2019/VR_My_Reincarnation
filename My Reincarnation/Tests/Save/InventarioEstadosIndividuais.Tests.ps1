@@ -20,7 +20,7 @@ $shieldSave += $shield.Substring($start, $end-$start)
 $stub = @'
 // Component absent in these legacy fixtures; generation/selection has its own tests.
 public class AtributosManoplas:UnityEngine.MonoBehaviour { public float vidaMaxima=100,vidaAtual=100; public float VidaMaxima=>vidaMaxima; public void AtualizarDurabilidadeVisual(){}  public bool Gerado; public string estado; public string ExportarEstadoJson()=>estado; public void RestaurarEstadoJson(string json){estado=json;Gerado=true;} public void PrepararMigracaoSaveLegado(){Gerado=false;} public static object LerEValidarEstadoJson(string json){if(json!=null&&json.StartsWith("roll:"))return null;throw new System.IO.InvalidDataException("Bad roll");} }
-public class AtributosPeitoral:UnityEngine.MonoBehaviour { public float vidaMaxima=100,vidaAtual=100; public float VidaMaxima=>vidaMaxima; public void AtualizarDurabilidadeVisual(){}  public bool Gerado; public string estado; public string ExportarEstadoJson()=>estado; public void RestaurarEstadoJson(string json){estado=json;Gerado=true;} public void PrepararMigracaoSaveLegado(){Gerado=false;} public static object LerEValidarEstadoJson(string json){if(json!=null&&json.StartsWith("roll:"))return null;throw new System.IO.InvalidDataException("Bad roll");} }
+public class EquiparPeitoral:UnityEngine.MonoBehaviour { public float vidaMaxima=100,vidaAtual=100; public float VidaMaxima=>vidaMaxima; public void AtualizarDurabilidadeVisual(){}  public bool Gerado; public string estado; public string ExportarEstadoJson()=>estado; public void RestaurarEstadoJson(string json){estado=json;Gerado=true;} public void PrepararMigracaoSaveLegado(){Gerado=false;} public static object LerEValidarEstadoJson(string json){if(json!=null&&json.StartsWith("roll:"))return null;throw new System.IO.InvalidDataException("Bad roll");} }
 public class EquiparElmo:UnityEngine.MonoBehaviour { public float vidaMaxima=100,vidaAtual=100; public float VidaMaxima=>vidaMaxima; public void AtualizarDurabilidadeVisual(){}  public bool Gerado; public string estado; public string ExportarEstadoJson()=>estado; public void RestaurarEstadoJson(string json){estado=json;Gerado=true;} public void PrepararMigracaoSaveLegado(){Gerado=false;} public static object LerEValidarEstadoJson(string json){if(json!=null&&json.StartsWith("roll:"))return null;throw new System.IO.InvalidDataException("Bad roll");} }
 namespace UnityEngine {
  [AttributeUsage(AttributeTargets.Class)] public class DisallowMultipleComponent : Attribute {}
@@ -125,7 +125,7 @@ public static class Audit05 {
   foreach(var id in d.instanciaIds) {
    var unit=d.CriarDataParaInstancia(id);var grab=New(id,100,unit.durabilidade>=0);
    if(unit.dadosExtrasJson!=null&&unit.dadosExtrasJson.Contains("my-reincarnation.manoplas.v1"))grab.gameObject.Add<AtributosManoplas>();
-   if(unit.dadosExtrasJson!=null&&unit.dadosExtrasJson.Contains("my-reincarnation.peitoral.v1"))grab.gameObject.Add<AtributosPeitoral>();
+   if(unit.dadosExtrasJson!=null&&unit.dadosExtrasJson.Contains("my-reincarnation.peitoral.v1"))grab.gameObject.Add<EquiparPeitoral>();
    if(unit.dadosExtrasJson!=null&&unit.dadosExtrasJson.Contains("my-reincarnation.elmo.v1"))grab.gameObject.Add<EquiparElmo>();
    if(d.versaoEstadosIndividuais==1)ItemPersistente.ValidarEstadoIndividualNoPrefab(grab.gameObject,unit);
    grab.GetComponent<ItemPersistente>().AplicarSaveData(unit);stack.Add(grab);
@@ -246,7 +246,7 @@ public static class Audit05 {
   ItemPersistente.ValidarEstadoIndividualNoPrefab(gloveGo,legacyGlove);
   var chestGo=new UnityEngine.GameObject();var chestPersist=chestGo.Add<ItemPersistente>();
   Field(chestPersist,"tipoItemId","chest-type");chestPersist.DefinirInstanciaId(ids[1]);
-  var chest=chestGo.Add<AtributosPeitoral>();chest.vidaMaxima=200;chest.vidaAtual=123.5f;chest.Gerado=true;chest.estado="roll:chest";
+  var chest=chestGo.Add<EquiparPeitoral>();chest.vidaMaxima=200;chest.vidaAtual=123.5f;chest.Gerado=true;chest.estado="roll:chest";
   var chestData=chestPersist.CriarSaveData(0,1,false);
   Check(chestData.durabilidade==123.5f&&chestData.durabilidadeMaxima==200,"Chest float durability capture");
   ItemPersistente.ValidarEstadoIndividualNoPrefab(chestGo,chestData);

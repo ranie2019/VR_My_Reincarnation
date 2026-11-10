@@ -1048,8 +1048,7 @@ public class StatusPlayer : MonoBehaviour
         var equipamentos = GetComponent<GerenciadorEquipamentosPlayer>();
         var peitoral = equipamentos != null ? equipamentos.PeitoralAtual : null;
         if (peitoral == null || !peitoral.JaEquipado || !peitoral.gameObject.activeInHierarchy) return 0;
-        var dados = peitoral.GetComponent<AtributosPeitoral>();
-        return dados != null ? dados.ObterValor(atributo) : 0;
+        return peitoral.ObterValor(atributo);
     }
 
     private int ObterBonusManoplas(TipoAtributoManopla atributo)

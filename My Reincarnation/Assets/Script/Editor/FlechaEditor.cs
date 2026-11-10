@@ -194,6 +194,30 @@ public sealed class EquiparElmoEditor : Editor
     }
 }
 
+[CustomEditor(typeof(EquiparPeitoral))]
+[CanEditMultipleObjects]
+public sealed class EquiparPeitoralEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        serializedObject.Update();
+        using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Script"));
+
+        FlechaEditor.DesenharClasses(serializedObject, "Classes e atributos", camposPoder: System.Array.Empty<string>());
+        FlechaEditor.DesenharBloco(serializedObject, "Durabilidade", "vidaMaxima", "vidaAtual",
+            "desgasteNaturalPorMinuto", "textoDurabilidadeAtual", "textoDurabilidadeTotal");
+        FlechaEditor.DesenharBloco(serializedObject, "Restrição", "atributoRestricao", "valorMinimoParaUsar",
+            "grupoRestricao", "textoAtributoRestricao", "textoValorRestricao", "textoMensagemRestricao");
+        FlechaEditor.DesenharBloco(serializedObject, "Equipamento", "corpoAvatar", "pontoEquipamento",
+            "posicaoLocalNoCorpo", "rotacaoLocalNoCorpo", "esconderCorpoAoEquipar", "renderersCorpoAvatar");
+        FlechaEditor.DesenharBloco(serializedObject, "Popup", "popupInfo", "prefabObjeto", "nomeExibicao", "descricao",
+            "textoNome", "textoClasse", "textoDescricao", "textosValores", "cameraJogador", "tempoParaFecharPopup",
+            "posicaoPopupNaCamera", "rotacaoPopupNaCamera", "manterPopupNaFrenteDaCamera", "espacamentoHorizontalPopups");
+        serializedObject.ApplyModifiedProperties();
+    }
+}
+
 [CustomEditor(typeof(Machado))]
 [CanEditMultipleObjects]
 public sealed class MachadoEditor : Editor

@@ -19,7 +19,7 @@ public class Machado {public void GarantirSorteio(){}}
 public class Picareta {public void GarantirSorteio(){}}
 public class Escudo {public void GarantirSorteio(){}}
 public class EquiparElmo {public bool valido=true;public bool GarantirGeracao()=>valido;}
-public class AtributosPeitoral {public bool valido=true;public bool GarantirGeracao()=>valido;}
+public class EquiparPeitoral {public bool valido=true;public bool GarantirGeracao()=>valido;}
 public class AtributosManoplas {public bool valido=true;public bool GarantirGeracao()=>valido;}
 public class ItemPersistente {public int consumed;public void RegistrarConsumoPermanente(){consumed++;}}
 public class RecuperacaoItemCarga {GameObject go;bool active;public RecuperacaoItemCarga(XRGrabInteractable item){go=item.gameObject;active=go.active;}public void Restaurar(){go.active=active;}}

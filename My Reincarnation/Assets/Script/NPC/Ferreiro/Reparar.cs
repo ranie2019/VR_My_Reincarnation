@@ -44,7 +44,7 @@ public class Reparar : MonoBehaviour
         "Arco",
         "Escudo",
         "AtributosManoplas",
-        "AtributosPeitoral",
+        "EquiparPeitoral",
         "EquiparElmo"
     };
 

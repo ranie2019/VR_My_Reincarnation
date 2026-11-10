@@ -80,7 +80,7 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
             case "mao-direita":
             case "mao-esquerda": sucesso = TentarEquipar(item.GetComponent<EquiparManoplas>()); break;
             case "cabeca": sucesso = TentarEquiparElmo(item.GetComponent<EquiparElmo>(), restaurandoSave: true); break;
-            default: sucesso = TentarEquipar(item.GetComponent<EquiparPeitoral>()); break;
+            default: sucesso = TentarEquiparPeitoral(item.GetComponent<EquiparPeitoral>(), restaurandoSave: true); break;
         }
         if (!sucesso || IdentificarPosicaoVestida(item.gameObject) != posicao)
             throw new System.InvalidOperationException("Nao foi possivel restaurar equipamento: " + posicao);
@@ -337,15 +337,17 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
         return false;
     }
 
-    public bool TentarEquipar(EquiparPeitoral novoPeitoral)
+    public bool TentarEquipar(EquiparPeitoral novoPeitoral) => TentarEquiparPeitoral(novoPeitoral, restaurandoSave: false);
+
+    private bool TentarEquiparPeitoral(EquiparPeitoral novoPeitoral, bool restaurandoSave)
     {
         if (trocandoPeitoral) return false;
         trocandoPeitoral = true;
-        try { return TentarEquiparPeitoralInterno(novoPeitoral); }
+        try { return TentarEquiparPeitoralInterno(novoPeitoral, restaurandoSave); }
         finally { trocandoPeitoral = false; }
     }
 
-    private bool TentarEquiparPeitoralInterno(EquiparPeitoral novoPeitoral)
+    private bool TentarEquiparPeitoralInterno(EquiparPeitoral novoPeitoral, bool restaurandoSave)
     {
         if (novoPeitoral == null)
             return false;
@@ -360,6 +362,9 @@ public class GerenciadorEquipamentosPlayer : MonoBehaviour
             if (novoPeitoral.JaEquipado) return true;
             peitoralAtual = null;
         }
+
+        if (!restaurandoSave && !novoPeitoral.AtendeRestricao(GetComponent<StatusPlayer>()))
+            return false;
 
         XRGrabInteractable grabNovo = novoPeitoral.GetComponent<XRGrabInteractable>();
         EstadoItemInventario estadoNovo = grabNovo != null

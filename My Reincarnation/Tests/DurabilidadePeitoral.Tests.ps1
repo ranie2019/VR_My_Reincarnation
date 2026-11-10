@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$source=Get-Content -Raw (Join-Path $project 'Assets/Script/Equipamento/AtributosPeitoral.cs')
+$source=Get-Content -Raw (Join-Path $project 'Assets/Script/Equipamento/EquiparPeitoral.cs')
 $a=$source.IndexOf('    private void Update()')
 $b=$source.IndexOf('    public void AtualizarDurabilidadeVisual()', $a)
 $methods=$source.Substring($a,$b-$a)
@@ -17,6 +17,8 @@ public class ChestDurabilityHost {
  private EquiparPeitoral equip=new EquiparPeitoral();private EstadoItemInventario inventory=new EstadoItemInventario();
  private ItemPersistente persist=new ItemPersistente();private GameObject gameObject=new GameObject();private int destroyed;
  private T GetComponent<T>() where T:class=>typeof(T)==typeof(EquiparPeitoral)?equip as T:typeof(T)==typeof(EstadoItemInventario)?inventory as T:persist as T;
+ private bool jaEquipado=>equip.JaEquipado;
+ private void PrepararQuebraPorDurabilidade()=>equip.PrepararQuebraPorDurabilidade();
  private void Destroy(GameObject go){destroyed++;}
  private void AtualizarDurabilidadeVisual(){}
 '@+$methods+@'

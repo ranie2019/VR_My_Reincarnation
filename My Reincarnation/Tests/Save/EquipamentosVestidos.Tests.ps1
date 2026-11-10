@@ -50,7 +50,7 @@ public class GerenciadorEquipamentosPlayer {
  T[] GetComponentsInChildren<T>(bool inactive)=>renderers.OfType<T>().ToArray();
  bool TentarEquipar(EquiparManoplas v){if(forceFailure)return false;v.JaEquipado=true;if(v.LadoMao==LadoMaoEquipamento.Direita)luvaDireita=v;else luvaEsquerda=v;return true;}
  bool TentarEquiparElmo(EquiparElmo v,bool restaurandoSave){if(!restaurandoSave||forceFailure)return false;v.JaEquipado=true;elmoAtual=v;return true;}
- bool TentarEquipar(EquiparPeitoral v){if(forceFailure)return false;v.JaEquipado=true;peitoralAtual=v;return true;}
+ bool TentarEquiparPeitoral(EquiparPeitoral v,bool restaurandoSave){if(!restaurandoSave||forceFailure)return false;v.JaEquipado=true;peitoralAtual=v;return true;}
 '@+$methods+@'
 }
 public class RestoreHost {

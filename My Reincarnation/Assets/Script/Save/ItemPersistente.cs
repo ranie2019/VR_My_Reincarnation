@@ -433,7 +433,7 @@ public class ItemPersistente : MonoBehaviour
 
         var espada = GetComponent<Espada>();
         if (espada != null && GetComponent<AtributosManoplas>() == null &&
-            GetComponent<AtributosPeitoral>() == null && GetComponent<EquiparElmo>() == null)
+            GetComponent<EquiparPeitoral>() == null && GetComponent<EquiparElmo>() == null)
         {
             if (!espada.Gerado) return dadosExtrasJson;
             var extras = LerExtrasEspada(dadosExtrasJson) ??
@@ -450,7 +450,7 @@ public class ItemPersistente : MonoBehaviour
             extras.elmo = elmo.ExportarEstadoJson();
             return JsonUtility.ToJson(extras);
         }
-        var peitoral = GetComponent<AtributosPeitoral>();
+        var peitoral = GetComponent<EquiparPeitoral>();
         if (peitoral != null)
         {
             if (!peitoral.Gerado) return dadosExtrasJson;
@@ -530,9 +530,9 @@ public class ItemPersistente : MonoBehaviour
         var peitoral = LerExtrasPeitoral(dadosExtrasJson);
         if (peitoral != null)
         {
-            if (prefab == null || prefab.GetComponent<AtributosPeitoral>() == null || string.IsNullOrWhiteSpace(peitoral.peitoral))
+            if (prefab == null || prefab.GetComponent<EquiparPeitoral>() == null || string.IsNullOrWhiteSpace(peitoral.peitoral))
                 throw new System.IO.InvalidDataException("Dados de peitoral sem componente ou estado correspondente.");
-            AtributosPeitoral.LerEValidarEstadoJson(peitoral.peitoral);
+            EquiparPeitoral.LerEValidarEstadoJson(peitoral.peitoral);
             return;
         }
         ExtrasManoplas extras = LerExtrasManoplas(dadosExtrasJson);
@@ -596,7 +596,7 @@ public class ItemPersistente : MonoBehaviour
         }
         elmo?.PrepararMigracaoSaveLegado();
         var extrasPeitoral = LerExtrasPeitoral(dadosExtrasJson);
-        var peitoral = GetComponent<AtributosPeitoral>();
+        var peitoral = GetComponent<EquiparPeitoral>();
         if (extrasPeitoral != null)
         {
             if (peitoral == null || string.IsNullOrWhiteSpace(extrasPeitoral.peitoral))
@@ -639,8 +639,8 @@ public class ItemPersistente : MonoBehaviour
             respawnItemDesarmado = RespawnItemEstaDesarmado(),
             possuiDurabilidadeManopla = GetComponent<AtributosManoplas>() != null,
             durabilidadeMaximaManopla = GetComponent<AtributosManoplas>() != null ? GetComponent<AtributosManoplas>().VidaMaxima : 0f,
-            possuiDurabilidadePeitoral = GetComponent<AtributosPeitoral>() != null,
-            durabilidadeMaximaPeitoral = GetComponent<AtributosPeitoral>() != null ? GetComponent<AtributosPeitoral>().VidaMaxima : 0f,
+            possuiDurabilidadePeitoral = GetComponent<EquiparPeitoral>() != null,
+            durabilidadeMaximaPeitoral = GetComponent<EquiparPeitoral>() != null ? GetComponent<EquiparPeitoral>().VidaMaxima : 0f,
             possuiDurabilidadeElmo = GetComponent<EquiparElmo>() != null,
             durabilidadeMaximaElmo = GetComponent<EquiparElmo>() != null ? GetComponent<EquiparElmo>().VidaMaxima : 0f,
             possuiDurabilidadeEspada = GetComponent<Espada>() != null,
@@ -660,7 +660,7 @@ public class ItemPersistente : MonoBehaviour
         if (estado.possuiDurabilidadeManopla)
             TentarEscreverNumero(GetComponent<AtributosManoplas>(), "vidaMaxima", estado.durabilidadeMaximaManopla);
         if (estado.possuiDurabilidadePeitoral)
-            TentarEscreverNumero(GetComponent<AtributosPeitoral>(), "vidaMaxima", estado.durabilidadeMaximaPeitoral);
+            TentarEscreverNumero(GetComponent<EquiparPeitoral>(), "vidaMaxima", estado.durabilidadeMaximaPeitoral);
         if (estado.possuiDurabilidadeElmo)
             TentarEscreverNumero(GetComponent<EquiparElmo>(), "vidaMaxima", estado.durabilidadeMaximaElmo);
         if (estado.possuiDurabilidadeEspada)
@@ -813,7 +813,7 @@ public class ItemPersistente : MonoBehaviour
     public static bool EhMigracaoDurabilidadeManopla(GameObject prefab, InventorySaveData data)
     {
         return data.durabilidade == -1f && !data.possuiDurabilidadeMaxima &&
-            (ObterComponenteDuravel(prefab) is AtributosManoplas || ObterComponenteDuravel(prefab) is AtributosPeitoral || ObterComponenteDuravel(prefab) is EquiparElmo);
+            (ObterComponenteDuravel(prefab) is AtributosManoplas || ObterComponenteDuravel(prefab) is EquiparPeitoral || ObterComponenteDuravel(prefab) is EquiparElmo);
     }
 
     // Compatibilidade com arcos antigos: vida atual veio do Arco, maxima do popup legado.
@@ -855,7 +855,7 @@ public class ItemPersistente : MonoBehaviour
              estado.durabilidade < 0f || estado.durabilidade > estado.durabilidadeMaximaElmo))
             throw new System.IO.InvalidDataException("Durabilidade de elmo de cena invalida.");
         if (estado.possuiDurabilidadePeitoral &&
-            (prefab == null || prefab.GetComponent<AtributosPeitoral>() == null ||
+            (prefab == null || prefab.GetComponent<EquiparPeitoral>() == null ||
              float.IsNaN(estado.durabilidadeMaximaPeitoral) || float.IsInfinity(estado.durabilidadeMaximaPeitoral) ||
              estado.durabilidadeMaximaPeitoral <= 0f || float.IsNaN(estado.durabilidade) || float.IsInfinity(estado.durabilidade) ||
              estado.durabilidade < 0f || estado.durabilidade > estado.durabilidadeMaximaPeitoral))
@@ -982,7 +982,7 @@ public class ItemPersistente : MonoBehaviour
     {
         return objeto.GetComponent("Equipamento") ?? (Component)objeto.GetComponent<Espada>() ??
                objeto.GetComponent("Machado") ?? objeto.GetComponent("Picareta") ??
-               objeto.GetComponent("Arco") ?? objeto.GetComponent("Escudo") ?? objeto.GetComponent<AtributosManoplas>() ?? (Component)objeto.GetComponent<AtributosPeitoral>() ?? objeto.GetComponent<EquiparElmo>();
+               objeto.GetComponent("Arco") ?? objeto.GetComponent("Escudo") ?? objeto.GetComponent<AtributosManoplas>() ?? (Component)objeto.GetComponent<EquiparPeitoral>() ?? objeto.GetComponent<EquiparElmo>();
     }
 
     private bool TentarLerNumero(Component componente, string nome, out float valor)

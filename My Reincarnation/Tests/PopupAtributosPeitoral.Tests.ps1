@@ -1,11 +1,11 @@
 ﻿$ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$source = Get-Content -Raw (Join-Path $project 'Assets/Script/Equipamento/AtributosPeitoral.cs')
+$source = Get-Content -Raw (Join-Path $project 'Assets/Script/Equipamento/EquiparPeitoral.cs')
 $a = $source.IndexOf('    private const int LimiteLinhasPopup')
 $b = $source.IndexOf('    [SerializeField, HideInInspector] private EstadoGerado', $a)
 $setup = $source.Substring($a, $b - $a)
 $a = $source.IndexOf('    private void AtualizarLinhasAtributos(')
-$b = $source.IndexOf('    private AtributosPeitoral ObterPeitoralComparacao(', $a)
+$b = $source.IndexOf('    private EquiparPeitoral ObterPeitoralComparacao(', $a)
 $render = $source.Substring($a, $b - $a)
 $a = $source.IndexOf('    private static void AtualizarComparacaoLinha(')
 $b = $source.IndexOf('    public string ExportarEstadoJson()', $a)
@@ -18,7 +18,7 @@ public enum TipoAtributoManopla { Forca, Constituicao, Agilidade, Resistencia, S
 public class TMP_Text { public string text="antigo"; }
 public static class Mathf { public static float Max(float a,float b)=>Math.Max(a,b); public static float Clamp(float v,float a,float b)=>Math.Min(b,Math.Max(a,v)); }
 public class GameObject { public bool activeSelf=true; public void SetActive(bool value){activeSelf=value;} }
-public class AtributosPeitoral {
+public class EquiparPeitoral {
  public class Estado { public List<PopupPeitoralTests.ValorAtributo> atributos=new List<PopupPeitoralTests.ValorAtributo>(); }
  public Estado resultado;
  public Dictionary<TipoAtributoManopla,int> valores=new Dictionary<TipoAtributoManopla,int>();
@@ -32,9 +32,10 @@ public class PopupPeitoralTests {
  public class ValorAtributo { public TipoAtributoManopla atributo; public int valor; }
  private float vidaMaxima=100,vidaAtual=100,desgasteNaturalPorMinuto=.5f;
  private List<TextoAtributo> textosValores;
- private AtributosPeitoral equipada;
+ private EquiparPeitoral equipada;
  private bool disponivel=true;
- private AtributosPeitoral ObterPeitoralComparacao(out bool ok){ok=disponivel;return equipada;}
+ private void ResolverPontoEquipamento(){}
+ private EquiparPeitoral ObterPeitoralComparacao(out bool ok){ok=disponivel;return equipada;}
 '@ + $setup + $render + @'
  public static int Run() {
   int n=0;Action<bool,string> check=(ok,msg)=>{if(!ok)throw new Exception(msg);n++;};
@@ -62,7 +63,7 @@ public class PopupPeitoralTests {
    row.sinalPositivo=new GameObject();row.sinalNegativo=new GameObject();
   }
   first=host.textosValores[0];
-  host.equipada=new AtributosPeitoral();host.equipada.valores[TipoAtributoManopla.Forca]=5;
+  host.equipada=new EquiparPeitoral();host.equipada.valores[TipoAtributoManopla.Forca]=5;
   values=new List<ValorAtributo>{new ValorAtributo{atributo=TipoAtributoManopla.Forca,valor=7}};
   host.AtualizarLinhasAtributos(values);
   check(first.textoDiferenca.text=="2"&&first.setaUp.activeSelf&&first.sinalPositivo.activeSelf&&!first.setaDown.activeSelf&&!first.sinalNegativo.activeSelf,"7 contra 5 deve mostrar +2 e somente up");
@@ -78,10 +79,10 @@ public class PopupPeitoralTests {
   check(first.textoDiferenca.text==""&&!first.setaUp.activeSelf&&!first.setaDown.activeSelf,"Comparacao indisponivel nao inventa diferenca");
   host.disponivel=true;host.AtualizarLinhasAtributos(new List<ValorAtributo>());
   foreach(var row in host.textosValores)check(row.textoDiferenca.text==""&&!row.setaUp.activeSelf&&!row.setaDown.activeSelf&&!row.sinalPositivo.activeSelf&&!row.sinalNegativo.activeSelf,"Linha vazia deve limpar todos os indicadores");
-  host.equipada=new AtributosPeitoral();host.equipada.valores[TipoAtributoManopla.Forca]=int.MaxValue;
+  host.equipada=new EquiparPeitoral();host.equipada.valores[TipoAtributoManopla.Forca]=int.MaxValue;
   values[0].atributo=TipoAtributoManopla.Forca;values[0].valor=0;host.AtualizarLinhasAtributos(values);
   check(first.textoDiferenca.text==int.MaxValue.ToString()&&first.setaDown.activeSelf,"Limite inteiro deve preservar diferenca negativa");
-  host.equipada.resultado=new AtributosPeitoral.Estado();
+  host.equipada.resultado=new EquiparPeitoral.Estado();
   host.equipada.resultado.atributos.Add(new ValorAtributo{atributo=TipoAtributoManopla.Resistencia,valor=4});
   host.equipada.valores[TipoAtributoManopla.Resistencia]=4;
   values[0].valor=7;host.AtualizarLinhasAtributos(values);

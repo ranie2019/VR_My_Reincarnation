@@ -26,8 +26,11 @@ public class SlotInventario {
  public void FinalizarRestauracaoDoSave(){}
 }
 public class InventarioVR {public SlotInventario[] slots;public SlotInventario[] ObterSlotsParaSave()=>slots;}
+public class StatusPlayer:Component {}
 public class EquiparPeitoral:Component {
  public bool JaEquipado,esconderCorpoAoEquipar;public Transform CorpoConfigurado,corpoAvatar;public Renderer[] renderersCorpoAvatar;
+ public bool atendeRestricao=true;
+ public bool AtendeRestricao(StatusPlayer jogador)=>atendeRestricao;
  private bool jaEquipado=>JaEquipado;
  private readonly Dictionary<Renderer,bool> visibilidadeOriginalCorpo=new Dictionary<Renderer,bool>();
  public bool PodeEquiparNoCorpo(Transform t)=>t!=null;
@@ -36,7 +39,7 @@ public class EquiparPeitoral:Component {
 '@
 $middle=@'
 }
-public class ManagerHost {
+public class ManagerHost:Component {
  public EquiparPeitoral peitoralAtual;public bool trocandoPeitoral;public Transform corpoAvatar;public InventarioVR inventario;
  private void ResolverReferencias(){}
 '@
@@ -45,10 +48,12 @@ $tests=@'
 public static class ChestTests {
  static int checks;static void Check(bool b,string m){checks++;if(!b)throw new Exception(m);}
  static EquiparPeitoral Armor(){var go=new GameObject();go.Add<XRGrabInteractable>();go.Add<EstadoItemInventario>();return go.Add<EquiparPeitoral>();}
- static ManagerHost Manager(){return new ManagerHost {corpoAvatar=new GameObject().transform,inventario=new InventarioVR {slots=new[]{new SlotInventario()}}};}
+ static ManagerHost Manager(){return new ManagerHost {gameObject=new GameObject(),corpoAvatar=new GameObject().transform,inventario=new InventarioVR {slots=new[]{new SlotInventario()}}};}
  public static string Run(){
   var m=Manager();var a=Armor();Check(m.TentarEquipar(a)&&a.JaEquipado&&m.peitoralAtual==a,"World equip");Check(m.TentarEquipar(a),"Repeated equip");
-  var b=Armor();var slot=m.inventario.slots[0];slot.RestaurarItemSalvoNoSlot(b.GetComponent<XRGrabInteractable>(),false);Check(m.TentarEquipar(b),"Swap from full source slot");Check(m.peitoralAtual==b&&b.JaEquipado&&!a.JaEquipado&&slot.items.Single()==a.GetComponent<XRGrabInteractable>(),"Previous armor not returned");
+  var b=Armor();var slot=m.inventario.slots[0];var grabB=b.GetComponent<XRGrabInteractable>();slot.RestaurarItemSalvoNoSlot(grabB,false);
+  b.atendeRestricao=false;Check(!m.TentarEquipar(b)&&m.peitoralAtual==a&&a.JaEquipado&&slot.items.Single()==grabB,"Restriction must preserve the equipped armor and source slot");
+  b.atendeRestricao=true;Check(m.TentarEquipar(b),"Swap from full source slot");Check(m.peitoralAtual==b&&b.JaEquipado&&!a.JaEquipado&&slot.items.Single()==a.GetComponent<XRGrabInteractable>(),"Previous armor not returned");
   var c=Armor();Check(!m.TentarEquipar(c)&&m.peitoralAtual==b&&b.JaEquipado&&!c.JaEquipado,"Full inventory lost equipped armor");Check(!m.DesequiparPeitoral()&&b.JaEquipado,"Full inventory unequip");
   slot.items.Clear();Check(m.DesequiparPeitoral()&&m.peitoralAtual==null&&!b.JaEquipado&&slot.items.Count==1,"Unequip storage");
   m=Manager();m.corpoAvatar=null;a=Armor();Check(!m.TentarEquipar(a)&&!a.JaEquipado,"Missing body accepted");

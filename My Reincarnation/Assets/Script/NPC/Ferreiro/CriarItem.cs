@@ -279,7 +279,7 @@ public class CriarItem : MonoBehaviour
                 var atributos = criado.GetComponent<AtributosManoplas>();
                 if (atributos != null && !atributos.GarantirGeracao())
                     throw new InvalidOperationException("Configuracao de atributos invalida no item criado.");
-                var peitoral = criado.GetComponent<AtributosPeitoral>();
+                var peitoral = criado.GetComponent<EquiparPeitoral>();
                 if (peitoral != null && !peitoral.GarantirGeracao())
                     throw new InvalidOperationException("Configuracao de atributos do peitoral invalida no item criado.");
                 var elmo = criado.GetComponent<EquiparElmo>();
