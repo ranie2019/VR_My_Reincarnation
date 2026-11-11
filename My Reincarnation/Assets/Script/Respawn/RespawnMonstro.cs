@@ -69,7 +69,7 @@ public class RespawnMonstro : MonoBehaviour
         {
             var hit = soloVerde[i];
             if (hit.collider == null || hit.collider.GetComponentInParent<SlimeIA>() != null || hit.collider.GetComponentInParent<StatusPlayer>() != null) continue;
-            if (hit.distance < menor && SlimeMovimento.SoloTransitavel(hit.normal, 45f))
+            if (hit.distance < menor && SlimeIA.SlimeMovimento.SoloTransitavel(hit.normal, 45f))
             { menor = hit.distance; soloMaisAlto = hit.point.y; local.y = Mathf.Max(pedido.y, hit.point.y + 0.04f); achou = true; }
         }
         if (volume != null && volume.volumeVermelho && achou)
@@ -201,6 +201,13 @@ public class RespawnMonstro : MonoBehaviour
         {
             slimeNovo.DefinirPontosPatrulha(pontosPatrulhaOriginais);
             slimeNovo.ReiniciarAposRespawn();
+        }
+
+        TopeiraIA topeiraNova = novoMonstro.GetComponent<TopeiraIA>();
+        if (topeiraNova != null)
+        {
+            topeiraNova.DefinirPontosPatrulha(pontosPatrulhaOriginais);
+            topeiraNova.ReiniciarAposRespawn();
         }
     }
 

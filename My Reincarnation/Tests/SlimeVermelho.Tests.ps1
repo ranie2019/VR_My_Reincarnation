@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference='Stop'
+$ErrorActionPreference='Stop'
 # Reutiliza o host de regressao do Verde e acrescenta metodos reais exclusivos do Vermelho.
 $fixture=Get-Content -Raw (Join-Path $PSScriptRoot 'SlimeVerde.Tests.ps1')
 $injection=@'
@@ -15,11 +15,12 @@ $more=@"
  var peak=CalcularArco(inicio,direcao,1.5f,.6f,.5f);c(Math.Abs(peak.y-2.6f)<.001&&Math.Abs(peak.z-20.75f)<.001,"Red arc preserves original height and horizontal progress");
  var end=CalcularArco(inicio,direcao,1.5f,.6f,1);c(Math.Abs(end.y-2)<.001&&end.z==21.5f,"Red arc preserves distance and returns to original altitude before gravity resumes");
  var h=New();h.movimentoVerde.PreservarArcoInvestida=true;h.movimentoVerde.rb=h.rb;h.estadoAtual=EstadoSlime.Atacando;h.animacao=new SlimeAnimacao();
- var routine=h.InvestidaArcoVermelho();int steps=0;while(routine.MoveNext())steps++;
+ var routine=h.InvestidaArcoVermelho(direcao);int steps=0;while(routine.MoveNext())steps++;
  c(Math.Abs(steps*Time.fixedDeltaTime-.35f)<.051,"Original duration retained to physics step precision");c(h.playerHits==1&&h.rb.useGravity,"Attack resolves once and restores gravity");
- h=New();h.movimentoVerde.PreservarArcoInvestida=true;h.movimentoVerde.rb=h.rb;h.estadoAtual=EstadoSlime.Atacando;h.animacao=new SlimeAnimacao();routine=h.InvestidaArcoVermelho();routine.MoveNext();routine.MoveNext();int before=h.movimentoVerde.moves;h.AplicarDanoRecebido(1,null);while(routine.MoveNext()){};
+ h=New();h.movimentoVerde.PreservarArcoInvestida=true;h.movimentoVerde.rb=h.rb;h.estadoAtual=EstadoSlime.Atacando;h.animacao=new SlimeAnimacao();routine=h.InvestidaArcoVermelho(direcao);routine.MoveNext();routine.MoveNext();int before=h.movimentoVerde.moves;h.AplicarDanoRecebido(1,null);while(routine.MoveNext()){};
  c(h.movimentoVerde.moves==before&&h.playerHits==0&&h.rb.useGravity,"Damage interrupts arc completely with no late movement or hit");
- h=New();h.movimentoVerde.PreservarArcoInvestida=true;h.movimentoVerde.rb=h.rb;h.movimentoVerde.block=true;h.estadoAtual=EstadoSlime.Atacando;routine=h.InvestidaArcoVermelho();while(routine.MoveNext()){};c(h.blocks==1&&h.playerHits==0&&h.rb.useGravity,"Shield blocks arc and gravity recovers");
+ h=New();h.movimentoVerde.PreservarArcoInvestida=true;h.movimentoVerde.rb=h.rb;h.movimentoVerde.block=true;h.estadoAtual=EstadoSlime.Atacando;routine=h.InvestidaArcoVermelho(direcao);while(routine.MoveNext()){};c(h.movimentoVerde.escudo.blocks==1&&h.playerHits==0&&h.rb.useGravity,"Shield blocks arc and gravity recovers");
+ h=New();h.movimentoVerde.rb=h.rb;h.movimentoVerde.land=true;h.estadoAtual=EstadoSlime.Atacando;routine=h.InvestidaArcoVermelho(direcao);while(routine.MoveNext()){};c(h.playerHits==1&&h.rb.useGravity,"Landing resolves the attack once and restores gravity");
  RespawnMonstro.Instancia=new RespawnMonstro();h=New();h.movimentoVerde.PreservarArcoInvestida=true;h.animacao=new SlimeAnimacao();h.tempoParaMorrer=.2f;h.failXp=true;h.Morrer();h.Morrer();c(h.destroys==1&&RespawnMonstro.Instancia.scheduled==1&&h.loot==1,"Red death finalizes and schedules once despite reward failure");c(h.destroyedAfter>=1.5f,"Destruction waits for configured death animation");
  return n;}
 "@
@@ -28,7 +29,7 @@ $code=$code.Insert($index,$arc+$routine+$more)
 $code=$code.Replace('public static Vector3 operator*','public static Vector3 operator+(Vector3 a,Vector3 b)=>new Vector3(a.x+b.x,a.y+b.y,a.z+b.z);public static Vector3 operator*')
 $code=$code.Replace('public const float Deg2Rad=','public const float PI=(float)Math.PI;public static float Sin(float n)=>(float)Math.Sin(n);public static float Clamp01(float n)=>Math.Clamp(n,0,1);public const float Deg2Rad=')
 $code=$code.Replace('public class Coroutine {}','public static class Time {public static float fixedDeltaTime=.05f;}public class WaitForFixedUpdate {}public class Rigidbody {public Vector3 position;public bool useGravity=true;}public class Coroutine {}')
-$code=$code.Replace('public bool dead;public int resumes;','public Rigidbody rb;public bool block;public int moves;public bool PodeSaltarPara(Vector3 p)=>true;public void IniciarArco(Vector3 d){rb.useGravity=false;}public bool MoverArco(Vector3 p,out Collider c){moves++;rb.position=p;c=block?new Collider{shield=true}:null;return block;}public bool dead;public int resumes;')
+$code=$code.Replace('public bool dead;public int resumes;','public Rigidbody rb;public bool block, land;public int moves;public Escudo escudo=new Escudo();public void IniciarArco(Vector3 d){rb.useGravity=false;}public bool MoverArco(Vector3 p,out Collider c,out bool aterrissou){moves++;rb.position=p;c=block?new Collider{shield=escudo}:null;aterrissou=land;return block||land;}public bool dead;public int resumes;')
 $code=$code.Replace('if(!v)resumes++;','if(!v){resumes++;if(rb!=null)rb.useGravity=true;}')
 $code=$code.Replace('void Destroy(GameObject g,float t){destroys++;}','public float destroyedAfter;void Destroy(GameObject g,float t){destroys++;destroyedAfter=t;}')
 '@

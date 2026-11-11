@@ -24,9 +24,9 @@ public class Coroutine {public IEnumerator run;public bool stopped;}
 public class MonoBehaviour {public bool enabled=true,isActiveAndEnabled=true;public static List<GameObject> born=new List<GameObject>();public List<Coroutine> routines=new List<Coroutine>();public Coroutine StartCoroutine(IEnumerator e){var c=new Coroutine{run=e};routines.Add(c);e.MoveNext();return c;}public void StopCoroutine(Coroutine c){c.stopped=true;}public GameObject Instantiate(GameObject g,Vector3 p,Quaternion r){var n=new GameObject{slime=new SlimeIA()};n.transform.position=p;n.transform.rotation=r;born.Add(n);return n;}}
 public static class Debug {public static int errors;public static void LogError(string s,object o){errors++;}}
 }
-public class SlimeIA {public Transform[] patrol;public int resets;public void DefinirPontosPatrulha(Transform[] t){patrol=t;}public void ReiniciarAposRespawn(){resets++;}}
+public class TopeiraIA {public void DefinirPontosPatrulha(Transform[] pontos){}public void ReiniciarAposRespawn(){}}
+public class SlimeIA {public static class SlimeMovimento {public static bool SoloTransitavel(Vector3 n,float a)=>n.y>.7f;}public Transform[] patrol;public int resets;public void DefinirPontosPatrulha(Transform[] t){patrol=t;}public void ReiniciarAposRespawn(){resets++;}}
 public class StatusPlayer {}
-public static class SlimeMovimento {public static bool SoloTransitavel(Vector3 n,float a)=>n.y>.7f;}
 '@
 $checks=@'
 public static class RespawnChecks {

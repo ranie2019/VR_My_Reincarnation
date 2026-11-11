@@ -1,6 +1,7 @@
 $ErrorActionPreference='Stop'
-$source=Get-Content -Raw (Join-Path $PSScriptRoot '../Assets/Script/Enemy/Slime/SlimeDeteccao.cs')
-$source=[regex]::Replace($source,'(?m)^using .*?;\s*$','')
+$source=Get-Content -Raw (Join-Path $PSScriptRoot '../Assets/Script/Enemy/Slime/SlimeIA.cs')
+$source=[regex]::Match($source,'(?ms)^    #region Deteccao\r?\n(.*?)^    #endregion').Groups[1].Value
+$source=$source.Replace('private sealed class SlimeDeteccao','public sealed class SlimeDeteccao')
 $stub=@'
 using System;
 using System.Collections.Generic;
@@ -23,11 +24,11 @@ public class AvatarBody {public Transform corpoAvatar;}
 '@
 $checks=@'
 public static class VisionChecks {
-public static int Run(){int n=0;Action<bool,string> c=(ok,m)=>{if(!ok)throw new Exception(m);n++;};var d=new SlimeDeteccao();var p=new GameObject();var body=new GameObject();body.transform.position=new Vector3(0,1,3);p.avatar=new AvatarBody{corpoAvatar=body.transform};var origin=new Vector3(0,1,0);
+public static int Run(){int n=0;Action<bool,string> c=(ok,m)=>{if(!ok)throw new Exception(m);n++;};var d=new SlimeDeteccao();var raiz=new GameObject().transform;d.Inicializar(raiz);var p=new GameObject();var body=new GameObject();body.transform.position=new Vector3(0,1,3);p.avatar=new AvatarBody{corpoAvatar=body.transform};var origin=new Vector3(0,1,0);
 c(d.PosicaoJogador(p.transform).z==3,"Uses tracked avatar body instead of stationary XR origin");
 c(d.Visivel(p.transform,origin,Vector3.forward,8,120,65),"Clear visible player acquired");int queries=Physics.calls;d.Visivel(p.transform,origin,Vector3.forward,8,120,65);c(queries==Physics.calls,"Repeated frame checks share cached visibility");
 Time.time=1;Physics.blockers=new[]{new Collider()};c(!d.Visivel(p.transform,origin,Vector3.forward,8,120,65),"Solid obstacle blocks vision");
-Time.time=2;var own=new Collider();own.transform.parent=d.transform;var playerCollider=new Collider();playerCollider.transform.parent=p.transform;Physics.blockers=new[]{own,playerCollider};c(d.Visivel(p.transform,origin,Vector3.forward,8,120,65),"Self and target colliders do not hide player");
+Time.time=2;var own=new Collider();own.transform.parent=raiz;var playerCollider=new Collider();playerCollider.transform.parent=p.transform;Physics.blockers=new[]{own,playerCollider};c(d.Visivel(p.transform,origin,Vector3.forward,8,120,65),"Self and target colliders do not hide player");
 body.transform.position=new Vector3(0,1,10);c(!d.Visivel(p.transform,origin,Vector3.forward,8,120,65),"Tracked movement outside range invalidates cached visibility");
 body.transform.position=new Vector3(0,1,-3);c(!d.Visivel(p.transform,origin,Vector3.forward,8,120,65),"Player behind field of view rejected");
 body.transform.position=new Vector3(0,1,3);Physics.blockers=new Collider[0];GameObject.players=new[]{p};Time.time=4;d.ProcurarJogador("Player",origin,Vector3.forward,8,120,65);var d2=new SlimeDeteccao();d2.ProcurarJogador("Player",origin,Vector3.forward,8,120,65);c(GameObject.searches==1,"Multiple green slimes share player registry query");

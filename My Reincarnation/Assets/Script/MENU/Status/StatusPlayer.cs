@@ -271,7 +271,7 @@ public class StatusPlayer : MonoBehaviour
         }
 
         IDano fonteDano = EncontrarFonteDano(outro, out GameObject objetoFonteDano);
-        if (fonteDano is SlimeIA || fonteDano is GoblinIA) return; // A IA resolve o mesmo golpe com o escudo.
+        if (fonteDano is SlimeIA || fonteDano is GoblinIA || fonteDano is TopeiraIA) return; // A IA resolve o mesmo golpe com o escudo.
         string tagCollider = outro.gameObject.tag;
         LogDano(
             $"{evento}: objeto='{outro.name}', tag='{tagCollider}', " +

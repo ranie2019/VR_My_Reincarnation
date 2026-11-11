@@ -1,6 +1,6 @@
-﻿$ErrorActionPreference='Stop'
-$source=Get-Content -Raw (Join-Path $PSScriptRoot '../Assets/Script/Enemy/Slime/SlimeAnimacao.cs')
-$source=[regex]::Replace($source,'(?m)^using .*?;\s*$','')
+$ErrorActionPreference='Stop'
+$source=Get-Content -Raw (Join-Path $PSScriptRoot '../Assets/Script/Enemy/Slime/SlimeIA.cs')
+$source=[regex]::Match($source,'(?ms)^    #region Animacao\r?\n(.*?)^    #endregion').Groups[1].Value
 $stub=@'
 using System;
 using System.Collections.Generic;
@@ -26,7 +26,13 @@ public static int Run(){int n=0;Action<bool,string> c=(ok,m)=>{if(!ok)throw new 
 a.AnimarAtacando();a.ReiniciarAcaoConfigurada("Ataque");c(animator.plays==0&&animator.values[Animator.StringToHash("Ataque")],"Green and other consumers retain default parameter-only animation");c(a.ObterTempoMorteConfigurado()==0,"Legacy destruction delay not extended by default");
 Set(a,"reiniciarAcoesPorGolpe",true);Set(a,"clipMorte",new AnimationClip{length=1.333f});a.AnimarAlerta();c(animator.lastState==Animator.StringToHash("Base Layer.Alerta")&&!animator.values[Animator.StringToHash("Ataque")],"Red alert uses actual alert state without attacking");
 int before=animator.plays;a.AnimarAtacando();a.ReiniciarAcaoConfigurada("Ataque");c(animator.plays==before+2,"Repeated attack can restart the existing clip");a.AnimarTomandoDano();c(animator.lastState==Animator.StringToHash("Base Layer.Dano")&&!animator.values[Animator.StringToHash("Ataque")],"Damage interrupts attack visuals");a.AnimarMorto();c(animator.lastState==Animator.StringToHash("Base Layer.Morto")&&animator.values[Animator.StringToHash("Morrer")],"Death uses existing Morto state and Morrer parameter");c(a.ObterTempoMorteConfigurado()>1.58f,"Death waits for real clip and transition margin");animator.speed=2;c(a.ObterTempoMorteConfigurado()<1,"Death duration respects animator playback speed");
-animator.isActiveAndEnabled=false;before=animator.plays;a.ReiniciarAcaoConfigurada("Ataque");c(before==animator.plays,"Inactive animator is not restarted");return n;}
+animator.isActiveAndEnabled=false;before=animator.plays;a.ReiniciarAcaoConfigurada("Ataque");c(before==animator.plays,"Inactive animator is not restarted");
+var turtleAnimator=new Animator();
+turtleAnimator.parameters=new[]{new AnimatorControllerParameter{nameHash=Animator.StringToHash("Morto"),type=AnimatorControllerParameterType.Bool}};
+var turtle=new SlimeAnimacao();Set(turtle,"animator",turtleAnimator);turtle.AtualizarCacheParametros();
+turtle.AnimarMorto();c(turtleAnimator.values[Animator.StringToHash("Morto")],"Turtle death activates its existing Morto parameter");
+turtle.AnimarParado();c(!turtleAnimator.values[Animator.StringToHash("Morto")],"Turtle death parameter resets with idle");
+return n;}
 }
 '@
 Add-Type -TypeDefinition ($stub+$source+$checks) -CompilerOptions '/nowarn:0649,0414'
