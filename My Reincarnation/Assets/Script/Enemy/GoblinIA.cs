@@ -58,21 +58,20 @@ public class GoblinIA : MonoBehaviour, IDano
         public bool exigirMissaoAtiva = true;
     }
 
-    [Header("Vida")]
     [SerializeField] private int vidaMaxima = 6;
+    [SerializeField] private string nomeMonstro = "Goblin";
+    [SerializeField] private TMP_Text textoNomeMonstro;
     [SerializeField, Min(1)] private int nivelMonstro = 1;
     [SerializeField] private TMP_Text textoNivel;
     [SerializeField] private int vidaAtual = 6;
     [SerializeField] private float tempoAnimacaoDano = 0.35f;
     [SerializeField] private float tempoParaMorrer = 3f;
 
-    [Header("UI Vida")]
     [SerializeField] private Image imagemBarraVida;
     [SerializeField] private Canvas canvasVida;
     [SerializeField] private bool buscarBarraVidaAutomaticamente = true;
     [SerializeField] private bool esconderCanvasAoMorrer = true;
 
-    [Header("Patrulha")]
     [SerializeField] private Transform[] pontosPatrulha;
     [SerializeField] private float velocidadePatrulha = 1.4f;
     [SerializeField] private float distanciaChegadaPonto = 0.35f;
@@ -81,18 +80,15 @@ public class GoblinIA : MonoBehaviour, IDano
     [SerializeField] private int quantidadePontosAuto = 4;
     [SerializeField] private float raioPatrulhaAuto = 4f;
 
-    [Header("Campo de visao")]
     [SerializeField] private string tagPlayer = "Player";
     [SerializeField] private float raioCampoVisao = 8f;
     [SerializeField, Range(1f, 360f)] private float anguloCampoVisao = 120f;
     [SerializeField] private LayerMask layersObstaculo;
     [SerializeField] private float distanciaIniciarPerseguicao = 5f;
 
-    [Header("Ataque")]
     [SerializeField] private float velocidadePerseguicao = 2.6f;
     [SerializeField] private float distanciaAtaque = 1.6f;
 
-    [Header("Combate")]
     [SerializeField, Min(0)] private int danoAtaque = 4;
 
     public int DanoAtaque
@@ -107,35 +103,27 @@ public class GoblinIA : MonoBehaviour, IDano
     [SerializeField] private float alcanceAtaque = 1.6f;
     [SerializeField] private LayerMask layersAtaque = ~0;
 
-    [Header("Ataque parado (sem investida)")]
     [Tooltip("Tempo entre disparar a animacao de ataque e aplicar o dano, pra sincronizar com o golpe da animacao.")]
     [SerializeField] private float atrasoImpactoAtaque = 0.4f;
     [SerializeField] private float cooldownAtaque = 1.4f;
 
-    [Header("Dano recebido")]
 
-    [Header("Respawn")]
     [SerializeField] private string idRespawnMonstro = "Goblin";
 
-    [Header("Debug")]
     [SerializeField] private bool desenharGizmos = true;
     [SerializeField] private bool desenharGizmosSempre = true;
     [SerializeField] private float alturaOlhos = 1.4f;
     [SerializeField] private Transform pontoOlhos;
 
-    [Header("Spawn normal ao morrer")]
     [SerializeField] private SpawnNormalConfig[] prefabsSpawnNormal;
 
-    [Header("Spawn de missao ao morrer")]
     [SerializeField] private SpawnMissaoConfig[] prefabsSpawnMissao;
 
-    [Header("Recompensa REIN")]
     [SerializeField] private bool darReinAoMorrer = true;
     [SerializeField] private string reinMinimo = "0.01";
     [SerializeField] private string reinMaximo = "0.05";
     [SerializeField, Range(0, 5)] private int casasDecimaisSorteioRein = 5;
 
-    [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip somAndar;
     [SerializeField] private AudioClip somAtacar;
@@ -146,7 +134,6 @@ public class GoblinIA : MonoBehaviour, IDano
     [SerializeField] private float volumeDano = 1f;
     [SerializeField] private float volumeMorrer = 1f;
 
-    [Header("Componentes opcionais")]
     [SerializeField] private SlimeAnimacao animacao;
     [SerializeField] private Rigidbody rb;
     [SerializeField] private bool usarNavMeshAgent = true;
@@ -349,7 +336,7 @@ public class GoblinIA : MonoBehaviour, IDano
         for (int i = 0; i < imagens.Length; i++)
         {
             Image imagem = imagens[i];
-            if (imagem != null && string.Equals(imagem.name, "Vida Frente", StringComparison.Ordinal))
+            if (imagem != null && (imagem.name == "Barra Vida" || imagem.name == "Vida Frente"))
                 return imagem;
         }
 
@@ -358,6 +345,9 @@ public class GoblinIA : MonoBehaviour, IDano
 
     private void AtualizarBarraVida()
     {
+        if (textoNomeMonstro != null)
+            textoNomeMonstro.text = nomeMonstro;
+
         if (textoNivel != null)
             textoNivel.text = Mathf.Max(1, nivelMonstro).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
