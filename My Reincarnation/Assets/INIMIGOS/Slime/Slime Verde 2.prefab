@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 4190121295759144395}
   - component: {fileID: 4906506950392740284}
   - component: {fileID: 5936308750156664177}
-  - component: {fileID: 4979081043749226450}
   - component: {fileID: 3373616205194438}
   m_Layer: 0
   m_Name: Slime Verde 2
@@ -202,19 +201,6 @@ MonoBehaviour:
     margemTransicaoMorte: 0.25
   rb: {fileID: 4190121295759144395}
   usarNavMeshAgent: 0
---- !u!114 &4979081043749226450
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 196383462378299888}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9322d2d170d4fca97052ac0cfca6720, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
-  experienciaAoMorrer: 3
 --- !u!82 &3373616205194438
 AudioSource:
   m_ObjectHideFlags: 0

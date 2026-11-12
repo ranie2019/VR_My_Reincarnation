@@ -1,7 +1,14 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
 using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
+
 
 public class EsperitoDeFogoIA : MonoBehaviour
 {
@@ -65,11 +72,13 @@ public class EsperitoDeFogoIA : MonoBehaviour
     private Vector3 ultimaPosicaoConhecida;
     private bool morto;
     public bool Morto => morto;
+    private readonly RecompensaExperiencia recompensa = new RecompensaExperiencia();
+    public int ExperienciaAoMorrer => RecompensaExperiencia.Calcular(nivelMonstro);
 
     private const float VelocidadeRotacao = 8f;
     private const float AlturaOlhos = 0.7f;
 
-    private void Awake()
+    protected void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
         ConfigurarAnimacao();
@@ -83,7 +92,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
         ConfigurarUIVida();
     }
 
-    private void Start()
+    protected void Start()
     {
         vidaAtual = vidaMaxima;
         AtualizarBarraVida();
@@ -95,7 +104,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
         MudarEstado(QuantidadePontosValidos() > 0 ? Estado.Patrulhando : Estado.Parado);
     }
 
-    private void Update()
+    protected void Update()
     {
         if (morto) return;
 
@@ -258,9 +267,13 @@ public class EsperitoDeFogoIA : MonoBehaviour
 
     #region Combate e Dano
 
-    public void ReceberDano(float dano)
+    public void ReceberDano(float dano) => ReceberDano(dano, null);
+    public void ReceberDano(int dano, GameObject origem) => ReceberDano((float)dano, origem);
+
+    private void ReceberDano(float dano, GameObject origem)
     {
-        if (morto) return;
+        if (morto || dano <= 0f || float.IsNaN(dano) || float.IsInfinity(dano)) return;
+        recompensa.RegistrarPrimeiroAtacante(origem);
 
         vidaAtual -= dano;
         vidaAtual = Mathf.Max(0f, vidaAtual);
@@ -307,6 +320,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
             agent.enabled = false;
 
         AnimarMorrer();
+        recompensa.EntregarExperiencia(ExperienciaAoMorrer);
 
         if (esconderCanvasAoMorrer && canvasVida != null)
             canvasVida.SetActive(false);
@@ -466,7 +480,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
     private void AtualizarBarraVida()
     {
         if (textoNivel != null)
-            textoNivel.text = Mathf.Max(1, nivelMonstro).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            textoNivel.text = Mathf.Max(1, nivelMonstro).ToString(CultureInfo.InvariantCulture);
 
         if (barraVida != null)
             barraVida.fillAmount = vidaMaxima > 0 ? Mathf.Clamp01(vidaAtual / vidaMaxima) : 0f;
@@ -476,7 +490,7 @@ public class EsperitoDeFogoIA : MonoBehaviour
 
     #region Gizmos
 
-    private void OnDrawGizmosSelected()
+    protected void OnDrawGizmosSelected()
     {
         Vector3 origem = transform.position + Vector3.up * AlturaOlhos;
 
@@ -546,4 +560,116 @@ public class EsperitoDeFogoIA : MonoBehaviour
         anim.SetBool("Morto", estado == "Morto");
     }
     #endregion
+
+    private sealed class RecompensaExperiencia
+    {
+        public StatusPlayer PrimeiroAtacante { get; private set; }
+        private bool entregue;
+
+        public static int Calcular(int nivel)
+        {
+            return (int)System.Math.Min(int.MaxValue, 3L + (Mathf.Max(1, nivel) - 1L) * 2L);
+        }
+
+        public void RegistrarPrimeiroAtacante(GameObject origem)
+        {
+            if (PrimeiroAtacante != null || origem == null) return;
+
+            PrimeiroAtacante = origem.GetComponentInParent<StatusPlayer>()
+                ?? origem.transform.root.GetComponentInChildren<StatusPlayer>();
+            if (PrimeiroAtacante != null) return;
+
+            foreach (var componente in origem.GetComponentsInParent<MonoBehaviour>(true))
+            {
+                PrimeiroAtacante = EncontrarDono(componente);
+                if (PrimeiroAtacante != null) return;
+            }
+
+            foreach (var componente in origem.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                PrimeiroAtacante = EncontrarDono(componente);
+                if (PrimeiroAtacante != null) return;
+            }
+
+            var agarravel = origem.GetComponentInParent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+            if (agarravel == null) return;
+            foreach (var mao in agarravel.interactorsSelecting)
+            {
+                PrimeiroAtacante = mao.transform.GetComponentInParent<StatusPlayer>();
+                if (PrimeiroAtacante != null) return;
+            }
+        }
+
+        private static readonly string[] MetodosDono =
+        {
+            "GetStatusPlayerDonoAtual", "GetStatusPlayerDono", "GetStatusPlayerOwner",
+            "GetDonoAtual", "GetDono", "GetOwner", "ObterDonoAtual"
+        };
+
+        private static readonly string[] PropriedadesDono =
+        {
+            "DonoAtual", "Dono", "Owner", "StatusPlayerDonoAtual"
+        };
+
+        private static StatusPlayer EncontrarDono(MonoBehaviour componente)
+        {
+            if (componente == null) return null;
+            var tipo = componente.GetType();
+
+            foreach (string nome in MetodosDono)
+            {
+                var metodo = tipo.GetMethod(nome, System.Type.EmptyTypes);
+                if (metodo == null) continue;
+                var dono = ResolverStatus(metodo.Invoke(componente, null));
+                if (dono != null) return dono;
+            }
+
+            foreach (string nome in PropriedadesDono)
+            {
+                var propriedade = tipo.GetProperty(nome);
+                if (propriedade == null || !propriedade.CanRead || propriedade.GetIndexParameters().Length != 0) continue;
+                var dono = ResolverStatus(propriedade.GetValue(componente));
+                if (dono != null) return dono;
+            }
+
+            return null;
+        }
+
+        private static StatusPlayer ResolverStatus(object dono)
+        {
+            if (dono is Component componente && componente != null)
+                return componente.GetComponentInParent<StatusPlayer>();
+            if (dono is GameObject objeto && objeto != null)
+                return objeto.GetComponentInParent<StatusPlayer>();
+            return null;
+        }
+
+        public void EntregarExperiencia(int xp)
+        {
+            if (entregue || xp <= 0) return;
+            var jogador = PrimeiroAtacante;
+            if (jogador == null)
+                jogador = GameObject.FindWithTag("Player")?.GetComponentInChildren<StatusPlayer>()
+                    ?? UnityEngine.Object.FindFirstObjectByType<StatusPlayer>();
+            if (jogador == null) return;
+
+            entregue = true;
+            var grupo = jogador.GetComponentInParent<GrupoPlayer>();
+            if (grupo == null || !grupo.TemGrupoValido())
+            {
+                jogador.ReceberExperiencia(xp);
+                return;
+            }
+
+            var membros = grupo.GetMembrosValidos();
+            if (!membros.Contains(jogador)) membros.Add(jogador);
+            int parcela = xp / membros.Count;
+            int resto = xp % membros.Count;
+            foreach (var membro in membros)
+            {
+                int ganho = parcela + (membro == jogador ? resto : 0);
+                if (ganho > 0) membro.ReceberExperiencia(ganho);
+            }
+        }
+    }
 }

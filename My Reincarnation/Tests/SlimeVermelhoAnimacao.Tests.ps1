@@ -1,5 +1,5 @@
 $ErrorActionPreference='Stop'
-$source=Get-Content -Raw (Join-Path $PSScriptRoot '../Assets/Script/Enemy/Slime/SlimeIA.cs')
+$source=Get-Content -Raw (Join-Path $PSScriptRoot '../Assets/Script/Enemy/SlimeIA.cs')
 $source=[regex]::Match($source,'(?ms)^    #region Animacao\r?\n(.*?)^    #endregion').Groups[1].Value
 $stub=@'
 using System;

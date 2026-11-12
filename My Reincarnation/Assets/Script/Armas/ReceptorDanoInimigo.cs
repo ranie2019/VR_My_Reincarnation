@@ -11,6 +11,7 @@ internal static class ReceptorDanoInimigo
             if (alvo == null) alvo = t.GetComponent<GoblinIA>();
             if (alvo == null) alvo = t.GetComponent<EsperitoDeFogoIA>();
             if (alvo == null) alvo = t.GetComponent<TopeiraIA>();
+            if (alvo == null) alvo = t.GetComponent<RaposaIA>();
             if (alvo != null) return alvo;
         }
         return null;
@@ -21,6 +22,7 @@ internal static class ReceptorDanoInimigo
         if (alvo is GoblinIA goblin) return goblin.Morto;
         if (alvo is EsperitoDeFogoIA espirito) return espirito.Morto;
         if (alvo is TopeiraIA topeira) return topeira.Morto;
+        if (alvo is RaposaIA raposa) return raposa.Morto;
         return true;
     }
     internal static void Aplicar(Component alvo, int dano, GameObject origem)
@@ -28,11 +30,7 @@ internal static class ReceptorDanoInimigo
         if (alvo is SlimeIA slime) slime.ReceberDano(dano, origem);
         else if (alvo is GoblinIA goblin) goblin.ReceberDano(dano, origem);
         else if (alvo is TopeiraIA topeira) topeira.ReceberDano(dano, origem);
-        else if (alvo is EsperitoDeFogoIA espirito)
-        {
-            var xp = alvo.GetComponent<ExperienciaInimigo>();
-            if (xp != null) xp.RegistrarPrimeiroAtacante(origem);
-            espirito.ReceberDano(dano);
-        }
+        else if (alvo is RaposaIA raposa) raposa.ReceberDano(dano, origem);
+        else if (alvo is EsperitoDeFogoIA espirito) espirito.ReceberDano(dano, origem);
     }
 }

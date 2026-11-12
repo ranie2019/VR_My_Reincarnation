@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -208,6 +208,13 @@ public class RespawnMonstro : MonoBehaviour
         {
             topeiraNova.DefinirPontosPatrulha(pontosPatrulhaOriginais);
             topeiraNova.ReiniciarAposRespawn();
+        }
+
+        var raposaNova = novoMonstro.GetComponent<RaposaIA>();
+        if (raposaNova != null)
+        {
+            raposaNova.DefinirPontosPatrulha(pontosPatrulhaOriginais);
+            raposaNova.ReiniciarAposRespawn();
         }
     }
 

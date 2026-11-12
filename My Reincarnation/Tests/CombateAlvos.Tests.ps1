@@ -21,8 +21,8 @@ namespace UnityEngine {
 }
 public class SlimeIA:Component {public bool Morto;public int hits,total;public GameObject owner;public void ReceberDano(int n,GameObject o){hits++;total+=n;owner=o;}}
 public class GoblinIA:Component {public bool Morto;public int hits,total;public GameObject owner;public void ReceberDano(int n,GameObject o){hits++;total+=n;owner=o;}}
-public class EsperitoDeFogoIA:Component {public bool Morto;public int hits;public void ReceberDano(float f){hits++;}}
-public class ExperienciaInimigo:Component {public GameObject owner;public void RegistrarPrimeiroAtacante(GameObject o){owner=o;}}
+public class EsperitoDeFogoIA:Component {public bool Morto;public int hits;public GameObject owner;public void ReceberDano(int dano,GameObject origem){hits++;owner=origem;}}
+public class TopeiraIA:Component {public bool Morto;public void ReceberDano(int dano,GameObject origem){}}
 public static class EstadoItemInventario {public static bool EstaNoInventario(Component c)=>false;}
 public class ItemPersistente:Component {public int consumos;public void RegistrarConsumoPermanente()=>consumos++;}
 public class SaveManager {public static SaveManager Instancia;public void SolicitarSalvamentoInventario(){}}
@@ -57,10 +57,10 @@ public static class CombatTargetTests {
  static int checks;static void Check(bool v,string m){checks++;if(!v)throw new Exception(m);}
  static GameObject Child(GameObject p){var g=new GameObject();g.transform.parent=p.transform;return g;}
  public static string Run(){
-  var root=new GameObject();var s=Child(root).Add<SlimeIA>();var g=Child(root).Add<GoblinIA>();var e=Child(root).Add<EsperitoDeFogoIA>();var xp=e.gameObject.Add<ExperienciaInimigo>();
+  var root=new GameObject();var s=Child(root).Add<SlimeIA>();var g=Child(root).Add<GoblinIA>();var e=Child(root).Add<EsperitoDeFogoIA>();
   var gc=Child(g.gameObject).Add<Collider>();var gc2=Child(g.gameObject).Add<Collider>();var sc=Child(s.gameObject).Add<Collider>();var ec=Child(e.gameObject).Add<Collider>();
   Check(ReceptorDanoInimigo.Resolver(gc)==g,"Goblin resolved to sibling Slime");Check(ReceptorDanoInimigo.Resolver(sc)==s,"Slime resolution");Check(ReceptorDanoInimigo.Resolver(ec)==e,"Spirit resolution");Check(ReceptorDanoInimigo.Resolver(Child(root).Add<Collider>())==null,"Shared root selected unrelated enemy");
-  var owner=new GameObject();ReceptorDanoInimigo.Aplicar(e,7,owner);Check(e.hits==1&&xp.owner==owner,"Spirit attribution");
+  var owner=new GameObject();ReceptorDanoInimigo.Aplicar(e,7,owner);Check(e.hits==1&&e.owner==owner,"Spirit attribution");
   var a=new GameObject().Add<ArrowHost>();a.ProcessarColisao(gc,new Vector3(),new Vector3());Check(g.hits==0,"Unlaunched arrow caused damage");
   a.foiLancada=true;a.ProcessarColisao(Child(root).Add<Collider>(),new Vector3(),new Vector3());Check(a.finalizacoes==0,"Scenario contact finished flight before rest");
   a.ProcessarColisao(gc,new Vector3(),new Vector3());a.ProcessarColisao(gc2,new Vector3(),new Vector3());Check(g.hits==1&&g.total==20&&g.owner==a.gameObject,"Arrow duplicated damage/multiplier/owner");Check(a.finalizacoes==1,"Arrow use not finalized exactly once");Check(s.hits==0,"Arrow hit sibling Slime");

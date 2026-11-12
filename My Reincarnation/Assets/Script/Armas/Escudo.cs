@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -275,7 +275,7 @@ public class Escudo : MonoBehaviour
         // Slime e Goblin confirmam o ataque no proprio fluxo de combate.
         if (!PodeConcederBonus() || !PodeUsar(jogadorComBonus) ||
             contato.GetComponentInParent<IDano>() is not Component componente ||
-            componente is SlimeIA || componente is GoblinIA || componente is TopeiraIA ||
+            componente is SlimeIA || componente is GoblinIA || componente is TopeiraIA || componente is RaposaIA ||
             EstadoItemInventario.EstaNoInventario(componente))
             return;
 

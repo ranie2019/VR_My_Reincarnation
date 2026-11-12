@@ -31,7 +31,7 @@ Transform:
   m_Children:
   - {fileID: 4201210078927136}
   m_Father: {fileID: 4966007699546920}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -60.650574}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -27.383163}
 --- !u!1 &1215002072254110
 GameObject:
   m_ObjectHideFlags: 0
@@ -183,7 +183,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4574649352997690}
-  m_LocalEulerAnglesHint: {x: 5.0888872e-14, y: -2.5444436e-14, z: 1.4033418e-14}
+  m_LocalEulerAnglesHint: {x: 6.435254e-14, y: -3.217627e-14, z: 1.7746243e-14}
 --- !u!1 &1467097521789780
 GameObject:
   m_ObjectHideFlags: 0
@@ -248,7 +248,7 @@ Transform:
   - {fileID: 4372769990449160}
   - {fileID: 4836351918659748}
   m_Father: {fileID: 4788319935855200}
-  m_LocalEulerAnglesHint: {x: 0, y: -90, z: -174.33627}
+  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 134.4345}
 --- !u!1 &1713781036754730
 GameObject:
   m_ObjectHideFlags: 0
@@ -262,7 +262,6 @@ GameObject:
   - component: {fileID: 6046725634484717163}
   - component: {fileID: 5033575847218157174}
   - component: {fileID: 2390436842562960123}
-  - component: {fileID: 5679566462010110624}
   - component: {fileID: 9200431869941673865}
   m_Layer: 0
   m_Name: Esperito De Fogo
@@ -372,7 +371,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EsperitoDeFogoIA
   vidaMaxima: 25
-  nivelMonstro: 1
+  nivelMonstro: 6
   textoNivel: {fileID: 2830777943889095813}
   vidaAtual: 25
   barraVida: {fileID: 2008499830575437790}
@@ -402,19 +401,6 @@ MonoBehaviour:
   danoAtaque: 12
   tempoAnimacaoAtaque: 0.85
   tempoParaDestruir: 2
---- !u!114 &5679566462010110624
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1713781036754730}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9322d2d170d4fca97052ac0cfca6720, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
-  experienciaAoMorrer: 10
 --- !u!82 &9200431869941673865
 AudioSource:
   m_ObjectHideFlags: 0
@@ -543,7 +529,7 @@ Transform:
   m_Children:
   - {fileID: 4337812796121360}
   m_Father: {fileID: 4966007699546920}
-  m_LocalEulerAnglesHint: {x: 9.630682e-16, y: 1.4931284e-16, z: 8.812897}
+  m_LocalEulerAnglesHint: {x: 1.2178671e-15, y: 1.8881651e-16, z: 8.812897}
 --- !u!1 &1798525600516028
 GameObject:
   m_ObjectHideFlags: 0
@@ -606,7 +592,7 @@ Transform:
   m_Children:
   - {fileID: 4266849179980070}
   m_Father: {fileID: 4966007699546920}
-  m_LocalEulerAnglesHint: {x: -0.0000005035088, y: 0.000001812341, z: 151.66331}
+  m_LocalEulerAnglesHint: {x: -0.00000063672223, y: 0.000002291832, z: 151.66331}
 --- !u!1 &2694415805269835041
 GameObject:
   m_ObjectHideFlags: 0
@@ -816,7 +802,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 1
-  m_AdditionalShaderChannelsFlag: 0
+  m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
   m_SortingOrder: 0
@@ -945,7 +931,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 1
+  m_text: 6
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 5302535af1044152a457ed104f1f4b91, type: 2}
   m_sharedMaterial: {fileID: 2164040, guid: 5302535af1044152a457ed104f1f4b91, type: 2}

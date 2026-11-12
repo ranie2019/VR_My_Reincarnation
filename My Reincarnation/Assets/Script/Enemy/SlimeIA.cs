@@ -1,12 +1,13 @@
-using TMPro;
-using System.Collections;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
 
 [DisallowMultipleComponent]
 public class SlimeIA : MonoBehaviour, IDano
@@ -174,7 +175,9 @@ public class SlimeIA : MonoBehaviour, IDano
     private bool experienciaJaEntregue;
     private bool recompensaReinJaPaga;
     private Transform ultimoPlayerResponsavel;
-    private ExperienciaInimigo experienciaInimigo;
+    private RecompensaExperiencia experienciaInimigo = new RecompensaExperiencia();
+
+    public int ExperienciaAoMorrer => RecompensaExperiencia.Calcular(nivelMonstro);
     private GerenciadorMissoes gerenciadorMissoes;
     public int VidaAtual => vidaAtual;
     public int VidaMaxima => vidaMaxima;
@@ -202,7 +205,7 @@ public class SlimeIA : MonoBehaviour, IDano
         EscolherProximoPontoAleatorio();
     }
 
-    private void Awake()
+    protected void Awake()
     {
         if (rb == null)
             rb = GetComponent<Rigidbody>();
@@ -240,7 +243,6 @@ public class SlimeIA : MonoBehaviour, IDano
         if (audioSource == null)
             audioSource = GetComponent<AudioSource>();
 
-        experienciaInimigo = GetComponent<ExperienciaInimigo>();
         gerenciadorMissoes = FindFirstObjectByType<GerenciadorMissoes>();
         if (atributosPorNivel)
         {
@@ -261,12 +263,12 @@ public class SlimeIA : MonoBehaviour, IDano
         }
     }
 
-    private void FixedUpdate()
+    protected void FixedUpdate()
     {
         movimentoVerde?.AtualizarFisica();
     }
 
-    private void OnEnable()
+    protected void OnEnable()
     {
         if (morto)
         {
@@ -278,7 +280,7 @@ public class SlimeIA : MonoBehaviour, IDano
         MudarEstado(QuantidadePontosValidos() > 0 ? EstadoSlime.Patrulhando : EstadoSlime.Parado);
     }
 
-    private void Start()
+    protected void Start()
     {
         if (morto || !gerarPontosAutomaticamente)
             return;
@@ -335,18 +337,18 @@ public class SlimeIA : MonoBehaviour, IDano
         }
     }
 
-    private void OnDestroy()
+    protected void OnDestroy()
     {
         foreach (var ponto in pontosAutoProprios) if (ponto != null) Destroy(ponto);
     }
-    private void OnDisable()
+    protected void OnDisable()
     {
         if (movimentoVerde != null) movimentoVerde.Parar();
         CancelarImpactoAtaquePendente();
         PararSomAndar();
     }
 
-    private void OnValidate()
+    protected void OnValidate()
     {
         velocidadePatrulha = Mathf.Max(0f, velocidadePatrulha);
         velocidadePerseguicao = Mathf.Max(0f, velocidadePerseguicao);
@@ -416,7 +418,7 @@ public class SlimeIA : MonoBehaviour, IDano
         if (textoNomeMonstro != null)
             textoNomeMonstro.text = string.IsNullOrWhiteSpace(nomeMonstro) ? gameObject.name.Replace("(Clone)", "").Trim() : nomeMonstro;
         if (textoNivel != null)
-            textoNivel.text = Mathf.Max(1, nivelMonstro).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            textoNivel.text = Mathf.Max(1, nivelMonstro).ToString(CultureInfo.InvariantCulture);
 
         if (imagemBarraVida == null)
             return;
@@ -424,7 +426,7 @@ public class SlimeIA : MonoBehaviour, IDano
         imagemBarraVida.fillAmount = vidaMaxima > 0 ? Mathf.Clamp01((float)vidaAtual / vidaMaxima) : 0f;
     }
 
-    private void Update()
+    protected void Update()
     {
         if (morto)
             return;
@@ -500,11 +502,8 @@ public class SlimeIA : MonoBehaviour, IDano
         if (origemDano == null)
             return;
 
-        if (experienciaInimigo == null)
-            experienciaInimigo = GetComponent<ExperienciaInimigo>();
 
-        if (experienciaInimigo != null)
-            experienciaInimigo.RegistrarPrimeiroAtacante(origemDano);
+        experienciaInimigo.RegistrarPrimeiroAtacante(origemDano);
     }
 
     private Transform ProcurarTransformComTagPlayer(Transform origem)
@@ -1401,13 +1400,13 @@ public class SlimeIA : MonoBehaviour, IDano
         return pontoOlhos != null ? pontoOlhos.position : transform.position + Vector3.up * alturaOlhos;
     }
 
-    private void OnDrawGizmos()
+    protected void OnDrawGizmos()
     {
         if (desenharGizmos && desenharGizmosSempre && GizmosPodemDesenhar())
             DesenharGizmosCampoVisao();
     }
 
-    private void OnDrawGizmosSelected()
+    protected void OnDrawGizmosSelected()
     {
         if (desenharGizmos && !desenharGizmosSempre && GizmosPodemDesenhar())
             DesenharGizmosCampoVisao();
@@ -1766,11 +1765,8 @@ public class SlimeIA : MonoBehaviour, IDano
 
         experienciaJaEntregue = true;
 
-        if (experienciaInimigo == null)
-            experienciaInimigo = GetComponent<ExperienciaInimigo>();
 
-        if (experienciaInimigo != null)
-            experienciaInimigo.EntregarExperiencia();
+        experienciaInimigo.EntregarExperiencia(ExperienciaAoMorrer);
     }
 
     /// <summary>
@@ -1807,10 +1803,8 @@ public class SlimeIA : MonoBehaviour, IDano
 
     private CarteiraReinPlayer EncontrarCarteiraReinDoPrimeiroAtacante()
     {
-        if (experienciaInimigo == null)
-            experienciaInimigo = GetComponent<ExperienciaInimigo>();
 
-        StatusPlayer status = experienciaInimigo != null ? experienciaInimigo.PrimeiroAtacante : null;
+        StatusPlayer status = experienciaInimigo.PrimeiroAtacante;
         if (status == null)
             status = ObterStatusPlayerEmTransform(ultimoPlayerResponsavel);
         if (status == null)
@@ -2195,6 +2189,7 @@ public class SlimeIA : MonoBehaviour, IDano
 
     public void ReiniciarAposRespawn()
     {
+        experienciaInimigo = new RecompensaExperiencia();
         if (movimentoVerde != null) movimentoVerde.Reiniciar();
         morto = false;
         experienciaJaEntregue = false;
@@ -2814,4 +2809,116 @@ public class SlimeIA : MonoBehaviour, IDano
         }
     }
     #endregion
+
+    private sealed class RecompensaExperiencia
+    {
+        public StatusPlayer PrimeiroAtacante { get; private set; }
+        private bool entregue;
+
+        public static int Calcular(int nivel)
+        {
+            return (int)System.Math.Min(int.MaxValue, 3L + (Mathf.Max(1, nivel) - 1L) * 2L);
+        }
+
+        public void RegistrarPrimeiroAtacante(GameObject origem)
+        {
+            if (PrimeiroAtacante != null || origem == null) return;
+
+            PrimeiroAtacante = origem.GetComponentInParent<StatusPlayer>()
+                ?? origem.transform.root.GetComponentInChildren<StatusPlayer>();
+            if (PrimeiroAtacante != null) return;
+
+            foreach (var componente in origem.GetComponentsInParent<MonoBehaviour>(true))
+            {
+                PrimeiroAtacante = EncontrarDono(componente);
+                if (PrimeiroAtacante != null) return;
+            }
+
+            foreach (var componente in origem.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                PrimeiroAtacante = EncontrarDono(componente);
+                if (PrimeiroAtacante != null) return;
+            }
+
+            var agarravel = origem.GetComponentInParent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+            if (agarravel == null) return;
+            foreach (var mao in agarravel.interactorsSelecting)
+            {
+                PrimeiroAtacante = mao.transform.GetComponentInParent<StatusPlayer>();
+                if (PrimeiroAtacante != null) return;
+            }
+        }
+
+        private static readonly string[] MetodosDono =
+        {
+            "GetStatusPlayerDonoAtual", "GetStatusPlayerDono", "GetStatusPlayerOwner",
+            "GetDonoAtual", "GetDono", "GetOwner", "ObterDonoAtual"
+        };
+
+        private static readonly string[] PropriedadesDono =
+        {
+            "DonoAtual", "Dono", "Owner", "StatusPlayerDonoAtual"
+        };
+
+        private static StatusPlayer EncontrarDono(MonoBehaviour componente)
+        {
+            if (componente == null) return null;
+            var tipo = componente.GetType();
+
+            foreach (string nome in MetodosDono)
+            {
+                var metodo = tipo.GetMethod(nome, System.Type.EmptyTypes);
+                if (metodo == null) continue;
+                var dono = ResolverStatus(metodo.Invoke(componente, null));
+                if (dono != null) return dono;
+            }
+
+            foreach (string nome in PropriedadesDono)
+            {
+                var propriedade = tipo.GetProperty(nome);
+                if (propriedade == null || !propriedade.CanRead || propriedade.GetIndexParameters().Length != 0) continue;
+                var dono = ResolverStatus(propriedade.GetValue(componente));
+                if (dono != null) return dono;
+            }
+
+            return null;
+        }
+
+        private static StatusPlayer ResolverStatus(object dono)
+        {
+            if (dono is Component componente && componente != null)
+                return componente.GetComponentInParent<StatusPlayer>();
+            if (dono is GameObject objeto && objeto != null)
+                return objeto.GetComponentInParent<StatusPlayer>();
+            return null;
+        }
+
+        public void EntregarExperiencia(int xp)
+        {
+            if (entregue || xp <= 0) return;
+            var jogador = PrimeiroAtacante;
+            if (jogador == null)
+                jogador = GameObject.FindWithTag("Player")?.GetComponentInChildren<StatusPlayer>()
+                    ?? UnityEngine.Object.FindFirstObjectByType<StatusPlayer>();
+            if (jogador == null) return;
+
+            entregue = true;
+            var grupo = jogador.GetComponentInParent<GrupoPlayer>();
+            if (grupo == null || !grupo.TemGrupoValido())
+            {
+                jogador.ReceberExperiencia(xp);
+                return;
+            }
+
+            var membros = grupo.GetMembrosValidos();
+            if (!membros.Contains(jogador)) membros.Add(jogador);
+            int parcela = xp / membros.Count;
+            int resto = xp % membros.Count;
+            foreach (var membro in membros)
+            {
+                int ganho = parcela + (membro == jogador ? resto : 0);
+                if (ganho > 0) membro.ReceberExperiencia(ganho);
+            }
+        }
+    }
 }

@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(TopeiraIA), true)]
-public sealed class TopeiraIAEditor : Editor
+public class TopeiraIAEditor : Editor
 {
     public override void OnInspectorGUI()
     {
@@ -39,6 +39,8 @@ public sealed class TopeiraIAEditor : Editor
             MonstroEditorUtil.DesenharDrop(serializedObject, "Chances do drop normal", "prefabsSpawnNormal", "chanceNada");
             MonstroEditorUtil.DesenharDrop(serializedObject, "Chances do drop de missão", "prefabsSpawnMissao", "chanceNadaMissao");
         }
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            EditorGUILayout.LabelField("XP ao morrer", (target is RaposaIA raposa ? raposa.ExperienciaAoMorrer : ((TopeiraIA)target).ExperienciaAoMorrer).ToString());
         DesenharBloco("Recompensa REIN", "darReinAoMorrer", "reinMinimo", "reinMaximo", "casasDecimaisSorteioRein");
         DesenharBloco("Gizmos", "desenharGizmos", "desenharGizmosSempre");
 
@@ -48,3 +50,6 @@ public sealed class TopeiraIAEditor : Editor
     private void DesenharBloco(string titulo, params string[] campos) =>
         FlechaEditor.DesenharBloco(serializedObject, titulo, campos);
 }
+
+[CustomEditor(typeof(RaposaIA))]
+public sealed class RaposaIAEditor : TopeiraIAEditor { }

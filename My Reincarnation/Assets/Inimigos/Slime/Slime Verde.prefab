@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 8900474738893511074}
   - component: {fileID: 910000000000000001}
   - component: {fileID: 2147096935551787010}
-  - component: {fileID: 8765013490624175002}
   - component: {fileID: 384598592461434145}
   m_Layer: 0
   m_Name: Slime Verde
@@ -202,19 +201,6 @@ MonoBehaviour:
     margemTransicaoMorte: 0.25
   rb: {fileID: 8900474738893511074}
   usarNavMeshAgent: 0
---- !u!114 &8765013490624175002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 332626234346422910}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9322d2d170d4fca97052ac0cfca6720, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
-  experienciaAoMorrer: 2
 --- !u!82 &384598592461434145
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1300,7 +1286,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0.44, y: 1.53}
+  m_AnchoredPosition: {x: 0, y: 1.53}
   m_SizeDelta: {x: 1, y: 1}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &4461697328249709024

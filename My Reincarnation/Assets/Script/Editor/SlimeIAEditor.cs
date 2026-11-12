@@ -34,6 +34,8 @@ public sealed class SlimeIAEditor : Editor
             DesenharDrop("Chances do drop normal", "prefabsSpawnNormal", "chanceNada");
             DesenharDrop("Chances do drop de missão", "prefabsSpawnMissao", "chanceNadaMissao");
         }
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            EditorGUILayout.LabelField("XP ao morrer", ((SlimeIA)target).ExperienciaAoMorrer.ToString());
         DesenharBloco("Recompensa REIN", "darReinAoMorrer", "reinMinimo", "reinMaximo", "casasDecimaisSorteioRein");
         DesenharBloco("Gizmos", "desenharGizmos", "desenharGizmosSempre");
 

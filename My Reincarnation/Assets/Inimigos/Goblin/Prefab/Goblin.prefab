@@ -286,7 +286,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 1
-  m_AdditionalShaderChannelsFlag: 0
+  m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
   m_SortingOrder: 0
@@ -415,7 +415,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 1
+  m_text: 7
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 5302535af1044152a457ed104f1f4b91, type: 2}
   m_sharedMaterial: {fileID: 2164040, guid: 5302535af1044152a457ed104f1f4b91, type: 2}
@@ -724,9 +724,6 @@ PrefabInstance:
       addedObject: {fileID: 8254489244228254811}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 2593457bc342b964f9661c19259376f1, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 7753509305178575408}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 2593457bc342b964f9661c19259376f1, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 4520528126492532863}
     - targetCorrespondingSourceObject: {fileID: 2018522135773944601, guid: 2593457bc342b964f9661c19259376f1, type: 3}
       insertIndex: -1
@@ -889,10 +886,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GloblinIA
   vidaMaxima: 30
-  nivelMonstro: 1
+  nivelMonstro: 7
   textoNivel: {fileID: 8562968697232129804}
   vidaAtual: 30
-  barraVida: {fileID: 5934290100088354011}
+  tempoAnimacaoDano: 0.35
+  tempoParaMorrer: 3
+  imagemBarraVida: {fileID: 0}
   canvasVida: {fileID: 7846304268891389927}
   buscarBarraVidaAutomaticamente: 1
   esconderCanvasAoMorrer: 1
@@ -906,20 +905,51 @@ MonoBehaviour:
   velocidadePatrulha: 1
   distanciaChegadaPonto: 0.35
   tempoObservando: 2
+  gerarPontosAutomaticamente: 1
+  quantidadePontosAuto: 4
+  raioPatrulhaAuto: 4
   tagPlayer: Player
-  distanciaVisao: 20
-  anguloVisao: 140
-  layerObstaculos:
+  raioCampoVisao: 8
+  anguloCampoVisao: 120
+  layersObstaculo:
     serializedVersion: 2
     m_Bits: 0
-  tempoMemoriaJogador: 4
-  distanciaAtaque: 1.8
+  distanciaIniciarPerseguicao: 5
   velocidadePerseguicao: 2
-  cooldownAtaque: 1.4
+  distanciaAtaque: 1.8
   danoAtaque: 15
-  tempoAnimacaoAtaque: 0.9
-  tempoParaDestruir: 2
-  animacao: {fileID: 8254489244228254811}
+  pontoOrigemAtaque: {fileID: 0}
+  alturaOrigemAtaque: 1.1
+  raioAtaque: 0.4
+  alcanceAtaque: 1.6
+  layersAtaque:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  atrasoImpactoAtaque: 0.4
+  cooldownAtaque: 1.4
+  idRespawnMonstro: Goblin
+  desenharGizmos: 1
+  desenharGizmosSempre: 1
+  alturaOlhos: 1.4
+  pontoOlhos: {fileID: 0}
+  prefabsSpawnNormal: []
+  prefabsSpawnMissao: []
+  darReinAoMorrer: 1
+  reinMinimo: 0.01
+  reinMaximo: 0.05
+  casasDecimaisSorteioRein: 5
+  audioSource: {fileID: 0}
+  somAndar: {fileID: 0}
+  somAtacar: {fileID: 0}
+  somDano: {fileID: 0}
+  somMorrer: {fileID: 0}
+  volumeAndar: 1
+  volumeAtacar: 1
+  volumeDano: 1
+  volumeMorrer: 1
+  animacao: {fileID: 0}
+  rb: {fileID: 0}
+  usarNavMeshAgent: 1
 --- !u!114 &8254489244228254811
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -932,19 +962,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f215d4fa1305bd54d8f06180cbe2111e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GoblinAnimacao
---- !u!114 &7753509305178575408
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6616180842985100433}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9322d2d170d4fca97052ac0cfca6720, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ExperienciaInimigo
-  experienciaAoMorrer: 12
 --- !u!82 &4520528126492532863
 AudioSource:
   m_ObjectHideFlags: 0

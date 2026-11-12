@@ -1,6 +1,6 @@
-﻿$ErrorActionPreference='Stop'
+$ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$source=Get-Content -Raw (Join-Path $project 'Assets/Script/Enemy/Slime/SlimeIA.cs')
+$source=Get-Content -Raw (Join-Path $project 'Assets/Script/Enemy/SlimeIA.cs')
 $motor=$source
 function Extract($text,$start,$end){$a=$text.IndexOf($start);if($a -lt 0){throw "Missing method $start"};$b=$text.IndexOf($end,$a+$start.Length);if($b -lt 0){throw "Missing end $end"};return $text.Substring($a,$b-$a)}
 $methods=(Extract $source '    private void AplicarDanoRecebido(' '    public void AcionarDano(')+(Extract $source '    private void CancelarImpactoAtaquePendente(' '    private void AtualizarAlvoPlayer(')+(Extract $source '    private void MudarEstado(' '    // ---------------------------------------------------------------')+(Extract $source '    private void Morrer()' '    private void EntregarExperienciaAoMorrer()')
